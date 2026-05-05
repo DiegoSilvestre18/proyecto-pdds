@@ -1,3 +1,5 @@
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import WorldMap from "./components/map/WorldMap";
 import AirportDetailPanel from "./components/controlTower/AirportDetailPanel";
 
@@ -21,6 +23,7 @@ import "./App.css";
 // Patron Container-Presenter: App solo compone UI y delega estado/reglas de negocio al hook.
 // Esto reduce acoplamiento, facilita testing y mantiene componentes visuales enfocados.
 const App = () => {
+  const navigate = useNavigate();
   const {
     activeAircraft,
     activeAirportRows,
@@ -28,7 +31,12 @@ const App = () => {
     activeTab,
     airportByCode,
     airportNodes,
+    comparisonData,
     elapsedOperationTime,
+    eventLog,
+    currentEpochTime,
+    totalBagsWaiting,
+    activeShipments,
     handleTabChange,
     hideAirportDetail,
     isAirportDetailOpen,
@@ -38,6 +46,7 @@ const App = () => {
     isScenarioConfigOpen,
     isSimScenario,
     kpiCards,
+    liveStatus,
     panelVisibility,
     selectedAircraftId,
     selectedAirport,
@@ -47,6 +56,7 @@ const App = () => {
     selectedAlgorithm,
     selectedFromAirport,
     selectedToAirport,
+    sessionId,
     setSelectedAircraftId,
     setSelectedAlgorithm,
     setSimSpeed,
@@ -54,6 +64,11 @@ const App = () => {
     showAirportDetail,
     simSpeed,
     simState,
+    startSimulation,
+    startDayToDaySimulation,
+    startCollapseSimulation,
+    exportSimulationExcel,
+    resetSimulation,
     summary,
     tabs,
     toggleDock,
@@ -62,10 +77,38 @@ const App = () => {
     toggleScenarioConfig,
   } = useControlTowerController();
 
+  // Estados para controlar el Zoom y Pan del mapa
+  const [mapZoom, setMapZoom] = useState(1);
+  const [mapCenter, setMapCenter] = useState([0, 20]);
+
+  const handleZoomIn = () => setMapZoom((z) => Math.min(z * 1.5, 8));
+  const handleZoomOut = () => setMapZoom((z) => Math.max(z / 1.5, 1));
+  const handleResetMap = () => {
+    setMapZoom(1);
+    setMapCenter([0, 20]);
+  };
+
   return (
     <div
       className={`control-tower ${isCollapseScenario ? "control-tower--collapse" : ""}`}
     >
+      {/* ── Botón de Experimentación Numérica ─────────────────────────────── */}
+      <button
+        id="btn-experiment-nav"
+        onClick={() => navigate('/experiment')}
+        title="Ir al módulo de Experimentación Numérica"
+        style={{
+          position: 'fixed', top: 12, right: 16, zIndex: 9999,
+          background: 'linear-gradient(90deg, #7c3aed, #4f46e5)',
+          color: 'white', border: 'none', borderRadius: 8,
+          padding: '7px 14px', cursor: 'pointer',
+          fontSize: 12, fontWeight: 700, letterSpacing: 0.5,
+          boxShadow: '0 4px 15px rgba(124,58,237,0.4)',
+        }}
+      >
+        🧪 Experimentación Numérica
+      </button>
+
       <ScenarioHeader
         tabs={tabs}
         activeTab={activeTab}
@@ -91,6 +134,11 @@ const App = () => {
 
       <main className="ct-main">
         <section className="ct-map-area" aria-label="Mapa de operaciones">
+          {liveStatus?.isCollapseMode && (
+            <div style={{ position: 'absolute', top: 0, left: 0, right: 0, background: '#ef4444', color: 'white', textAlign: 'center', padding: '6px', fontWeight: 'bold', zIndex: 100, letterSpacing: '2px', fontSize: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+              ⚠️ MODO CRISIS: RESILIENCIA ALNS ACTIVA ⚠️
+            </div>
+          )}
           <WorldMap
             airports={airportNodes}
             activeMetrics={activeMetrics}
@@ -103,6 +151,12 @@ const App = () => {
             onAirportSelect={showAirportDetail}
             selectedAircraftId={selectedAircraftId}
             onAircraftSelect={setSelectedAircraftId}
+            zoom={mapZoom}
+            center={mapCenter}
+            onMoveEnd={(position) => {
+              setMapZoom(position.zoom);
+              setMapCenter(position.coordinates);
+            }}
           />
 
           <DayToDayConfig
@@ -110,18 +164,33 @@ const App = () => {
             onClose={toggleScenarioConfig}
             selectedAlgorithm={selectedAlgorithm}
             onAlgorithmChange={setSelectedAlgorithm}
+            activeShipments={activeShipments}
+            totalBagsWaiting={totalBagsWaiting}
+            currentEpochTime={currentEpochTime}
+            simState={simState}
+            liveStatus={liveStatus}
+            onStartDayToDay={startDayToDaySimulation}
+            onReset={resetSimulation}
           />
           <PeriodSimConfig
             isOpen={isScenarioConfigOpen && activeTab === "periodo"}
             onClose={toggleScenarioConfig}
             selectedAlgorithm={selectedAlgorithm}
             onAlgorithmChange={setSelectedAlgorithm}
+            onStart={(dias, startDate) => startDayToDaySimulation(startDate, dias)}
+            liveStatus={liveStatus}
+            simState={simState}
+            sessionId={sessionId}
+            onExportExcel={exportSimulationExcel}
+            onReset={resetSimulation}
           />
           <CollapseSimConfig
             isOpen={isScenarioConfigOpen && activeTab === "colapso"}
             onClose={toggleScenarioConfig}
             selectedAlgorithm={selectedAlgorithm}
             onAlgorithmChange={setSelectedAlgorithm}
+            onStart={startCollapseSimulation}
+            liveStatus={liveStatus}
           />
 
           <div className="ct-floating-rail ct-floating-rail--left">
@@ -136,6 +205,16 @@ const App = () => {
               transitByContinent={summary.transitByContinent}
               onHide={() => togglePanel("transitInventory")}
             />
+            {eventLog && eventLog.length > 0 && (
+              <aside className="ct-panel ct-panel--event-log" style={{ maxHeight: '200px', overflowY: 'auto', background: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(8px)', marginTop: '8px' }}>
+                <div className="ct-panel-header"><p>LOG DE EVENTOS</p></div>
+                <div style={{ padding: '0.75rem', fontSize: '11px', fontFamily: 'monospace', color: '#9ca3af', display: 'flex', flexDirection: 'column-reverse' }}>
+                  {eventLog.map((log, i) => (
+                    <div key={i} style={{ marginBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.05)', paddingBottom: '4px' }}>{log}</div>
+                  ))}
+                </div>
+              </aside>
+            )}
           </div>
 
           <div className="ct-panel-stack ct-panel-stack--right">
@@ -161,6 +240,8 @@ const App = () => {
               <AlgorithmComparisonPanel
                 isVisible={panelVisibility.comparison}
                 onHide={() => togglePanel("comparison")}
+                sessionId={sessionId}
+                comparisonData={comparisonData}
               />
               <ShipmentDetailPanel
                 isVisible={panelVisibility.shipmentDetail}
@@ -169,11 +250,11 @@ const App = () => {
             </div>
           </div>
 
-          <div className="ct-side-controls" aria-hidden="true">
-            <button type="button">+</button>
-            <button type="button">-</button>
-            <button type="button">◎</button>
-            <button type="button">✋</button>
+          <div className="ct-side-controls" aria-label="Controles del mapa">
+            <button type="button" onClick={handleZoomIn} title="Acercar">+</button>
+            <button type="button" onClick={handleZoomOut} title="Alejar">-</button>
+            <button type="button" onClick={handleResetMap} title="Restablecer vista">◎</button>
+            <button type="button" title="Mover mapa (Arrastrar)">✋</button>
           </div>
         </section>
       </main>

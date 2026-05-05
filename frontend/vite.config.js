@@ -7,4 +7,16 @@ export default defineConfig({
   optimizeDeps: {
     include: ['react-simple-maps', 'prop-types'],
   },
+  server: {
+    proxy: {
+      // Redirige /api/v1/... → http://localhost:8080/api/v1/...
+      // Esto evita CORS en desarrollo sin modificar el backend
+      '/api': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+        secure: false,
+      },
+    },
+  },
 })
+

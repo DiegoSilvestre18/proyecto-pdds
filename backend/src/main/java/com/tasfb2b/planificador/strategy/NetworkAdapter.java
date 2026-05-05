@@ -5,6 +5,7 @@ import com.tasfb2b.superlote.domain.SuperLot;
 import com.tasfb2b.vuelo.domain.Vuelo;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public interface NetworkAdapter {
@@ -13,6 +14,19 @@ public interface NetworkAdapter {
     List<Vuelo> findBestRoute(Aeropuerto origen,
                               Aeropuerto destino,
                               SuperLot lot);
+
+    /**
+     * Ruta óptima con filtrado por capacidad restante.
+     * Dijkstra ignora vuelos cuya capacidad disponible sea ≤ 0.
+     * Usar cuando se construyen rutas de forma secuencial para evitar
+     * que varios lotes compitan por el mismo vuelo lleno.
+     *
+     * @param remainingCap mapa vueloId → capacidad restante en ese vuelo
+     */
+    List<Vuelo> findBestRoute(Aeropuerto origen,
+                              Aeropuerto destino,
+                              SuperLot lot,
+                              Map<Long, Integer> remainingCap);
 
     /**
      * Ruta alternativa que excluye los vuelos indicados.

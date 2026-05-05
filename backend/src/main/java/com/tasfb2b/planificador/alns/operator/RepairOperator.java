@@ -15,14 +15,16 @@ import java.util.Map;
 public interface RepairOperator {
 
     /**
-     * @param partialRoutes rutas actuales sin los lotes removidos
-     * @param removed       lotes que deben ser reinsertados
-     * @param airportMap    mapa ICAO → Aeropuerto
+     * @param partialRoutes      rutas actuales sin los lotes removidos
+     * @param removed            lotes que deben ser reinsertados
+     * @param airportMap         mapa ICAO → Aeropuerto
+     * @param capacidadDisponible mapa vueloId → capacidad restante (vacío = sin restricción)
      * @return nueva lista de rutas con los lotes removidos ya insertados
      */
     List<Route> repair(List<Route> partialRoutes,
                        List<SuperLot> removed,
-                       Map<String, Aeropuerto> airportMap);
+                       Map<String, Aeropuerto> airportMap,
+                       Map<Long, Integer> capacidadDisponible);
 
     /** Nombre identificador para el tracker de pesos. */
     String name();

@@ -20,6 +20,9 @@ public class Route {
     private long arrivalTime;
     private long deadline;
 
+    @Builder.Default
+    private String status = "normal";
+
     // ── DERIVADOS ─────────────────────────────────────
 
     public boolean isIntercontinental() {

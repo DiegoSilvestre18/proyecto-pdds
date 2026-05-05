@@ -1,4 +1,4 @@
-import { ComposableMap, Geographies, Geography, Marker, Line } from "react-simple-maps";
+import { ComposableMap, Geographies, Geography, Marker, Line, ZoomableGroup } from "react-simple-maps";
 import { interpolateCoordinates } from "../../data/airportsData";
 
 // TopoJSON servido localmente — sin dependencia de red
@@ -32,9 +32,9 @@ const WorldMap = ({
   onAirportSelect = () => {},
   selectedAircraftId = null,
   onAircraftSelect = () => {},
-  // zoom y center reservados para fase futura (ZoomableGroup)
-  // zoom = 1,
-  // center = [0, 0],
+  zoom = 1,
+  center = [0, 20],
+  onMoveEnd = () => {},
 }) => (
   <div className="ct-world-map" aria-label="Mapa de operaciones global">
     <ComposableMap
@@ -42,7 +42,8 @@ const WorldMap = ({
       projectionConfig={PROJECTION_CONFIG}
       className="ct-world-map__svg"
     >
-      {/* ── Países ──────────────────────────────────────────────────────────── */}
+      <ZoomableGroup zoom={zoom} center={center} onMoveEnd={onMoveEnd} maxZoom={8}>
+        {/* ── Países ──────────────────────────────────────────────────────────── */}
       <Geographies geography={GEO_URL}>
         {({ geographies }) =>
           geographies.map((geo) => (
@@ -89,35 +90,35 @@ const WorldMap = ({
         if (!from || !to) return null;
         const position = interpolateCoordinates(from, to, plane.progress);
         const isBlocked = plane.status === "blocked";
+        const isCancelled = plane.status === "cancelled";
+        const isRescued = plane.status === "rescued";
 
         return (
-          <Marker key={`plane-${plane.id}`} coordinates={position}>
+          <Marker
+            key={`plane-${plane.id}`}
+            coordinates={position}
+            style={{ transition: "transform 0.5s linear" }}
+          >
             <g
               className={`ct-aircraft-pin ct-aircraft-pin--${plane.status} ${
                 selectedAircraftId === plane.id ? "ct-aircraft-pin--selected" : ""
               }`}
               role="button"
               tabIndex={0}
-              aria-label={`Vuelo ${plane.from} → ${plane.to}${isBlocked ? " — BLOQUEADO" : ""}`}
+              aria-label={`Vuelo ${plane.from} → ${plane.to}${isBlocked ? " — BLOQUEADO" : ""}${isCancelled ? " — CANCELADO" : ""}${isRescued ? " — RESCATADO" : ""}`}
               onClick={() => onAircraftSelect(plane.id)}
               onKeyDown={(e) => e.key === "Enter" && onAircraftSelect(plane.id)}
-              style={{ cursor: "pointer" }}
+              style={{ cursor: "pointer", color: isCancelled ? '#ef4444' : isRescued ? '#3b82f6' : undefined }}
             >
-              {isBlocked ? (
-                <text
-                  textAnchor="middle"
-                  dominantBaseline="central"
-                  className="ct-aircraft-pin__blocked"
-                  y={0}
-                >
-                  ✕
-                </text>
-              ) : (
-                <path
-                  d="M0,-11 L3,-4 L11,-4 L5,2 L7,11 L0,7 L-7,11 L-5,2 L-11,-4 L-3,-4 Z"
-                  className="ct-aircraft-pin__icon"
-                />
-              )}
+              <text
+                textAnchor="middle"
+                dominantBaseline="central"
+                className={isBlocked ? "ct-aircraft-pin__blocked" : "ct-aircraft-pin__icon"}
+                y={0}
+                style={{ fontSize: isBlocked || isCancelled ? "12px" : "16px", fill: "currentColor" }}
+              >
+                {isCancelled ? "💥" : isBlocked ? "⚠️" : "✈"}
+              </text>
             </g>
           </Marker>
         );
@@ -167,6 +168,7 @@ const WorldMap = ({
           </Marker>
         );
       })}
+      </ZoomableGroup>
     </ComposableMap>
   </div>
 );

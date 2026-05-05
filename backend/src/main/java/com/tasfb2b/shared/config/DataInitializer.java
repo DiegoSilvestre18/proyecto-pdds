@@ -45,10 +45,10 @@ public class DataInitializer {
             // 2. Vuelos
             vueloService.cargarDesdeArchivo(basePath.resolve("planes_vuelo.txt"));
 
-            // 3. Envíos (múltiples archivos)
-            cargarEnvios(basePath);
+            // 3. Envíos (múltiples archivos) - DESACTIVADO PARA CARGA DIFERIDA
+            // cargarEnvios(basePath);
 
-            System.out.println("─── Datos cargados correctamente ───");
+            System.out.println("─── Datos base cargados correctamente (Sin envíos) ───");
         };
     }
 
@@ -65,15 +65,27 @@ public class DataInitializer {
                         .filter(path -> path.getFileName().toString().startsWith("_envios_"))
                         .sorted()
                         .forEach(path -> {
-                            try {
-                                List<String> lineas = Files.readAllLines(path);
+                            try (java.util.stream.Stream<String> lineas = Files.lines(path)) {
+
+                                // Filtro de fecha: solo líneas cuyo campo[1] empiece con "2029"
+                                // Formato: CODIGO-YYYYMMDD-HH-MM-DESTINO-CANTIDAD-CLIENTE
+                                List<String> filtradas = lineas
+                                        .filter(l -> {
+                                            int guion = l.indexOf('-');
+                                            return guion >= 0 && l.length() > guion + 4
+                                                    && l.substring(guion + 1, guion + 5).equals("2029");
+                                        })
+                                        .collect(java.util.stream.Collectors.toList());
+
+                                if (filtradas.isEmpty()) return; // archivo sin datos 2029, saltar
 
                                 envioService.cargarDesdeLineasArchivo(
                                         path.getFileName().toString(),
-                                        lineas
+                                        filtradas
                                 );
 
-                                System.out.println("✔ Cargado: " + path.getFileName());
+                                System.out.println("✔ Cargado: " + path.getFileName()
+                                        + " (" + filtradas.size() + " líneas 2029)");
 
                             } catch (Exception e) {
                                 throw new RuntimeException("Error cargando " + path, e);

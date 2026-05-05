@@ -28,7 +28,7 @@ public class EnvioService {
 
     private static final int BATCH_SIZE = 500;
 
-    @Transactional
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     public void cargarDesdeLineasArchivo(String nombreArchivo, List<String> lineas) {
 
         Map<String, Aeropuerto> aeropuertoCache = aeropuertoRepo.findAll()
@@ -37,12 +37,20 @@ public class EnvioService {
 
         String origenIcao = NombreArchivoParser.extraerIcao(nombreArchivo);
         Aeropuerto origen = aeropuertoCache.get(origenIcao);
-        if (origen == null) throw new RuntimeException("Origen no encontrado: " + origenIcao);
+        if (origen == null) {
+            System.err.println("[EnvioService] Origen no registrado, se omite: " + nombreArchivo);
+            return;
+        }
 
         List<Envio> batch = new ArrayList<>(BATCH_SIZE);
 
         for (String linea : lineas) {
-            ParsedEnvio parsed = EnvioParser.parse(linea);
+            ParsedEnvio parsed;
+            try {
+                parsed = EnvioParser.parse(linea);
+            } catch (Exception e) {
+                continue; // linea malformada, se ignora
+            }
             if (parsed == null) continue;
 
             Aeropuerto destino = aeropuertoCache.get(parsed.destinoIcao());
@@ -62,13 +70,65 @@ public class EnvioService {
                     .build());
 
             if (batch.size() == BATCH_SIZE) {
-                envioRepo.saveAll(batch);
+                try {
+                    envioRepo.saveAll(batch);
+                } catch (Exception ignored) {
+                    // Lote con duplicados o restriccion de integridad: se omite y se continua
+                }
                 batch.clear();
             }
         }
 
         if (!batch.isEmpty()) {
-            envioRepo.saveAll(batch);
+            try {
+                envioRepo.saveAll(batch);
+            } catch (Exception ignored) {
+                // idem
+            }
         }
+    }
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    public void cargarPorFecha(LocalDate inicio, LocalDate fin, String dataPath) {
+        java.nio.file.Path folder = java.nio.file.Path.of(dataPath);
+        String startStr = inicio.format(DateTimeFormatter.BASIC_ISO_DATE);
+        String endStr = fin.format(DateTimeFormatter.BASIC_ISO_DATE);
+
+        try (java.nio.file.DirectoryStream<java.nio.file.Path> stream = java.nio.file.Files.newDirectoryStream(folder, "_envios_*.txt")) {
+            for (java.nio.file.Path archivo : stream) {
+                List<String> lineasFecha = new java.util.ArrayList<>();
+                try (java.io.BufferedReader br = java.nio.file.Files.newBufferedReader(archivo)) {
+                    String linea;
+                    while ((linea = br.readLine()) != null) {
+                        int guion = linea.indexOf('-');
+                        if (guion < 0 || linea.length() <= guion + 8) continue;
+                        String f = linea.substring(guion + 1, guion + 9);
+                        if (f.compareTo(startStr) >= 0 && f.compareTo(endStr) <= 0) {
+                            lineasFecha.add(linea);
+                        }
+                    }
+                }
+                if (!lineasFecha.isEmpty()) {
+                    cargarDesdeLineasArchivo(archivo.getFileName().toString(), lineasFecha);
+                }
+            }
+        } catch (Exception e) {
+            throw new RuntimeException("Error en carga bajo demanda", e);
+        }
+    }
+
+    /**
+     * Devuelve la demanda REAL de maletas por día en el rango dado.
+     * Fuente: tabla Envio en BD (cargada previamente con cargarPorFecha).
+     * Clave del mapa: "YYYYMMDD", valor: suma de cantidadMaletas de todos los aeropuertos.
+     */
+    @Transactional(readOnly = true)
+    public java.util.Map<String, Long> getDemandaRealPorFecha(LocalDate inicio, LocalDate fin) {
+        return envioRepo.findDailyTotalsByRange(inicio, fin).stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        dt -> dt.getFecha().format(DateTimeFormatter.BASIC_ISO_DATE),
+                        EnvioRepository.DailyTotal::getTotal,
+                        Long::sum,
+                        java.util.TreeMap::new
+                ));
     }
 }

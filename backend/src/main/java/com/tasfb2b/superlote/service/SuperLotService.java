@@ -79,6 +79,56 @@ public class SuperLotService {
         return superLots;
     }
 
+    /**
+     * Igual que agruparEnvios() pero filtrando solo los envíos de una fecha específica.
+     * Usado por el loop diario de SimulationService para obtener la demanda REAL de cada día.
+     */
+    @Transactional(readOnly = true)
+    public List<SuperLot> agruparEnviosPorFecha(java.time.LocalDate fecha) {
+
+        Map<String, Accumulator> grupos = new HashMap<>();
+
+        try (Stream<EnvioResumen> stream = envioRepo.streamResumenesPorFecha(fecha)) {
+            stream.forEach(e -> {
+                String key = e.getOrigenIcao() + "-" + e.getDestinoIcao();
+
+                long readyTime = java.time.LocalDateTime
+                        .of(e.getFecha(), e.getHora())
+                        .toInstant(ZoneOffset.UTC)
+                        .toEpochMilli();
+
+                grupos.computeIfAbsent(key, k -> new Accumulator(
+                        0,
+                        e.getOrigenContinente(),
+                        e.getDestinoContinente(),
+                        readyTime
+                )).add(e.getCantidadMaletas(), readyTime);
+            });
+        }
+
+        List<SuperLot> superLots = new ArrayList<>();
+        int id = 0;
+
+        for (var entry : grupos.entrySet()) {
+            String[] partes = entry.getKey().split("-");
+            Accumulator acc = entry.getValue();
+
+            boolean intercontinental = acc.origenCont != acc.destinoCont;
+
+            long sla = intercontinental ? 48L * 3600_000 : 24L * 3600_000;
+
+            SuperLot lot = new SuperLot(
+                    id++, partes[0], partes[1],
+                    acc.totalMaletas, acc.minReadyTime,
+                    sla, intercontinental, 0);
+
+            lot.validate();
+            superLots.add(lot);
+        }
+
+        return superLots;
+    }
+
     // ─────────────────────────────
     // ACCUMULATOR INTERNO
     // ─────────────────────────────

@@ -28,16 +28,18 @@ public class GreedyRepairOp implements RepairOperator {
     @Override
     public List<Route> repair(List<Route> partialRoutes,
                               List<SuperLot> removed,
-                              Map<String, Aeropuerto> airportMap) {
+                              Map<String, Aeropuerto> airportMap,
+                              Map<Long, Integer> capacidadDisponible) {
 
         List<Route> result = new ArrayList<>(partialRoutes);
 
-        // Insertar primero los más urgentes (menor SLA = deadline más próximo)
+        // Insertar primero los más urgentes (menor SLA = deadline más próximo).
+        // Pasamos capacidadDisponible real: Dijkstra sabrá qué vuelos están llenos.
         removed.stream()
                 .sorted(Comparator.comparingLong(SuperLot::getSla))
                 .forEach(lot -> {
                     Route r = routeBuilder.build(lot, airportMap,
-                            new HashMap<>(), new HashMap<>());
+                            new HashMap<>(), capacidadDisponible);
                     result.add(r);
                 });
 

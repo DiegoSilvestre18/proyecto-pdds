@@ -4,6 +4,8 @@ import com.tasfb2b.aeropuerto.domain.Aeropuerto;
 import com.tasfb2b.superlote.domain.SuperLot;
 import com.tasfb2b.vuelo.domain.Vuelo;
 import com.tasfb2b.vuelo.repository.VueloRepository;
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -20,6 +22,20 @@ import java.util.Collections;
 public class NetworkAdapterImpl implements NetworkAdapter {
 
     private final VueloRepository repo;
+
+    // EntityManager para hacer JOIN FETCH y evitar LazyInitializationException
+    // en hilos @Async que no tienen sesión JPA por defecto.
+    @PersistenceContext
+    private EntityManager em;
+
+    /**
+     * Período de repetición de vuelos (ms).
+     * Todos los vuelos del dataset académico TASF.B2B son diarios.
+     * Extraemos la constante para que sea documentable y testeable;
+     * un futuro upgrade puede leer la frecuencia por vuelo desde la BD.
+     */
+    static final long PERIODO_DIARIO_MS = 24L * 60 * 60 * 1000;
+
     // Volatile para asegurar visibilidad entre hilos sin bloquear findBestRoute
     private volatile Map<String, List<Vuelo>> graph;
 
@@ -31,7 +47,16 @@ public class NetworkAdapterImpl implements NetworkAdapter {
         if (graph == null) {
             synchronized (this) {
                 if (graph == null) {
-                    List<Vuelo> vuelos = repo.findAll();
+                    // JOIN FETCH garantiza que origen y destino se cargan EAGERLY
+                    // dentro de la misma query, evitando proxies sin sesión.
+                    // Funciona tanto en hilos HTTP como en hilos @Async.
+                    @SuppressWarnings("unchecked")
+                    List<Vuelo> vuelos = em.createQuery(
+                            "SELECT DISTINCT v FROM Vuelo v " +
+                            "LEFT JOIN FETCH v.origen " +
+                            "LEFT JOIN FETCH v.destino"
+                    ).getResultList();
+
                     Map<String, List<Vuelo>> tempGraph = new HashMap<>();
                     for (Vuelo v : vuelos) {
                         tempGraph.computeIfAbsent(
@@ -48,9 +73,16 @@ public class NetworkAdapterImpl implements NetworkAdapter {
 
     @Override
     public List<Vuelo> findBestRoute(Aeropuerto origen, Aeropuerto destino, SuperLot lot) {
-        // 1. ELIMINADO EL CACHE: Evita inconsistencias y OOM.
-        // 2. DETERMINISMO: Usamos el tiempo del lote, no el del sistema.
-        return calcularRuta(origen, destino, lot.getReadyTime(), Collections.emptySet());
+        return calcularRuta(origen, destino, lot.getReadyTime(),
+                Collections.emptySet(), Collections.emptyMap());
+    }
+
+    @Override
+    public List<Vuelo> findBestRoute(Aeropuerto origen, Aeropuerto destino,
+                                     SuperLot lot, Map<Long, Integer> remainingCap) {
+        // Dijkstra consciente de capacidad: filtra vuelos sin espacio disponible.
+        return calcularRuta(origen, destino, lot.getReadyTime(),
+                Collections.emptySet(), remainingCap);
     }
 
     @Override
@@ -58,7 +90,8 @@ public class NetworkAdapterImpl implements NetworkAdapter {
                                              Aeropuerto destino,
                                              SuperLot lot,
                                              Set<Long> excludedFlightIds) {
-        return calcularRuta(origen, destino, lot.getReadyTime(), excludedFlightIds);
+        return calcularRuta(origen, destino, lot.getReadyTime(),
+                excludedFlightIds, Collections.emptyMap());
     }
 
     @Override
@@ -75,7 +108,8 @@ public class NetworkAdapterImpl implements NetworkAdapter {
     private List<Vuelo> calcularRuta(Aeropuerto origen,
                                      Aeropuerto destino,
                                      long startTime,
-                                     Set<Long> excludedFlightIds) {
+                                     Set<Long> excludedFlightIds,
+                                     Map<Long, Integer> remainingCap) {
 
         Map<String, List<Vuelo>> localGraph = getGraph();
         String destIcao = destino.getIcaoCode();
@@ -87,7 +121,6 @@ public class NetworkAdapterImpl implements NetworkAdapter {
         pq.add(new Node(origen.getIcaoCode(), startTime));
         bestTime.put(origen.getIcaoCode(), startTime);
 
-        // Eliminamos maxIter. Con un grafo de ~3k nodos, Dijkstra converge rápido.
         while (!pq.isEmpty()) {
             Node current = pq.poll();
 
@@ -96,7 +129,16 @@ public class NetworkAdapterImpl implements NetworkAdapter {
 
             for (Vuelo v : localGraph.getOrDefault(current.airport, List.of())) {
                 if (Boolean.TRUE.equals(v.getCancelled())) continue;
-                if (excludedFlightIds.contains(v.getId())) continue;  // exclusión para backup
+                if (excludedFlightIds.contains(v.getId())) continue; // exclusión para backup
+
+                // Fix Dijkstra-ciego: saltar vuelos sin capacidad disponible.
+                // Un vuelo con cap=0 no puede absorber ningún lote; excluirlo fuerza
+                // a Dijkstra a encontrar una ruta alternativa con espacio real.
+                // Si remainingCap está vacío (modo legacy), este filtro no aplica.
+                if (!remainingCap.isEmpty()) {
+                    int capRestante = remainingCap.getOrDefault(v.getId(), v.getCapacidadTotal());
+                    if (capRestante <= 0) continue;
+                }
 
                 long wait = calcularEsperaMatematica(current.time, v);
                 long newTime = current.time + wait + v.getDuracionMs();
@@ -117,12 +159,13 @@ public class NetworkAdapterImpl implements NetworkAdapter {
         long dep = v.getDepartureEpoch();
         if (currentTime <= dep) return dep - currentTime;
 
-        // Aritmética en lugar de bucle while
-        long periodoMs = 24L * 60 * 60 * 1000;
+        // Aritmética modular: calcula cuánto falta para el próximo ciclo del vuelo.
+        // PERIODO_DIARIO_MS es configurable (campo estático documentado = 24h).
+        // Asunción académica: todos los vuelos del dataset TASF.B2B son diarios.
+        // Un upgrade futuro leería v.getFrecuenciaDias() para vuelos no-diarios.
         long diff = currentTime - dep;
-        long saltosNecesarios = (diff / periodoMs) + 1;
-
-        return (dep + (saltosNecesarios * periodoMs)) - currentTime;
+        long saltosNecesarios = (diff / PERIODO_DIARIO_MS) + 1;
+        return (dep + (saltosNecesarios * PERIODO_DIARIO_MS)) - currentTime;
     }
 
     private List<Vuelo> reconstruirRuta(Map<String, Vuelo> prev, String origen, String destino) {

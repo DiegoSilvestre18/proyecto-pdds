@@ -26,7 +26,12 @@ public class RouteBuilder {
         Aeropuerto origen  = airportMap.get(lot.getOrigenIcao());
         Aeropuerto destino = airportMap.get(lot.getDestinoIcao());
 
-        List<Vuelo> flights = network.findBestRoute(origen, destino, lot);
+        // Si el caller provee un mapa de capacidad real (ALNS con estado acumulado),
+        // usamos el overload consciente de capacidad. Dijkstra filtrará vuelos llenos.
+        // Si el mapa está vacío (modo legacy/HGA), usamos el Dijkstra estándar.
+        List<Vuelo> flights = capacidadVuelo.isEmpty()
+                ? network.findBestRoute(origen, destino, lot)
+                : network.findBestRoute(origen, destino, lot, capacidadVuelo);
 
         if (flights == null || flights.isEmpty()) {
             return Route.builder()

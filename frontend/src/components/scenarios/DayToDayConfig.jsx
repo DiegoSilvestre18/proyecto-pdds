@@ -1,117 +1,57 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 
-const MOCK_AIRLINES = [
-  { id: "AL-001", name: "LATAM Airlines" },
-  { id: "AL-002", name: "Iberia" },
-  { id: "AL-003", name: "Air France" },
-  { id: "AL-004", name: "Japan Airlines" },
-  { id: "AL-005", name: "Emirates" },
-];
-
-const MOCK_SHIPMENTS = [
-  {
-    id: "ENV-10421",
-    origin: "LIM",
-    dest: "MAD",
-    bags: 12,
-    airline: "LATAM Airlines",
-    status: "en tránsito",
-    sla: "green",
-  },
-  {
-    id: "ENV-10422",
-    origin: "CDG",
-    dest: "DEL",
-    bags: 8,
-    airline: "Air France",
-    status: "en tránsito",
-    sla: "amber",
-  },
-  {
-    id: "ENV-10423",
-    origin: "HND",
-    dest: "CBR",
-    bags: 5,
-    airline: "Japan Airlines",
-    status: "pendiente",
-    sla: "green",
-  },
-  {
-    id: "ENV-10424",
-    origin: "BOG",
-    dest: "EZE",
-    bags: 20,
-    airline: "LATAM Airlines",
-    status: "en tránsito",
-    sla: "red",
-  },
-  {
-    id: "ENV-10425",
-    origin: "MAD",
-    dest: "LHR",
-    bags: 3,
-    airline: "Iberia",
-    status: "entregado",
-    sla: "green",
-  },
-  {
-    id: "ENV-10426",
-    origin: "RUH",
-    dest: "PEK",
-    bags: 15,
-    airline: "Emirates",
-    status: "en tránsito",
-    sla: "amber",
-  },
-];
-
-const MOCK_LIVE_ARRIVALS = [
-  { time: "14:28:03", airport: "LIM", bags: 4 },
-  { time: "14:28:11", airport: "CDG", bags: 7 },
-  { time: "14:28:22", airport: "PEK", bags: 2 },
-  { time: "14:28:35", airport: "MEX", bags: 9 },
-];
+// ── DayToDayConfig — Panel del escenario "Operación Día a Día" ──────────────
+// Muestra monitoreo en vivo y permite iniciar la simulación con la fecha real
+// del dispositivo. No expone selector de fecha ni rango — eso es para "Periodo".
 
 function DayToDayConfig({
   isOpen,
   onClose,
   selectedAlgorithm,
   onAlgorithmChange,
+  activeShipments,
+  totalBagsWaiting,
+  currentEpochTime,
+  simState,
+  liveStatus,
+  onStartDayToDay,
+  onReset,
 }) {
+  // ── Todos los hooks PRIMERO (antes de cualquier return condicional) ─────────
   const [activeSection, setActiveSection] = useState("envios");
 
-  if (!isOpen) {
-    return null;
-  }
+  const todayStr = useMemo(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+  }, []);
+
+  // ── Early return DESPUÉS de todos los hooks ───────────────────────────────
+  if (!isOpen) return null;
+
+  const isRunning   = simState === "running";
+  const isCompleted = simState === "completed";
 
   const sections = [
-    { key: "envios", label: "Envíos" },
-    { key: "registro", label: "Registrar" },
-    { key: "vuelos", label: "Vuelos" },
-    { key: "config", label: "Config" },
+    { key: "envios",  label: "Monitor" },
+    { key: "vuelos",  label: "Vuelos" },
+    { key: "config",  label: "Config" },
   ];
 
   return (
-    <aside
-      className="ct-scenario-config ct-scenario-config--vivo"
-      aria-label="Configuración día a día"
-    >
+    <aside className="ct-scenario-config ct-scenario-config--vivo" aria-label="Configuración día a día">
+
+      {/* Header */}
       <div className="ct-scenario-config__header">
         <div>
           <p className="ct-scenario-config__label">ESCENARIO ACTIVO</p>
           <h3 className="ct-scenario-config__title">Operación Día a Día</h3>
         </div>
-        <button
-          type="button"
-          className="ct-scenario-config__close"
-          onClick={onClose}
-        >
-          ✕
-        </button>
+        <button type="button" className="ct-scenario-config__close" onClick={onClose}>✕</button>
       </div>
 
+      {/* Nav */}
       <nav className="ct-scenario-config__nav">
-        {sections.map((s) => (
+        {sections.map(s => (
           <button
             key={s.key}
             type="button"
@@ -124,195 +64,171 @@ function DayToDayConfig({
       </nav>
 
       <div className="ct-scenario-config__body">
+
+        {/* ── INICIAR / ESTADO ─────────────────────────────────────────────── */}
+        <div className="ct-config-section" style={{ marginBottom: 0 }}>
+          {!isRunning && !isCompleted ? (
+          <>
+            <p style={{ fontSize: 11, color: "#64748b", marginBottom: 8 }}>
+              Fecha de hoy: <strong style={{ color: "#818cf8" }}>{todayStr}</strong>
+              {" · "}Algoritmo: <strong style={{ color: "#818cf8" }}>{selectedAlgorithm?.toUpperCase()}</strong>
+            </p>
+            <button
+              id="dtd-btn-start"
+              type="button"
+              onClick={() => onStartDayToDay && onStartDayToDay(todayStr, 1)}
+              style={{
+                width: "100%", padding: "12px 0", borderRadius: 8, border: "none",
+                background: "linear-gradient(135deg, #10b981, #059669)",
+                color: "white", fontWeight: 700, fontSize: 14, cursor: "pointer",
+                boxShadow: "0 4px 15px rgba(16,185,129,0.35)",
+                letterSpacing: 0.5,
+              }}
+            >
+              ▶ INICIAR OPERACIÓN
+            </button>
+          </>
+        ) : isRunning ? (
+          <div style={{ textAlign: "center", padding: "8px 0" }}>
+            <span style={{ color: "#10b981", fontSize: 13, fontWeight: 700 }}>
+              ● EN OPERACIÓN — Día {liveStatus?.currentDay ?? 1}
+            </span>
+            <div style={{ height: 4, background: "rgba(255,255,255,0.08)", borderRadius: 4, marginTop: 8 }}>
+              <div style={{
+                height: "100%", borderRadius: 4,
+                width: `${liveStatus?.percent ?? 0}%`,
+                background: "linear-gradient(90deg, #4f46e5, #10b981)",
+                transition: "width 0.5s ease",
+              }} />
+            </div>
+          </div>
+        ) : (
+          <div style={{ textAlign: "center", padding: "6px 0" }}>
+            <span style={{ color: "#34d399", fontSize: 12, fontWeight: 700 }}>✓ Operación completada</span>
+            <button
+              id="dtd-btn-reset"
+              type="button"
+              onClick={() => onReset && onReset()}
+              style={{
+                display: "block", width: "100%", marginTop: 8,
+                padding: "8px 0", borderRadius: 7,
+                border: "1px solid rgba(255,255,255,0.12)",
+                background: "transparent", color: "#94a3b8",
+                fontWeight: 600, fontSize: 12, cursor: "pointer",
+              }}
+            >
+              ↩ Nueva operación
+            </button>
+          </div>
+        )}
+        </div>
+
+        {/* ── SECCIÓN MONITOR ──────────────────────────────────────────────── */}
         {activeSection === "envios" && (
           <>
             <div className="ct-config-section">
-              <p className="ct-config-section__title">LLEGADA EN TIEMPO REAL</p>
-              <div className="ct-live-arrivals">
-                {MOCK_LIVE_ARRIVALS.map((a) => (
-                  <div key={a.time} className="ct-live-arrival">
-                    <span className="ct-live-arrival__time">{a.time}</span>
-                    <span className="ct-live-arrival__airport">
-                      {a.airport}
-                    </span>
-                    <span className="ct-live-arrival__bags">
-                      {a.bags} maletas
-                    </span>
-                  </div>
-                ))}
+              <p className="ct-config-section__title">📦 MALETAS EN ESPERA</p>
+              <div style={{ padding: "14px", background: "rgba(255,255,255,0.04)", borderRadius: 8, textAlign: "center" }}>
+                <span style={{ fontSize: 26, fontWeight: 800, color: "#10b981" }}>
+                  {(totalBagsWaiting ?? 0).toLocaleString("es-PE")}
+                </span>
+                <span style={{ display: "block", fontSize: 11, opacity: 0.6, marginTop: 4 }}>
+                  maletas esperando en almacenes
+                </span>
               </div>
             </div>
 
             <div className="ct-config-section">
-              <p className="ct-config-section__title">ENVÍOS ACTIVOS</p>
+              <p className="ct-config-section__title">✈️ VENTANA MÓVIL (24H)</p>
               <div className="ct-shipment-list">
-                {MOCK_SHIPMENTS.map((s) => (
-                  <div key={s.id} className="ct-shipment-item">
-                    <div className="ct-shipment-item__header">
-                      <strong>{s.id}</strong>
-                      <span className={`ct-sla-dot ct-sla-dot--${s.sla}`} />
-                    </div>
-                    <p className="ct-shipment-item__route">
-                      {s.origin} → {s.dest} · {s.bags} maletas
-                    </p>
-                    <p className="ct-shipment-item__meta">
-                      {s.airline} · <em>{s.status}</em>
-                    </p>
+                {(!activeShipments || activeShipments.length === 0) ? (
+                  <div style={{ padding: "20px", textAlign: "center", opacity: 0.5, fontSize: 12 }}>
+                    Esperando próxima ventana de vuelos...
                   </div>
-                ))}
+                ) : activeShipments.slice(0, 6).map(s => {
+                  const depDate = new Date(s.departureTime);
+                  const depFmt  = depDate.toLocaleTimeString("en-GB",
+                    { hour: "2-digit", minute: "2-digit", timeZone: "UTC" }) + " UTC";
+                  const colors  = { cancelled: "#ef4444", rescued: "#3b82f6",
+                                    blocked: "#f59e0b", critical: "#f97316" };
+                  const dot     = colors[s.status] ?? "#10b981";
+                  return (
+                    <div key={`s-${s.id}`} className="ct-shipment-item">
+                      <div className="ct-shipment-item__header">
+                        <strong>Vuelo {s.id}</strong>
+                        <span className="ct-sla-dot" style={{ background: dot }} title={s.status} />
+                      </div>
+                      <p className="ct-shipment-item__route">{s.from} → {s.to} · {depFmt}</p>
+                      <p className="ct-shipment-item__meta">
+                        {s.status?.toUpperCase()} · <em>Cap: {s.capacityPercent?.toFixed(1)}%</em>
+                      </p>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </>
         )}
 
-        {activeSection === "registro" && (
-          <div className="ct-config-section">
-            <p className="ct-config-section__title">REGISTRAR NUEVO ENVÍO</p>
-            <form
-              className="ct-config-form"
-              onSubmit={(e) => e.preventDefault()}
-            >
-              <label className="ct-config-form__label">
-                Aerolínea
-                <select className="ct-config-form__select">
-                  <option value="">Seleccionar...</option>
-                  {MOCK_AIRLINES.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="ct-config-form__label">
-                Origen
-                <select className="ct-config-form__select">
-                  <option value="">Aeropuerto origen...</option>
-                  <option value="LIM">LIM - Lima</option>
-                  <option value="BOG">BOG - Bogotá</option>
-                  <option value="CDG">CDG - París</option>
-                  <option value="PEK">PEK - Pekín</option>
-                  <option value="HND">HND - Tokio</option>
-                </select>
-              </label>
-              <label className="ct-config-form__label">
-                Destino
-                <select className="ct-config-form__select">
-                  <option value="">Aeropuerto destino...</option>
-                  <option value="MAD">MAD - Madrid</option>
-                  <option value="EZE">EZE - Buenos Aires</option>
-                  <option value="DEL">DEL - Nueva Delhi</option>
-                  <option value="LHR">LHR - Londres</option>
-                  <option value="CBR">CBR - Canberra</option>
-                </select>
-              </label>
-              <label className="ct-config-form__label">
-                Cantidad de maletas
-                <input
-                  type="number"
-                  className="ct-config-form__input"
-                  min="1"
-                  max="50"
-                  defaultValue="1"
-                />
-              </label>
-              <button type="submit" className="ct-config-form__submit">
-                Registrar envío
-              </button>
-            </form>
-          </div>
-        )}
-
+        {/* ── SECCIÓN VUELOS ───────────────────────────────────────────────── */}
         {activeSection === "vuelos" && (
           <div className="ct-config-section">
             <p className="ct-config-section__title">CANCELAR VUELO</p>
             <p className="ct-config-hint">
-              Seleccione un vuelo en curso para simular cancelación. Las maletas
-              afectadas serán replanificadas.
+              Seleccione un vuelo en curso para simular cancelación. Las maletas afectadas serán replanificadas.
             </p>
             <div className="ct-cancel-list">
-              <div className="ct-cancel-item">
-                <span>IAD → LHR</span>
-                <span>42 maletas</span>
-                <button type="button" className="ct-cancel-btn">
-                  Cancelar
-                </button>
-              </div>
-              <div className="ct-cancel-item">
-                <span>CDG → DEL</span>
-                <span>38 maletas</span>
-                <button type="button" className="ct-cancel-btn">
-                  Cancelar
-                </button>
-              </div>
-              <div className="ct-cancel-item">
-                <span>PEK → HND</span>
-                <span>25 maletas</span>
-                <button type="button" className="ct-cancel-btn">
-                  Cancelar
-                </button>
-              </div>
-            </div>
-            <div className="ct-config-alert ct-config-alert--info">
-              <strong>Nota:</strong> Al cancelar, el planificador reasignará
-              automáticamente las maletas a vuelos alternativos (R-091).
+              {["IAD → LHR", "CDG → DEL", "PEK → HND"].map((ruta, i) => (
+                <div key={i} className="ct-cancel-item">
+                  <span>{ruta}</span>
+                  <span>{[42, 38, 25][i]} maletas</span>
+                  <button type="button" className="ct-cancel-btn">Cancelar</button>
+                </div>
+              ))}
             </div>
           </div>
         )}
 
+        {/* ── SECCIÓN CONFIG ───────────────────────────────────────────────── */}
         {activeSection === "config" && (
           <div className="ct-config-section">
             <p className="ct-config-section__title">ALGORITMO PLANIFICADOR</p>
             <div className="ct-algorithm-selector">
-              <label className="ct-algorithm-option">
-                <input
-                  type="radio"
-                  name="algorithm"
-                  value="hga"
-                  checked={selectedAlgorithm === "hga"}
-                  onChange={() => onAlgorithmChange("hga")}
-                />
-                <div>
-                  <strong>Algoritmo A — HGA</strong>
-                  <span>Hybrid Genetic Algorithm</span>
-                </div>
-              </label>
-              <label className="ct-algorithm-option">
-                <input
-                  type="radio"
-                  name="algorithm"
-                  value="alns"
-                  checked={selectedAlgorithm === "alns"}
-                  onChange={() => onAlgorithmChange("alns")}
-                />
-                <div>
-                  <strong>Algoritmo B — ALNS</strong>
-                  <span>Adaptive Large Neighborhood Search</span>
-                </div>
-              </label>
+              {[{ val: "hga", label: "Algoritmo A — HGA", sub: "Hybrid Genetic Algorithm" },
+                { val: "alns", label: "Algoritmo B — ALNS", sub: "Adaptive Large Neighborhood Search" }
+              ].map(opt => (
+                <label key={opt.val} className="ct-algorithm-option">
+                  <input
+                    type="radio"
+                    name="algorithm-dtd"
+                    value={opt.val}
+                    checked={selectedAlgorithm === opt.val}
+                    onChange={() => onAlgorithmChange(opt.val)}
+                  />
+                  <div>
+                    <strong>{opt.label}</strong>
+                    <span>{opt.sub}</span>
+                  </div>
+                </label>
+              ))}
             </div>
 
-            <p
-              className="ct-config-section__title"
-              style={{ marginTop: "16px" }}
-            >
-              🚦 SEMÁFORO DE MALETAS
-            </p>
+            <p className="ct-config-section__title" style={{ marginTop: 16 }}>🚦 SEMÁFORO DE MALETAS</p>
             <div className="ct-sla-legend">
-              <div className="ct-sla-legend__item">
-                <span className="ct-sla-dot ct-sla-dot--green" />
-                <span>Verde: &lt;70% del plazo</span>
-              </div>
-              <div className="ct-sla-legend__item">
-                <span className="ct-sla-dot ct-sla-dot--amber" />
-                <span>Ámbar: 70-95% del plazo</span>
-              </div>
-              <div className="ct-sla-legend__item">
-                <span className="ct-sla-dot ct-sla-dot--red" />
-                <span>Rojo: &gt;95% o retrasada</span>
-              </div>
+              {[
+                { cls: "green",  label: "Verde: <70% del plazo" },
+                { cls: "amber",  label: "Ámbar: 70-95% del plazo" },
+                { cls: "red",    label: "Rojo: >95% o retrasada" },
+              ].map(item => (
+                <div key={item.cls} className="ct-sla-legend__item">
+                  <span className={`ct-sla-dot ct-sla-dot--${item.cls}`} />
+                  <span>{item.label}</span>
+                </div>
+              ))}
             </div>
           </div>
         )}
+
       </div>
     </aside>
   );

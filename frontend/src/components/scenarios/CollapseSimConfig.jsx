@@ -18,8 +18,17 @@ const SLA_VIOLATIONS = [
   { id: 'ENV-10502', origin: 'IAD', dest: 'FCO', hours: 26, sla: 24, status: 'Excedido +2h (mismo cont.)' },
 ]
 
-function CollapseSimConfig({ isOpen, onClose, selectedAlgorithm, onAlgorithmChange }) {
+function CollapseSimConfig({ isOpen, onClose, selectedAlgorithm, onAlgorithmChange, onStart, liveStatus }) {
   const [activeSection, setActiveSection] = useState('config')
+  const [isStarting, setIsStarting] = useState(false)
+
+  const handleStart = async () => {
+    if (!onStart) return;
+    setIsStarting(true);
+    await onStart(5); // 5 días por defecto
+    setIsStarting(false);
+    setActiveSection("progreso");
+  };
 
   if (!isOpen) {
     return null
@@ -119,8 +128,18 @@ function CollapseSimConfig({ isOpen, onClose, selectedAlgorithm, onAlgorithmChan
             </div>
 
             <div className="ct-config-section">
-              <button type="button" className="ct-sim-start-btn ct-sim-start-btn--danger">
-                ⚠ Iniciar simulación de colapso
+              <button 
+                type="button" 
+                className="ct-sim-start-btn ct-sim-start-btn--danger"
+                onClick={handleStart}
+                disabled={isStarting || liveStatus?.status === 'RUNNING'}
+                style={{ opacity: isStarting ? 0.7 : 1 }}
+              >
+                {isStarting
+                  ? '⏳ Iniciando...'
+                  : liveStatus?.status === 'RUNNING'
+                    ? `⚙ Simulando colapso día ${liveStatus.currentDay}/${liveStatus.totalDays}...`
+                    : `⚠ Iniciar simulación de colapso real`}
               </button>
             </div>
           </>

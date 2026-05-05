@@ -10,12 +10,12 @@ public class EnvioParser {
         }
 
         return new ParsedEnvio(
-                parts[0],
-                parts[1],
-                parts[2] + ":" + parts[3],
-                parts[4],
-                Integer.parseInt(parts[5]),
-                parts[6]
+                parts[0],          // codigo
+                parts[1],          // fecha YYYYMMDD
+                parts[2] + ":" + parts[3], // hora HH:MM
+                parts[4],          // destinoIcao
+                Integer.parseInt(parts[5]), // cantidadMaletas (###, 3 posiciones: 001..999)
+                parts[6]           // clienteId        (7 posiciones: 0000001..9999999)
         );
     }
 }

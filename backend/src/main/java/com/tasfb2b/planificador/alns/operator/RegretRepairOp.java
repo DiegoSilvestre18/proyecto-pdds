@@ -32,7 +32,8 @@ public class RegretRepairOp implements RepairOperator {
     @Override
     public List<Route> repair(List<Route> partialRoutes,
                               List<SuperLot> removed,
-                              Map<String, Aeropuerto> airportMap) {
+                              Map<String, Aeropuerto> airportMap,
+                              Map<Long, Integer> capacidadDisponible) {
 
         List<Route> result = new ArrayList<>(partialRoutes);
         List<SuperLot> pending = new ArrayList<>(removed);
@@ -44,16 +45,16 @@ public class RegretRepairOp implements RepairOperator {
             double   maxRegret = Double.NEGATIVE_INFINITY;
 
             for (SuperLot lot : pending) {
-                double regret = calcularRegret(lot, airportMap);
+                double regret = calcularRegret(lot, airportMap, capacidadDisponible);
                 if (regret > maxRegret) {
                     maxRegret = regret;
                     bestLot   = lot;
                 }
             }
 
-            // Insertar el lote con mayor regret
+            // Insertar el lote con mayor regret pasando capacidad real
             Route r = routeBuilder.build(bestLot, airportMap,
-                    new HashMap<>(), new HashMap<>());
+                    new HashMap<>(), capacidadDisponible);
             result.add(r);
             pending.remove(bestLot);
         }
@@ -67,10 +68,11 @@ public class RegretRepairOp implements RepairOperator {
      * a Dijkstra a encontrar un camino diferente con distinto timing.
      * Un regret alto → este lote es difícil de reubicar → insertarlo primero.
      */
-    private double calcularRegret(SuperLot lot, Map<String, Aeropuerto> airportMap) {
+    private double calcularRegret(SuperLot lot, Map<String, Aeropuerto> airportMap,
+                                  Map<Long, Integer> capacidadDisponible) {
 
         Route mejorRuta = routeBuilder.build(lot, airportMap,
-                new HashMap<>(), new HashMap<>());
+                new HashMap<>(), capacidadDisponible);
 
         // Perturbar readyTime para obtener segunda alternativa
         SuperLot lotPerturbado = new SuperLot(
@@ -85,7 +87,7 @@ public class RegretRepairOp implements RepairOperator {
         );
 
         Route segundaMejor = routeBuilder.build(lotPerturbado, airportMap,
-                new HashMap<>(), new HashMap<>());
+                new HashMap<>(), capacidadDisponible);
 
         double costMejor   = costoDe(mejorRuta);
         double costSegunda = costoDe(segundaMejor);

@@ -207,8 +207,11 @@ public class ALNSPlannerService {
             // ── Destruir ───────────────────────────────────────────
             List<SuperLot> removed = dOp.destroy(candidate, q, rng);
 
+            // ── Construir estado de capacidad real ANTES de reparar ─────────
+            Map<Long, Integer> capacidadDisponible = buildCapacidadDisponible(candidate);
+
             // ── Reparar ────────────────────────────────────────────
-            candidate = rOp.repair(candidate, removed, airportMap);
+            candidate = rOp.repair(candidate, removed, airportMap, capacidadDisponible);
 
             // ── Resolver conflictos de capacidad ───────────────────
             resolverConflictosCapacidad(candidate);
@@ -307,6 +310,32 @@ public class ALNSPlannerService {
                 capacidadDisponible.merge(v.getId(), -asignar, Integer::sum);
             }
         }
+    }
+
+    /**
+     * Construye el mapa de capacidad restante por vuelo, dado el estado actual de las rutas.
+     * Este mapa se pasa a los operadores de reparación y a Dijkstra para que eviten
+     * asignar lotes a vuelos que ya no tienen espacio libre.
+     *
+     * @param routes rutas actuales (pueden incluir rutas parcialmente asignadas)
+     * @return mapa vueloId → capacidad restante (capacidadTotal − ya asignado)
+     */
+    private Map<Long, Integer> buildCapacidadDisponible(List<Route> routes) {
+        Map<Long, Integer> cap = new HashMap<>();
+        // Inicializar con capacidad total de cada vuelo
+        for (Route r : routes) {
+            for (Vuelo v : r.getFlights()) {
+                cap.putIfAbsent(v.getId(), v.getCapacidadTotal());
+            }
+        }
+        // Descontar la demanda ya asignada en las rutas actuales
+        for (Route r : routes) {
+            int asignado = r.getCapacidadAsignada();
+            for (Vuelo v : r.getFlights()) {
+                cap.merge(v.getId(), -asignado, Integer::sum);
+            }
+        }
+        return cap;
     }
 
     private double evalFitness(List<Route> routes,
