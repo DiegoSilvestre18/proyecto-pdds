@@ -182,13 +182,19 @@ const WorldMap = ({
     return () => clearTimeout(highlightTimerRef.current);
   }, []);
 
-  const getStrokeColor = (status, ocupacion = 0) => {
+  const getStrokeColor = (status, ocupacion = 0, capacidadMax = 0) => {
     switch (status) {
       case "cancelled": return "#f43f5e";
       case "critical": return "#f59e0b";
       case "blocked": return "#e11d48";
       case "rescued": return "#3b82f6";
-      default: return ocupacion > 0 ? "#10b981" : "#0f766e"; // Verde vibrante si lleva carga, verde oscuro si va vacío
+      default: {
+        if (ocupacion === 0) return "#64748b";
+        const pct = capacidadMax > 0 ? (ocupacion / capacidadMax) * 100 : 0;
+        if (pct >= 90) return "#ef4444";
+        if (pct >= 70) return "#f59e0b";
+        return "#10b981";
+      }
     }
   };
 
@@ -448,31 +454,50 @@ const WorldMap = ({
                   if (!from || !to) return null;
 
                   const progress = plane.progress ?? 0;
-                  // Optimización: No renderizar ruta si el avión no ha salido o ya llegó
-                  if (progress <= 0 || progress >= 0.99) return null;
+                  // Optimización: No renderizar ruta si el avión ya llegó
+                  if (progress >= 0.99) return null;
 
                   const passesFilter = flightPassesFilter(plane.status);
-                  const strokeColor = getStrokeColor(plane.status, plane.ocupacionReal);
+                  const strokeColor = getStrokeColor(plane.status, plane.ocupacionReal, plane.capacidadMax);
                   
                   // Posición actual del avión
                   const position = interpolateCoordinates(from, to, progress);
 
                   // Trayectoria lineal restante
                   const remainingPath = getStraightPath(position, to.coordinates);
+                  // Trayectoria ya recorrida (estela)
+                  const traveledPath = progress > 0.02 ? getStraightPath(from.coordinates, position) : null;
 
                   return (
-                    <Line
-                      key={`path-${plane.id}`}
-                      coordinates={remainingPath}
-                      stroke={strokeColor}
-                      strokeWidth={1.5}
-                      strokeDasharray="4 3"
-                      style={{
-                        opacity: passesFilter ? getOpacity(plane.id, 0.45) : 0,
-                        transition: "opacity 0.3s ease",
-                        pointerEvents: "none"
-                      }}
-                    />
+                    <>
+                      {/* Tramo recorrido (estela) — línea sólida tenue */}
+                      {traveledPath && (
+                        <Line
+                          key={`trail-${plane.id}`}
+                          coordinates={traveledPath}
+                          stroke={strokeColor}
+                          strokeWidth={1.5}
+                          style={{
+                            opacity: passesFilter ? 0.15 : 0,
+                            transition: "opacity 0.3s ease",
+                            pointerEvents: "none"
+                          }}
+                        />
+                      )}
+                      {/* Tramo restante — línea discontinua */}
+                      <Line
+                        key={`path-${plane.id}`}
+                        coordinates={remainingPath}
+                        stroke={strokeColor}
+                        strokeWidth={1.5}
+                        strokeDasharray="4 3"
+                        style={{
+                          opacity: passesFilter ? getOpacity(plane.id, 0.45) : 0,
+                          transition: "opacity 0.3s ease",
+                          pointerEvents: "none"
+                        }}
+                      />
+                    </>
                   );
                 })}
 
@@ -530,11 +555,11 @@ const WorldMap = ({
                         onKeyDown={(e) => e.key === "Enter" && onAircraftSelect(plane.id)}
                         style={{ 
                           cursor: "pointer", 
-                          color: isCancelled ? "#ef4444" : isRescued ? "#3b82f6" : getStrokeColor(plane.status, plane.ocupacionReal),
+                          color: isCancelled ? "#ef4444" : isRescued ? "#3b82f6" : getStrokeColor(plane.status, plane.ocupacionReal, plane.capacidadMax),
                           opacity: passesFilter ? getOpacity(plane.id, 1) : 0.08,
                           transition: "opacity 0.3s ease, color 0.3s ease",
                           filter: isSelected || isHighlighted 
-                            ? `drop-shadow(0 0 6px ${getStrokeColor(plane.status, plane.ocupacionReal)})` 
+                            ? `drop-shadow(0 0 6px ${getStrokeColor(plane.status, plane.ocupacionReal, plane.capacidadMax)})` 
                             : "drop-shadow(0 1px 2px rgba(0,0,0,0.8))"
                         }}
                       >
@@ -554,6 +579,13 @@ const WorldMap = ({
                         >
                           {planeIcon}
                         </text>
+                        {plane.ocupacionReal != null && plane.capacidadMax != null && (
+                          <text y={12} textAnchor="middle"
+                                style={{ fontSize: "7px", fill: "#cbd5e1", fontWeight: "bold",
+                                         paintOrder: "stroke fill", stroke: "#061828", strokeWidth: "1.5px" }}>
+                            {plane.ocupacionReal}/{plane.capacidadMax}
+                          </text>
+                        )}
                       </g>
                     </Marker>
                   );
@@ -565,11 +597,11 @@ const WorldMap = ({
           {/* ── Marcadores de aeropuerto ──────────────────────────────────── */}
           {airports.map((airport) => {
             const metrics    = activeMetrics[airport.icao];
-            const level      = metrics?.level ?? "green";
-            const isSaturated= isCollapseScenario && metrics?.isSaturated;
-            const isSelected = selectedAirportCode === airport.icao;
             const stockBags  = metrics?.storedBags ?? metrics?.load ?? 0;
             const maxCap     = metrics?.warehouseCapacity ?? metrics?.capacity ?? "—";
+            const level      = stockBags === 0 && metrics ? "empty" : (metrics?.level ?? "green");
+            const isSaturated= isCollapseScenario && metrics?.isSaturated;
+            const isSelected = selectedAirportCode === airport.icao;
             const isHighlighted = highlightedId === airport.icao;
             const passesFilter = airportPassesFilter(airport.icao);
 
@@ -605,11 +637,16 @@ const WorldMap = ({
                     }}
                   />
                   <circle r={isSaturated ? 6 : 4.5} className="ct-airport-marker__dot" />
+                  <rect x={-5} y={5} width={10} height={1.5} rx={0.5} fill="currentColor" opacity={0.5} />
                   <text y={-13} textAnchor="middle" className="ct-airport-marker__label">
                     {airport.icao}
                   </text>
                   <text y={22} textAnchor="middle" className="ct-airport-marker__city">
                     {airport.city}
+                  </text>
+                  <text y={32} textAnchor="middle"
+                        className={`ct-airport-marker__inventory ct-airport-marker__inventory--${level}`}>
+                    {stockBags}/{maxCap}
                   </text>
                 </g>
               </Marker>
@@ -640,7 +677,7 @@ const WorldMap = ({
                 >
                   <div style={{
                     background: "rgba(15, 23, 42, 0.96)",
-                    border: `1.5px solid ${getStrokeColor(selectedPlane.status, selectedPlane.ocupacionReal)}`,
+                    border: `1.5px solid ${getStrokeColor(selectedPlane.status, selectedPlane.ocupacionReal, selectedPlane.capacidadMax)}`,
                     borderRadius: "6px",
                     padding: "6px 8px",
                     color: "white",

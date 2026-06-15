@@ -2681,6 +2681,10 @@
   color: #ef4444;
 }
 
+.ct-airport-marker--empty {
+  color: #64748b;
+}
+
 /* Saturado — escenario colapso */
 .ct-airport-marker--saturated {
   color: #b91c1c;
