@@ -372,13 +372,13 @@ int cyclesPerDay = 1440 / saMinutes;
                                                                         int cantidad = r.getCapacidadAsignada();
                                                                         r.setCapacidadAsignada(0);
 
-                                                                        // Re-encolar para replanificación
+                                                                        // Re-encolar para replanificación inmediata
                                                                         SuperLot replanLot = elevateToMaxPriority(r.getLot(), currentSimTime);
                                                                         replanLot.setTotalMaletas(cantidad);
-                                                                        pendientes.add(replanLot);
+                                                                        planifiablePool.put(replanLot.getId(), replanLot);
 
                                                                         session.getEventLog().add(String.format(
-                                                                                "[%02d:%02d] 🔄 Replanificando automáticamente lote %d (%s -> %s) afectado por cancelación.",
+                                                                                "[%02d:%02d] 🔄 Replanificando inmediatamente lote %d (%s -> %s) afectado por cancelación.",
                                                                                 simHour, simMinute, r.getLot().getId(),
                                                                                 r.getLot().getOrigenIcao(), r.getLot().getDestinoIcao()));
                                                                 }

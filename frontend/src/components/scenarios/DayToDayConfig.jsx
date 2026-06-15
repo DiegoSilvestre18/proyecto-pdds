@@ -417,12 +417,6 @@ function DayToDayConfig({
               </div>
             ) : (
               <div>
-                {/* Si la simulación está corriendo o completada, mostramos panel interactivo en curso */}
-                <FlightCancellationPanel
-                  sessionId={sessionId}
-                  isRunning={isRunning}
-                />
-                
                 {/* Si hubo pre-cancelados, mostrar el listado como referencia de lectura */}
                 {preCancelledFlightIds.length > 0 && (
                   <div style={{

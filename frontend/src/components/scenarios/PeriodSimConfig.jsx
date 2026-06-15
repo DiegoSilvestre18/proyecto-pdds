@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import FlightCancellationPanel from "./FlightCancellationPanel";
 
 // ── Constantes ────────────────────────────────────────────────────────────────
 const DAYS_IN_MONTH = [31,28,31,30,31,30,31,31,30,31,30,31];

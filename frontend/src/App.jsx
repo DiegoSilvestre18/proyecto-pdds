@@ -246,6 +246,10 @@ targetPlaybackMinutes,
             isVisible={true}
             onHide={() => handleToggleWindow("cancellation")}
             onCancelFlight={cancelFlight}
+            sessionId={sessionId}
+            isRunning={simState === "running"}
+            startEpoch={liveStatus?.startEpoch}
+            currentEpochTime={liveStatus?.interpolatedTime}
           />
         </DraggableWindow>
       )}

@@ -464,12 +464,6 @@ const [isStarting, setIsStarting]       = useState(false)
                 ))}
               </div>
             )}
-
-            {/* Panel de cancelación manual de vuelos (solo visible durante simulación) */}
-            <FlightCancellationPanel
-              sessionId={sessionId}
-              isRunning={simState === 'running'}
-            />
           </div>
         )}
 

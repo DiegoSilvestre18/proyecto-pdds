@@ -8,6 +8,7 @@ const NAV_ITEMS = [
   { key: 'transitInventory', icon: '📦', label: 'Inventario' },
   { key: 'comparison',     icon: '⚖',  label: 'Comparativa' },
   { key: 'shipmentDetail', icon: '✉',  label: 'Envío' },
+  { key: 'cancellation', icon: '❌',  label: 'Cancelaciones' },
   { key: 'airportConfig',  icon: '🏢', label: 'Almacenes' },
   { key: 'bloqueos',       icon: '🚧', label: 'Bloqueos' },
   { key: 'reports',        icon: '📑', label: 'Reportes' },

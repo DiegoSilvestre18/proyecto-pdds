@@ -111,4 +111,25 @@ public class VueloService {
         // Invalidar el caché del grafo para que Dijkstra no vuelva a usarlo
         networkAdapter.invalidateGraph();
     }
+
+    public List<VueloResponse> buscar(String query) {
+        List<Vuelo> todos = vueloRepo.findAllWithAirports();
+        String q = query != null ? query.toUpperCase() : "";
+        
+        return todos.stream()
+                .filter(v -> q.isEmpty() || 
+                        v.getOrigen().getIcaoCode().contains(q) || 
+                        v.getDestino().getIcaoCode().contains(q))
+                .map(v -> new VueloResponse(
+                        v.getId(),
+                        v.getOrigen().getIcaoCode(),
+                        v.getDestino().getIcaoCode(),
+                        v.getCapacidadTotal(),
+                        v.getCancelled(),
+                        v.getDepartureMinute(),
+                        v.getArrivalMinute()
+                ))
+                .limit(100)
+                .toList();
+    }
 }

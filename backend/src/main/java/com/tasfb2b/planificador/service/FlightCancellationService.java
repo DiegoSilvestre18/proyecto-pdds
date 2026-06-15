@@ -1,9 +1,7 @@
 package com.tasfb2b.planificador.service;
 
 import com.tasfb2b.planificador.domain.Solution;
-import com.tasfb2b.vuelo.domain.Vuelo;
-import com.tasfb2b.vuelo.repository.VueloRepository;
-import com.tasfb2b.planificador.strategy.NetworkAdapter;
+import com.tasfb2b.vuelo.service.VueloService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -17,10 +15,9 @@ import org.springframework.transaction.annotation.Transactional;
 @Slf4j
 public class FlightCancellationService {
 
-    private final VueloRepository vueloRepository;
+    private final VueloService vueloService;
     private final ALNSPlannerService alnsPlanner;
     private final SimulationProgressHolder progressHolder;
-    private final NetworkAdapter networkAdapter;
     private final PlanningSessionHolder sessionHolder;
 
     /**
@@ -33,17 +30,10 @@ public class FlightCancellationService {
     public void cancelarVuelo(Long vueloId, String sessionId) {
         log.info("Cancelando manualmente el vuelo {}", vueloId);
 
-        Vuelo vuelo = vueloRepository.findById(vueloId)
-                .orElseThrow(() -> new IllegalArgumentException("Vuelo no encontrado: " + vueloId));
+        // 1. Delegamos la cancelación de datos al VueloService (DB + Invalida Grafo)
+        vueloService.cancelarVuelo(vueloId);
 
-        vuelo.setCancelled(true);
-        vueloRepository.save(vuelo);
-
-        // Invalidar el caché del grafo para que Dijkstra no vuelva a usarlo
-        networkAdapter.invalidateGraph();
-
-        // Si hay una simulación en curso, la replanificación se realiza de manera reactiva en el bucle de simulación.
-        // Si hay un warm-start o sesión de planificación estática, corremos la replanificación ALNS estática.
+        // 2. Orquestar la replanificación si hay sesión activa
         SimulationProgressHolder.SimulationSessionState session = null;
         if (sessionId != null) {
             session = progressHolder.get(sessionId);
