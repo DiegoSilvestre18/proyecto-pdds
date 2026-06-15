@@ -1,5 +1,4 @@
 import { useState, useMemo } from 'react'
-import FlightCancellationPanel from './FlightCancellationPanel'
 
 
 // Fecha mínima = hoy, máxima = 31 dic 2026

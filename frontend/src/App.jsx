@@ -13,7 +13,7 @@ import TopAirportsPanel from "./components/floating/TopAirportsPanel";
 import TransitInventoryPanel from "./components/floating/TransitInventoryPanel";
 import AlgorithmComparisonPanel from "./components/floating/AlgorithmComparisonPanel";
 import ShipmentDetailPanel from "./components/floating/ShipmentDetailPanel";
-import FlightCancellationPanel from "./components/floating/FlightCancellationPanel";
+import FlightCancellationPanel from "./components/scenarios/FlightCancellationPanel";
 import ReportsPanel from "./components/floating/ReportsPanel";
 import EntitiesListPanel from "./components/floating/EntitiesListPanel";
 import FlightDetailPanel from "./components/floating/FlightDetailPanel";
@@ -243,9 +243,6 @@ targetPlaybackMinutes,
           onFocus={() => handleFocusWindow("cancellation")}
         >
           <FlightCancellationPanel
-            isVisible={true}
-            onHide={() => handleToggleWindow("cancellation")}
-            onCancelFlight={cancelFlight}
             sessionId={sessionId}
             isRunning={simState === "running"}
             startEpoch={liveStatus?.startEpoch}

@@ -74,8 +74,6 @@ export default function FlightCancellationPanel({ sessionId, isRunning, startEpo
     return `${h.toString().padStart(2, '0')}:${min.toString().padStart(2, '0')}`;
   };
 
-  if (!isRunning) return null;
-
   return (
     <div style={{
       background: 'rgba(15, 23, 42, 0.85)',

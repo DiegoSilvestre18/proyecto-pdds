@@ -1,5 +1,4 @@
 import { useState, useMemo } from "react";
-import FlightCancellationPanel from "./FlightCancellationPanel";
 
 // ── DayToDayConfig — Panel del escenario "Operación Día a Día" ──────────────
 // Muestra monitoreo en vivo y permite iniciar la simulación con la fecha real
