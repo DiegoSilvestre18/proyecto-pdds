@@ -521,7 +521,7 @@ const WorldMap = ({
 
                   const dx = to.coordinates[0] - from.coordinates[0];
                   const dy = to.coordinates[1] - from.coordinates[1];
-                  const angle = Math.atan2(-dy, dx) * (180 / Math.PI) + 45;
+                  const angle = Math.atan2(-dy, dx) * (180 / Math.PI);
 
                   let planeIcon = "✈";
                   let planeSize = "18px";
