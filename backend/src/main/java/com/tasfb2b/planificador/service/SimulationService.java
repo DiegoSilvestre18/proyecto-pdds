@@ -299,7 +299,9 @@ int cyclesPerDay = 1440 / saMinutes;
                         long sleepPerCycleMs = computeSleepPerCycleMs(dias, playbackMinutes, cyclesPerDay, isRealTime, saMinutes);
                         
                         int malatetasAtendidasDia = 0;
-                        int totalMaletasDia = 0;
+                        int totalMaletasDia = planifiablePool.values().stream().mapToInt(SuperLot::getTotalMaletas).sum();
+                        Set<String> countedArrivalLotKeysToday = new HashSet<>();
+                        Set<String> countedAssignedLotKeysToday = new HashSet<>();
                         int maletasEntregadasAlEmpezarDia = globalState.getMaletasEntregadas();
                         
                         int targetMinuteOfDay = 1440;
@@ -400,6 +402,10 @@ int cyclesPerDay = 1440 / saMinutes;
                                         List<SuperLot> nuevosEnHorizonte = superLotService.agruparEnviosPorVentana(currentSimTime, horizonEnd);
                                         for (SuperLot lot : nuevosEnHorizonte) {
                                             planifiablePool.put(lot.getId(), lot);
+                                            // Solo sumamos al total del día si el lote es "nuevo" para hoy
+                                            if (countedArrivalLotKeysToday.add(lot.getKey())) {
+                                                totalMaletasDia += lot.getTotalMaletas();
+                                            }
                                         }
 
                                         // 2. Preparar lotes para el planificador
@@ -414,13 +420,14 @@ int cyclesPerDay = 1440 / saMinutes;
                                         // Fase 3: Actualizar versión del plan maestro
                                         session.setCurrentPlanId(sol.getPlanId());
                                         masterPlan = sol.getRoutes();
-
-                                        // Actualizar demanda total (solo informativos para KPIs del día)
-                                        totalMaletasDia += nuevosEnHorizonte.stream().mapToInt(SuperLot::getTotalMaletas).sum();
                                 }
                                 
-                                // Maletas atendidas: solo contamos lo que el planificador pudo asignar en este ciclo
-                                malatetasAtendidasDia += sol.getRoutes().stream().mapToInt(Route::getCapacidadAsignada).sum();
+                                // Maletas atendidas: solo contamos lo que el planificador pudo asignar por primera vez hoy
+                                for (Route r : sol.getRoutes()) {
+                                    if (r.isAtendido() && countedAssignedLotKeysToday.add(r.getLot().getKey())) {
+                                        malatetasAtendidasDia += r.getCapacidadAsignada();
+                                    }
+                                }
                                 
                                 // Actualizar el pool: remover lotes que YA despegado (protegidos por ALNS)
                                 for (Route r : sol.getRoutes()) {
