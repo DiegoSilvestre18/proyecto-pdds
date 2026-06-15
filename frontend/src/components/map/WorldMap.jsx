@@ -568,8 +568,8 @@ const WorldMap = ({
             const level      = metrics?.level ?? "green";
             const isSaturated= isCollapseScenario && metrics?.isSaturated;
             const isSelected = selectedAirportCode === airport.icao;
-            const stockBags  = metrics?.load ?? 0;
-            const maxCap     = metrics?.capacity ?? "—";
+            const stockBags  = metrics?.storedBags ?? metrics?.load ?? 0;
+            const maxCap     = metrics?.warehouseCapacity ?? metrics?.capacity ?? "—";
             const isHighlighted = highlightedId === airport.icao;
             const passesFilter = airportPassesFilter(airport.icao);
 

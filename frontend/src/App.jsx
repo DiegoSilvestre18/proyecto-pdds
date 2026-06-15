@@ -261,8 +261,8 @@ targetPlaybackMinutes,
           <AirportDetailPanel
             isOpen={true}
             selectedAirport={AIRPORT_BY_ICAO[selectedAirportCode]}
-            selectedAirportMetrics={null}
-            selectedAirportLevel="green"
+            selectedAirportMetrics={selectedAirportMetrics}
+            selectedAirportLevel={selectedAirportLevel}
             isCollapseScenario={isCollapseScenario}
             onClose={() => handleToggleWindow("airportDetail")}
           />

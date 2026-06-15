@@ -53,11 +53,14 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
 
   // UT Filters & Sort
   const [utSearch, setUtSearch] = useState('');
+  const [utSearchOrigin, setUtSearchOrigin] = useState('');
+  const [utSearchDest, setUtSearchDest] = useState('');
   const [utSort, setUtSort] = useState('occupancy_desc');
   const [expandedUt, setExpandedUt] = useState(null);
 
   // Warehouse Filters & Sort
   const [whSearch, setWhSearch] = useState('');
+  const [whContinent, setWhContinent] = useState(null);
   const [whSort, setWhSort] = useState('occupancy_desc');
   const [expandedWh, setExpandedWh] = useState(null);
 
@@ -138,16 +141,26 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
     setActiveFilters(prev => ({ ...prev, flightStatus: status }));
   }, [setActiveFilters]);
 
+  const handleContinentFilter = useCallback((continent) => {
+    setWhContinent(continent);
+  }, []);
+
   const filteredUTs = useMemo(() => {
     let result = [...(activeAircraft || [])];
     
     if (utSearch) {
       const q = utSearch.toLowerCase();
-      result = result.filter(ut => 
-        ut.id?.toLowerCase().includes(q) ||
-        ut.from?.toLowerCase().includes(q) ||
-        ut.to?.toLowerCase().includes(q)
-      );
+      result = result.filter(ut => ut.id?.toLowerCase().includes(q));
+    }
+
+    if (utSearchOrigin) {
+      const q = utSearchOrigin.toLowerCase();
+      result = result.filter(ut => ut.from?.toLowerCase().includes(q));
+    }
+
+    if (utSearchDest) {
+      const q = utSearchDest.toLowerCase();
+      result = result.filter(ut => ut.to?.toLowerCase().includes(q));
     }
 
     // Paso 6: Filtro por status de semáforo
@@ -166,7 +179,7 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
     });
 
     return result;
-  }, [activeAircraft, utSearch, utSort, activeFilters.flightStatus]);
+  }, [activeAircraft, utSearch, utSearchOrigin, utSearchDest, utSort, activeFilters.flightStatus]);
 
   const filteredWarehouses = useMemo(() => {
     let result = [...(airports || [])];
@@ -188,6 +201,19 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
       });
     }
 
+    // Item 2: Filtro por continente
+    if (whContinent) {
+      result = result.filter(wh => wh.continent === whContinent);
+    }
+
+    // Items 4 & 5: Computar próxima salida/llegada de UT por almacén
+    const nearestDep = {}
+    const nearestArr = {}
+    ;(activeAircraft || []).forEach(f => {
+      if (f.from) nearestDep[f.from] = Math.min(nearestDep[f.from] ?? Infinity, f.departureTime ?? Infinity)
+      if (f.to) nearestArr[f.to] = Math.min(nearestArr[f.to] ?? Infinity, f.arrivalTime ?? Infinity)
+    })
+
     result.sort((a, b) => {
       const mA = airportMetrics[a.icao] || {};
       const mB = airportMetrics[b.icao] || {};
@@ -196,12 +222,14 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
 
       if (whSort === 'occupancy_desc') return pctB - pctA;
       if (whSort === 'occupancy_asc') return pctA - pctB;
+      if (whSort === 'next_departure') return (nearestDep[a.icao] ?? Infinity) - (nearestDep[b.icao] ?? Infinity);
+      if (whSort === 'next_arrival') return (nearestArr[a.icao] ?? Infinity) - (nearestArr[b.icao] ?? Infinity);
       if (whSort === 'name_asc') return a.icao.localeCompare(b.icao);
       return 0;
     });
 
     return result;
-  }, [airports, airportMetrics, whSearch, whSort, activeFilters.semaphoreLevel]);
+  }, [airports, airportMetrics, activeAircraft, whSearch, whContinent, whSort, activeFilters.semaphoreLevel]);
 
   // ── Paso 10: Derivar envíos reales de activeAircraft por almacén ────────
   const getWarehouseFlights = useCallback((icao) => {
@@ -254,15 +282,17 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
               ))}
             </div>
 
+            <div style={{ display: 'flex', gap: '4px' }}>
+              <input type="text" placeholder="ID..." value={utSearch} onChange={(e) => setUtSearch(e.target.value)}
+                style={{ width: '70px', padding: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '4px', fontSize: '12px' }} />
+              <input type="text" placeholder="Origen..." value={utSearchOrigin} onChange={(e) => setUtSearchOrigin(e.target.value)}
+                style={{ flex: 1, padding: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '4px', fontSize: '12px' }} />
+              <input type="text" placeholder="Destino..." value={utSearchDest} onChange={(e) => setUtSearchDest(e.target.value)}
+                style={{ flex: 1, padding: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '4px', fontSize: '12px' }} />
+            </div>
             <div style={{ display: 'flex', gap: '8px' }}>
-              <input 
-                type="text" placeholder="Buscar por ID, Origen o Destino..." 
-                value={utSearch} onChange={(e) => setUtSearch(e.target.value)}
+              <select value={utSort} onChange={(e) => setUtSort(e.target.value)}
                 style={{ flex: 1, padding: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '4px', fontSize: '12px' }}
-              />
-              <select 
-                value={utSort} onChange={(e) => setUtSort(e.target.value)}
-                style={{ padding: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '4px', fontSize: '12px' }}
               >
                 <option value="occupancy_desc">Ocupación (Mayor a Menor)</option>
                 <option value="occupancy_asc">Ocupación (Menor a Mayor)</option>
@@ -365,18 +395,39 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
               ))}
             </div>
 
+            {/* Item 2: Filtro por continente */}
+            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+              {[{ value: null, label: '🌎 Todos', color: '#94a3b8' },
+                { value: 'america', label: '🌎 América', color: '#10b981' },
+                { value: 'europe', label: '🌎 Europa', color: '#3b82f6' },
+                { value: 'asia', label: '🌎 Asia', color: '#f59e0b' },
+              ].map(opt => (
+                <button key={opt.value ?? 'all'} onClick={() => handleContinentFilter(opt.value)}
+                  style={{
+                    padding: '4px 10px', borderRadius: '12px', fontSize: '10px', fontWeight: 'bold',
+                    cursor: 'pointer', transition: 'all 0.15s',
+                    border: whContinent === opt.value ? `1px solid ${opt.color}` : '1px solid rgba(255,255,255,0.1)',
+                    background: whContinent === opt.value ? `${opt.color}20` : 'transparent',
+                    color: whContinent === opt.value ? opt.color : '#64748b',
+                  }}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+
             <div style={{ display: 'flex', gap: '8px' }}>
-              <input 
-                type="text" placeholder="Buscar por código o ciudad..." 
+              <input type="text" placeholder="Buscar por código o ciudad..." 
                 value={whSearch} onChange={(e) => setWhSearch(e.target.value)}
                 style={{ flex: 1, padding: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '4px', fontSize: '12px' }}
               />
-              <select 
-                value={whSort} onChange={(e) => setWhSort(e.target.value)}
+              <select value={whSort} onChange={(e) => setWhSort(e.target.value)}
                 style={{ padding: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '4px', fontSize: '12px' }}
               >
                 <option value="occupancy_desc">Ocupación (Mayor a Menor)</option>
                 <option value="occupancy_asc">Ocupación (Menor a Mayor)</option>
+                <option value="next_departure">Próxima salida de UT</option>
+                <option value="next_arrival">Próxima llegada de UT</option>
                 <option value="name_asc">Código (A-Z)</option>
               </select>
             </div>
@@ -431,7 +482,9 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
                               onClick={(e) => { e.stopPropagation(); handleSelectUT(f); }}
                             >
                               <span>✈ Vuelo {fId} ({f.from})</span>
-                              <span style={{ color: '#10b981' }}>+{f.ocupacionReal ?? '?'} maletas</span>
+                              <span style={{ color: f.ocupacionReal > 0 ? '#10b981' : '#64748b' }}>
+                                {f.ocupacionReal > 0 ? `+${f.ocupacionReal} maletas` : 'En tránsito vacío'}
+                              </span>
                             </div>
                           );
                         }) : (
@@ -446,7 +499,9 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
                               onClick={(e) => { e.stopPropagation(); handleSelectUT(f); }}
                             >
                               <span>✈ Vuelo {fId} (→{f.to})</span>
-                              <span style={{ color: '#f59e0b' }}>-{f.ocupacionReal ?? '?'} maletas</span>
+                              <span style={{ color: f.ocupacionReal > 0 ? '#f59e0b' : '#64748b' }}>
+                                {f.ocupacionReal > 0 ? `-${f.ocupacionReal} maletas` : 'En tránsito vacío'}
+                              </span>
                             </div>
                           );
                         }) : (
