@@ -79,14 +79,19 @@ public class VueloService {
                         .orElseThrow(() ->
                                 new RuntimeException("Destino no encontrado: " + parsed.destinoIcao()));
 
+                // Normalización a UTC: Restar el GMT offset (local -> UTC)
+                // Usamos (minutos + 1440) % 1440 para manejar resultados negativos
+                int depUtc = (parsed.departureMinute() - (origen.getGmtOffset() * 60) + 1440) % 1440;
+                int arrUtc = (parsed.arrivalMinute() - (destino.getGmtOffset() * 60) + 1440) % 1440;
+
                 boolean intercontinental = origen.getContinent() != destino.getContinent();
 
                 Vuelo vuelo = Vuelo.builder()
                         .origen(origen)
                         .destino(destino)
                         .capacidadTotal(parsed.capacidad())
-                        .departureMinute(parsed.departureMinute())
-                        .arrivalMinute(parsed.arrivalMinute())
+                        .departureMinute(depUtc)
+                        .arrivalMinute(arrUtc)
                         .intercontinental(intercontinental)
                         .cancelled(false)
                         .build();

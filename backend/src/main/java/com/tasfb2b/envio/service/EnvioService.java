@@ -69,10 +69,19 @@ public class EnvioService {
                 continue;
             }
 
+            // Normalización a UTC: Ajustar fecha/hora según GMT offset del origen
+            java.time.LocalDateTime localDT = java.time.LocalDateTime.of(
+                    LocalDate.parse(parsed.fecha(), DateTimeFormatter.BASIC_ISO_DATE),
+                    LocalTime.parse(parsed.hora())
+            );
+            // Restamos el offset para pasar de local a UTC (ej: -5h offset -> restamos -5 = sumamos 5h)
+            java.time.ZonedDateTime utcDT = localDT.atZone(java.time.ZoneId.ofOffset("GMT", 
+                    java.time.ZoneOffset.ofHours(origen.getGmtOffset()))).withZoneSameInstant(java.time.ZoneOffset.UTC);
+
             batch.add(Envio.builder()
                     .codigoPedido(codigo)
-                    .fecha(LocalDate.parse(parsed.fecha(), DateTimeFormatter.BASIC_ISO_DATE))
-                    .hora(LocalTime.parse(parsed.hora()))
+                    .fecha(utcDT.toLocalDate())
+                    .hora(utcDT.toLocalTime())
                     .origen(origen)
                     .destino(destino)
                     .cantidadMaletas(parsed.cantidad())
