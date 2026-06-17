@@ -132,6 +132,7 @@ public class Route {
 
     public long getDepartureTime() {
         if (flights == null || flights.isEmpty()) return -1L;
-        return flights.get(0).getDepartureEpoch(getLot().getReadyTime());
+        // Obtenemos la salida real basada en el momento en que las maletas están listas
+        return flights.get(0).calcularSiguienteSalida(lot.getReadyTime());
     }
 }

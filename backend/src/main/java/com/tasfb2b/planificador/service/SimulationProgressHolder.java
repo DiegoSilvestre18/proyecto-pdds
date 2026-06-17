@@ -49,7 +49,8 @@ public class SimulationProgressHolder {
             Long taMs,
             Integer saMinutes,
             String planId,
-            List<Map<String, Object>> plannedRoutes
+            List<Map<String, Object>> plannedRoutes,
+            Double globalFleetOccupancy
     ) {}
 
     /**

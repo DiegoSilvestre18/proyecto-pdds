@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class SimulationWsPublisher {
 
-    private static final int DEFAULT_ROUTE_LIMIT = 220;
+    private static final int DEFAULT_ROUTE_LIMIT = 1400;
 
     private final SimulationProgressHolder progressHolder;
     private final SimpMessagingTemplate messaging;
@@ -198,13 +198,10 @@ public class SimulationWsPublisher {
     private SimulationKpiSnapshotDTO buildKpiSnapshot(SimulationSessionState session, SimulationProgressHolder.WsFrame frame) {
         Map<String, Map<String, Object>> loads = (frame != null) ? frame.airportLoads() : session.getAirportLoads();
 
-        double globalOccupancy = 0;
-        if (loads != null && !loads.isEmpty()) {
-            globalOccupancy = loads.values().stream()
-                    .mapToInt(data -> (Integer) data.getOrDefault("occupancy", 0))
-                    .average()
-                    .orElse(0);
-        }
+        // Usamos el cálculo de flota del backend si está disponible en el frame
+        double globalOccupancy = (frame != null && frame.globalFleetOccupancy() != null) 
+                ? frame.globalFleetOccupancy() 
+                : 0.0;
 
         if (frame != null) {
             return SimulationKpiSnapshotDTO.builder()
