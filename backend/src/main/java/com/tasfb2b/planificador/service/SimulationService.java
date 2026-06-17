@@ -734,7 +734,7 @@ int cyclesPerDay = 1440 / saMinutes;
                 // Conversión de Master Plan para WS
                 List<Map<String, Object>> plannedRoutes = new ArrayList<>();
                 if (masterPlan != null) {
-                    for (Route r : masterPlan.stream().limit(200).toList()) {
+                    for (Route r : masterPlan) {
                         Map<String, Object> rMap = new HashMap<>();
                         rMap.put("lotId", r.getLot().getId());
                         rMap.put("origin", r.getLot().getOrigenIcao());

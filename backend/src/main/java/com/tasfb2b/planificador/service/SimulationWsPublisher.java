@@ -280,7 +280,7 @@ public class SimulationWsPublisher {
         if (limit <= 0) {
             return DEFAULT_ROUTE_LIMIT;
         }
-        return Math.min(limit, 600);
+        return Math.min(limit, 2000);
     }
 
     private Long asLong(Object value) {
