@@ -305,13 +305,15 @@ function DayToDayConfig({
                   fontWeight: 600,
                   color: '#818cf8',
                   letterSpacing: '0.5px',
+                  opacity: 0.5
                 }}>
-                  ⚙️ CONFIGURAR CANCELACIONES PREVIAS
+                  ⚙️ CONFIGURAR CANCELACIONES PREVIAS (DESHABILITADO)
                 </div>
                 <p style={{ fontSize: '11px', color: '#64748b', margin: '0 0 12px 0', lineHeight: '1.4' }}>
-                  Define qué vuelos iniciarán cancelados desde el primer ciclo de la simulación.
+                  Esta función ha sido deshabilitada. Utiliza el panel de control durante la simulación para cancelaciones manuales.
                 </p>
 
+                {/* Se comenta el bloque de configuración previa por requerimiento
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '14px' }}>
                   <input
                     type="number"
@@ -350,7 +352,9 @@ function DayToDayConfig({
                     ➕ Agregar
                   </button>
                 </div>
+                */}
 
+                {/* 
                 {preCancelledFlightIds.length > 0 ? (
                   <div>
                     <div style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', marginBottom: '6px' }}>
@@ -413,6 +417,7 @@ function DayToDayConfig({
                     Ningún vuelo configurado para pre-cancelar.
                   </div>
                 )}
+                */}
               </div>
             ) : (
               <div>

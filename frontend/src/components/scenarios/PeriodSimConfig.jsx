@@ -328,12 +328,15 @@ function PeriodSimConfig({
               )}
             </div>
 
-            {/* Configurar pre-cancelaciones */}
+            {/* Configurar pre-cancelaciones (DESHABILITADO POR REQUERIMIENTO) */}
             <div className="ct-config-section" style={{
               background: 'rgba(15, 23, 42, 0.85)',
               borderRadius: '12px',
               border: '1px solid rgba(99, 102, 241, 0.3)',
               padding: '14px 16px',
+              opacity: 0.6,
+              pointerEvents: 'none',
+              userSelect: 'none'
             }}>
               <div style={{
                 display: 'flex',
@@ -345,12 +348,13 @@ function PeriodSimConfig({
                 color: '#818cf8',
                 letterSpacing: '0.5px',
               }}>
-                ⚙️ CANCELACIONES PROGRAMADAS (PREVIAS)
+                ⚙️ CANCELACIONES PROGRAMADAS (DESHABILITADO)
               </div>
               <p style={{ fontSize: '11px', color: '#64748b', margin: '0 0 12px 0', lineHeight: '1.4' }}>
-                Programa la cancelación de vuelos para un día específico o para todo el periodo.
+                Esta función ha sido deshabilitada. Utiliza el panel de control durante la simulación para cancelaciones manuales.
               </p>
 
+              {/* 
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
                 <input
                   type="number"
@@ -491,6 +495,7 @@ function PeriodSimConfig({
                   Ningún vuelo programado.
                 </div>
               )}
+              */}
             </div>
 
             {/* Botón iniciar */}
