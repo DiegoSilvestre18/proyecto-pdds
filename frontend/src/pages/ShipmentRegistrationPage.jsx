@@ -6,6 +6,7 @@ import { apiFetch } from '../hooks/api';
 const ShipmentRegistrationPage = () => {
     const navigate = useNavigate();
     const [trayShipments, setTrayShipments] = useState([]);
+    const [selectedFile, setSelectedFile] = useState(null);
 
     // Manual form state
     const [formData, setFormData] = useState({
@@ -57,51 +58,60 @@ const ShipmentRegistrationPage = () => {
         setTrayShipments([]);
     };
 
+    const handleBulkUpload = async () => {
+        if (!selectedFile) return;
+
+        try {
+            setLoading(true);
+
+            const formData = new FormData();
+            formData.append("file", selectedFile);
+
+            const res = await apiFetch(
+                "/api/v1/envios/archivo",
+                {
+                    method: "POST",
+                    body: formData
+                }
+            );
+
+            if (res.ok) {
+                setStatus({
+                    type: "success",
+                    message: "Archivo procesado correctamente."
+                });
+
+                setSelectedFile(null);
+
+                if (fileInputRef.current) {
+                    fileInputRef.current.value = "";
+                }
+            } else {
+                setStatus({
+                    type: "error",
+                    message: "Error al procesar el archivo."
+                });
+            }
+        } catch (err) {
+            setStatus({
+                type: "error",
+                message: "No se pudo conectar con el servidor."
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleTxtUpload = (e) => {
         const file = e.target.files[0];
         if (!file) return;
 
-        const reader = new FileReader();
-        reader.onload = (evt) => {
-            const text = evt.target.result;
-            const lines = text.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#') && !l.startsWith('fecha'));
+        setSelectedFile(file);
 
-            const newItems = [];
-            let errCount = 0;
-
-            lines.forEach(line => {
-                const parts = line.split(/[,;\t]/).map(p => p.trim());
-                if (parts.length >= 5) {
-                    newItems.push({
-                        idTemp: Date.now() + Math.random().toString(36).substr(2, 9),
-                        fecha: parts[0],
-                        hora: parts[1],
-                        origenIcao: parts[2].toUpperCase(),
-                        destinoIcao: parts[3].toUpperCase(),
-                        cantidadMaletas: parseInt(parts[4], 10) || 1,
-                        clienteId: parts[5] || Math.floor(1000000 + Math.random() * 9000000).toString()
-                    });
-                } else {
-                    errCount++;
-                }
-            });
-            setTrayShipments(prev => [...prev, ...newItems]);
-
-            if (errCount > 0) {
-                setStatus({
-                    type: 'amber',
-                    message: `Se cargaron ${newItems.length} envíos. Hubo ${errCount} líneas ignoradas por formato incorrecto.`
-                });
-            } else {
-                setStatus({
-                    type: 'success',
-                    message: `Se cargaron ${newItems.length} envíos desde el archivo .txt correctamente.`
-                });
-            }
-
-            if (fileInputRef.current) fileInputRef.current.value = '';
-        };
-        reader.readAsText(file);
+        setStatus({
+            type: 'info',
+            message: `Archivo seleccionado: ${file.name}`
+        });
     };
 
     const handleUploadToLiveSystem = async () => {
@@ -115,20 +125,10 @@ const ShipmentRegistrationPage = () => {
 
         await Promise.all(trayShipments.map(async (shipment) => {
             try {
-                const airport = AIRPORTS.find(a => a.icao === shipment.origenIcao);
-                const gmtOffset = airport ? airport.gmtOffset : 0;
-                const mapOffset = (new Date().getTimezoneOffset() / -60);
-                const hoursDifference = gmtOffset - mapOffset;
-
-                const [y, mo, d] = shipment.fecha.split('-').map(Number);
-                const [h, m] = shipment.hora.split(':').map(Number);
-
-                const dateObj = new Date(Date.UTC(y, mo - 1, d, h, m, 0));
-                dateObj.setUTCMinutes(dateObj.getUTCMinutes() - (hoursDifference * 60));
 
                 const payload = {
-                    fecha: dateObj.toISOString().split('T')[0],
-                    hora: dateObj.toISOString().split('T')[1].substring(0, 5),
+                    fecha: shipment.fecha,
+                    hora: shipment.hora,
                     origenIcao: shipment.origenIcao,
                     destinoIcao: shipment.destinoIcao,
                     cantidadMaletas: shipment.cantidadMaletas,
@@ -218,11 +218,14 @@ const ShipmentRegistrationPage = () => {
                                             (() => {
                                                 const airport = AIRPORTS.find(a => a.icao === formData.origenIcao);
                                                 if (!airport) return '--:--';
-                                                const mapOffset = (new Date().getTimezoneOffset() / -60);
-                                                const hoursDifference = airport.gmtOffset - mapOffset;
                                                 const [h, m] = formData.hora.split(':').map(Number);
+
                                                 const dateObj = new Date(Date.UTC(2026, 0, 1, h, m, 0));
-                                                dateObj.setUTCMinutes(dateObj.getUTCMinutes() - (hoursDifference * 60));
+
+                                                dateObj.setUTCMinutes(
+                                                    dateObj.getUTCMinutes() - (airport.gmtOffset * 60)
+                                                );
+
                                                 return dateObj.toISOString().split('T')[1].substring(0, 5);
                                             })()
                                         }
@@ -280,6 +283,27 @@ const ShipmentRegistrationPage = () => {
                         <h3 style={{ margin: '0 0 0.5rem 0', color: '#e2e8f0', fontSize: '14px' }}>📄 Carga desde archivo (.TXT)</h3>
                         <p style={{ margin: '0 0 1rem 0', fontSize: '11px', color: '#64748b' }}>Formato: YYYY-MM-DD, HH:mm, ORIGEN, DESTINO, CANTIDAD</p>
                         <input type="file" accept=".txt,.csv" onChange={handleTxtUpload} ref={fileInputRef} style={{ width: '100%', color: '#94a3b8', fontSize: '12px' }} />
+                        {selectedFile && (
+                            <button
+                                onClick={handleBulkUpload}
+                                disabled={loading}
+                                style={{
+                                    width: '100%',
+                                    marginTop: '1rem',
+                                    padding: '10px',
+                                    background: 'rgba(16, 185, 129, 0.15)',
+                                    color: '#34d399',
+                                    border: '1px solid rgba(16, 185, 129, 0.4)',
+                                    borderRadius: '8px',
+                                    cursor: loading ? 'not-allowed' : 'pointer',
+                                    fontWeight: 'bold'
+                                }}
+                            >
+                                {loading
+                                    ? '⏳ PROCESANDO ARCHIVO...'
+                                    : `📤 SUBIR ${selectedFile.name}`}
+                            </button>
+                        )}
                     </div>
                 </div>
 

@@ -214,7 +214,9 @@ public class SimulationService {
                                 networkAdapter.invalidateGraph();
                         }
 
-                        envioService.cargarPorDia(fechaDia, dataPath);
+                        if(!isRealTime) {
+                                envioService.cargarPorDia(fechaDia, dataPath);
+                        }
 
                         int malatetasAtendidasDia = 0;
                         int totalMaletasDia = planifiablePool.values().stream().mapToInt(SuperLot::getTotalMaletas).sum();

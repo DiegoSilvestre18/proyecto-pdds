@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
@@ -170,6 +171,17 @@ public class EnvioService {
                 ));
     }
 
+    private LocalDateTime convertirLocalAUtc(
+            LocalDate fechaLocal,
+            LocalTime horaLocal,
+            Aeropuerto origen
+    ) {
+        LocalDateTime fechaHoraLocal =
+                LocalDateTime.of(fechaLocal, horaLocal);
+
+        return fechaHoraLocal.minusHours(origen.getGmtOffset());
+    }
+
     @Transactional
     public void registrarManual(com.tasfb2b.envio.web.UserEnvioRequest req) {
         Aeropuerto origen = aeropuertoRepo.findByIcaoCode(req.getOrigenIcao())
@@ -177,12 +189,19 @@ public class EnvioService {
         Aeropuerto destino = aeropuertoRepo.findByIcaoCode(req.getDestinoIcao())
                 .orElseThrow(() -> new RuntimeException("Destino no encontrado: " + req.getDestinoIcao()));
 
+        LocalDateTime fechaHoraUtc =
+                convertirLocalAUtc(
+                        req.getFecha(),
+                        req.getHora(),
+                        origen
+                );
+
         String codigo9 = String.format("%09d", new java.util.Random().nextInt(1000000000));
 
         envioRepo.save(Envio.builder()
                 .codigoPedido(codigo9)
-                .fecha(req.getFecha())
-                .hora(req.getHora())
+                .fecha(fechaHoraUtc.toLocalDate())
+                .hora(fechaHoraUtc.toLocalTime())
                 .origen(origen)
                 .destino(destino)
                 .cantidadMaletas(req.getCantidadMaletas())
@@ -215,13 +234,18 @@ public class EnvioService {
                 Aeropuerto destino = aeropuertoCache.get(destinoIcao);
 
                 if (origen == null || destino == null) continue;
-
+                LocalDateTime fechaHoraUtc =
+                        convertirLocalAUtc(
+                                fecha,
+                                hora,
+                                origen
+                        );
                 String codigo9 = String.format("%09d", random.nextInt(1000000000));
 
                 batch.add(Envio.builder()
                         .codigoPedido(codigo9)
-                        .fecha(fecha)
-                        .hora(hora)
+                        .fecha(fechaHoraUtc.toLocalDate())
+                        .hora(fechaHoraUtc.toLocalTime())
                         .origen(origen)
                         .destino(destino)
                         .cantidadMaletas(cantidad)

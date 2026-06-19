@@ -10,6 +10,9 @@ import java.util.stream.Stream;
 
 public interface EnvioRepository extends CrudRepository<Envio, Long> {
 
+    @Query("SELECT e.codigoPedido, o.icaoCode, d.icaoCode, e.cantidadMaletas, e.fecha, e.hora FROM Envio e JOIN e.origen o JOIN e.destino d WHERE e.fecha BETWEEN :inicio AND :fin")
+    List<Object[]> findActiveShipmentData(@Param("inicio") java.time.LocalDate inicio, @Param("fin") java.time.LocalDate fin);
+
     @Query("SELECT e FROM Envio e JOIN FETCH e.origen JOIN FETCH e.destino WHERE e.fecha BETWEEN :inicio AND :fin")
     List<Envio> findByFechaBetween(@Param("inicio") java.time.LocalDate inicio, @Param("fin") java.time.LocalDate fin);
 

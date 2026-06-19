@@ -23,6 +23,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.tasfb2b.envio.domain.Envio;
+import com.tasfb2b.envio.repository.EnvioRepository;
+
 
 import java.util.HashMap;
 import java.util.Map;
@@ -155,7 +158,7 @@ public class SimulationController {
     }
 
     // ── GET /status/{sessionId} ─────────────────────────────────────────────
-
+/*
     @GetMapping("/active-shipments/{sessionId}")
     public ResponseEntity<List<Map<String, Object>>> getActiveShipments(@PathVariable String sessionId) {
         SimulationProgressHolder.SimulationSessionState session = progressHolder.get(sessionId);
@@ -170,7 +173,7 @@ public class SimulationController {
         java.time.LocalDate startDate = java.time.Instant.ofEpochMilli(minReadyTime).atOffset(java.time.ZoneOffset.UTC).toLocalDate().minusDays(1);
         java.time.LocalDate endDate = java.time.Instant.ofEpochMilli(maxReadyTime).atOffset(java.time.ZoneOffset.UTC).toLocalDate().plusDays(1);
 
-        List<Envio> envios = envioRepository.findByFechaBetween(startDate, endDate);
+        List<Object[]> envios = envioRepository.findActiveShipmentData(startDate, endDate);
 
         java.util.Map<String, String> assignmentMap = new java.util.HashMap<>();
         for (Route r : masterPlan) {
@@ -182,18 +185,25 @@ public class SimulationController {
         }
 
         List<Map<String, Object>> result = new java.util.ArrayList<>();
-        for (Envio e : envios) {
-            long readyTime = java.time.LocalDateTime.of(e.getFecha(), e.getHora())
+        for (Object[] row : envios) {
+            String codigoPedido = (String) row[0];
+            String origen = (String) row[1];
+            String destino = (String) row[2];
+            int cantidad = (Integer) row[3];
+            java.time.LocalDate fecha = (java.time.LocalDate) row[4];
+            java.time.LocalTime hora = (java.time.LocalTime) row[5];
+
+            long readyTime = java.time.LocalDateTime.of(fecha, hora)
                     .toInstant(java.time.ZoneOffset.UTC).toEpochMilli();
 
             if (readyTime >= minReadyTime && readyTime <= maxReadyTime) {
-                String key = e.getOrigen().getIcaoCode() + "-" + e.getDestino().getIcaoCode() + "-" + readyTime;
+                String key = origen + "-" + destino + "-" + readyTime;
                 if (assignmentMap.containsKey(key)) {
                     Map<String, Object> map = new java.util.HashMap<>();
-                    map.put("id", e.getCodigoPedido());
-                    map.put("origen", e.getOrigen().getIcaoCode());
-                    map.put("destino", e.getDestino().getIcaoCode());
-                    map.put("cantidad", e.getCantidadMaletas());
+                    map.put("id", codigoPedido);
+                    map.put("origen", origen);
+                    map.put("destino", destino);
+                    map.put("cantidad", cantidad);
                     map.put("vueloAsignado", assignmentMap.get(key));
                     result.add(map);
                 }
@@ -208,7 +218,7 @@ public class SimulationController {
 
         return ResponseEntity.ok(result);
     }
-
+*/
     @GetMapping("/status/{sessionId}")
     public ResponseEntity<SimulationStatusDTO> getStatus(
             @PathVariable String sessionId) {
