@@ -32,4 +32,10 @@ public class SimulationKpiSnapshotDTO {
     private String errorMessage;
     private Long startEpoch;
     private String algorithm;
+
+    /** Latencia de la última ejecución del ALNS (ms) */
+    private Long taMs;
+
+    /** Salto del algoritmo (minutos) */
+    private Integer saMinutes;
 }

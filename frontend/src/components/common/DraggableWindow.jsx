@@ -12,6 +12,7 @@ export default function DraggableWindow({
   const [position, setPosition] = useState(initialPosition);
   const [isDragging, setIsDragging] = useState(false);
   const dragRef = useRef({ startX: 0, startY: 0, initialX: 0, initialY: 0 });
+  const maxHeight = Math.min(window.innerHeight - 40, 480);
 
   const handleMouseDown = (e) => {
     if (e.target.tagName.toLowerCase() === 'button' || e.target.closest('button')) return;
@@ -32,7 +33,7 @@ export default function DraggableWindow({
       const dy = e.clientY - dragRef.current.startY;
       setPosition({
         x: Math.max(0, dragRef.current.initialX + dx),
-        y: Math.max(0, dragRef.current.initialY + dy)
+        y: Math.max(0, Math.min(window.innerHeight - 60, dragRef.current.initialY + dy))
       });
     };
 
@@ -60,6 +61,7 @@ export default function DraggableWindow({
         top: position.y,
         width: defaultSize.width,
         height: defaultSize.height,
+        maxHeight: maxHeight,
         minWidth: 300,
         background: 'rgba(30, 41, 59, 0.85)',
         backdropFilter: 'blur(16px)',

@@ -39,7 +39,7 @@ const FLIGHT_STATUS_OPTIONS = [
   { value: 'cancelled', label: '🔴 Cancelado', color: '#ef4444' },
 ];
 
-export default function EntitiesListPanel({ activeAircraft, airports, airportMetrics }) {
+export default function EntitiesListPanel({ activeAircraft, airports, airportMetrics, onSelectFlight }) {
   const [activeTab, setActiveTab] = useState('ut');
   
   // ── Selection Bridge ─────────────────────────────────────────────────────
@@ -60,7 +60,6 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
 
   // Warehouse Filters & Sort
   const [whSearch, setWhSearch] = useState('');
-  const [whContinent, setWhContinent] = useState(null);
   const [whSort, setWhSort] = useState('occupancy_desc');
   const [expandedWh, setExpandedWh] = useState(null);
 
@@ -106,7 +105,8 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
   // ── Clic en panel → enfocar en mapa ────────────────────────────────────
   const handleSelectUT = useCallback((ut) => {
     setFocusedEntity('flight', ut.id, 'panel');
-  }, [setFocusedEntity]);
+    if (onSelectFlight) onSelectFlight(ut.id);
+  }, [setFocusedEntity, onSelectFlight]);
 
   const handleSelectWarehouse = useCallback((wh) => {
     setFocusedEntity('airport', wh.icao, 'panel');
@@ -127,8 +127,8 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
   }, [setActiveFilters]);
 
   const handleContinentFilter = useCallback((continent) => {
-    setWhContinent(continent);
-  }, []);
+    setActiveFilters(prev => ({ ...prev, continent }));
+  }, [setActiveFilters]);
 
   const filteredUTs = useMemo(() => {
     let result = [...(activeAircraft || [])];
@@ -181,14 +181,14 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
     if (activeFilters.semaphoreLevel) {
       result = result.filter(wh => {
         const m = airportMetrics[wh.icao] || {};
-        const pct = m.capacity ? (m.load / m.capacity) * 100 : 0;
+        const pct = m.occupancy ?? 0;
         return getLevelName(pct) === activeFilters.semaphoreLevel;
       });
     }
 
     // Item 2: Filtro por continente
-    if (whContinent) {
-      result = result.filter(wh => wh.continent === whContinent);
+    if (activeFilters.continent) {
+      result = result.filter(wh => wh.continent === activeFilters.continent);
     }
 
     // Items 4 & 5: Computar próxima salida/llegada de UT por almacén
@@ -202,8 +202,8 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
     result.sort((a, b) => {
       const mA = airportMetrics[a.icao] || {};
       const mB = airportMetrics[b.icao] || {};
-      const pctA = mA.capacity ? (mA.load / mA.capacity) * 100 : 0;
-      const pctB = mB.capacity ? (mB.load / mB.capacity) * 100 : 0;
+      const pctA = mA.occupancy ?? 0;
+      const pctB = mB.occupancy ?? 0;
 
       if (whSort === 'occupancy_desc') return pctB - pctA;
       if (whSort === 'occupancy_asc') return pctA - pctB;
@@ -214,7 +214,7 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
     });
 
     return result;
-  }, [airports, airportMetrics, activeAircraft, whSearch, whContinent, whSort, activeFilters.semaphoreLevel]);
+  }, [airports, airportMetrics, activeAircraft, whSearch, activeFilters.continent, whSort, activeFilters.semaphoreLevel]);
 
   // ── Paso 10: Derivar envíos reales de activeAircraft por almacén ────────
   const getWarehouseFlights = useCallback((icao) => {
@@ -391,9 +391,9 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
                   style={{
                     padding: '4px 10px', borderRadius: '12px', fontSize: '10px', fontWeight: 'bold',
                     cursor: 'pointer', transition: 'all 0.15s',
-                    border: whContinent === opt.value ? `1px solid ${opt.color}` : '1px solid rgba(255,255,255,0.1)',
-                    background: whContinent === opt.value ? `${opt.color}20` : 'transparent',
-                    color: whContinent === opt.value ? opt.color : '#64748b',
+                    border: activeFilters.continent === opt.value ? `1px solid ${opt.color}` : '1px solid rgba(255,255,255,0.1)',
+                    background: activeFilters.continent === opt.value ? `${opt.color}20` : 'transparent',
+                    color: activeFilters.continent === opt.value ? opt.color : '#64748b',
                   }}
                 >
                   {opt.label}

@@ -271,8 +271,10 @@ public class SimulationService {
                                     if (countedArrivalLotKeysToday.add(lot.getKey())) totalMaletasDia += lot.getTotalMaletas();
                                 }
 
+                                long tPlanStart = System.currentTimeMillis();
                                 Solution sol = alnsPlanner.plan(superLotService.mergeLots(new ArrayList<>(planifiablePool.values())), 3000L, 
                                                 globalState.getCapacidadVuelo(), globalState.getCargaAeropuerto(), currentSimTime);
+                                session.setLastTaMs(System.currentTimeMillis() - tPlanStart);
                                 masterPlan = sol.getRoutes();
                                 session.setCurrentPlanId(sol.getPlanId());
 
