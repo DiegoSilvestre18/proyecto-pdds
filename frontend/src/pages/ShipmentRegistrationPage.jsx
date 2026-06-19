@@ -1,251 +1,392 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AIRPORTS } from '../data/airportsData';
 import { apiFetch } from '../hooks/api';
 
 const ShipmentRegistrationPage = () => {
-  const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('manual');
-  
-  // Manual form state
-  const [formData, setFormData] = useState({
-    fecha: '',
-    hora: '',
-    origenIcao: '',
-    destinoIcao: '',
-    cantidadMaletas: 1,
-    clienteId: ''
-  });
+    const navigate = useNavigate();
+    const [trayShipments, setTrayShipments] = useState([]);
 
-  const [file, setFile] = useState(null);
-  const [status, setStatus] = useState({ type: '', message: '' });
-  const [loading, setLoading] = useState(false);
+    // Manual form state
+    const [formData, setFormData] = useState({
+        fecha: new Date().toLocaleDateString('en-CA'), // Formato YYYY-MM-DD
+        hora: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
+        origenIcao: '',
+        destinoIcao: '',
+        cantidadMaletas: 1,
+        clienteId: ''
+    });
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-  };
+    const [status, setStatus] = useState({ type: '', message: '' });
+    const [loading, setLoading] = useState(false);
+    const fileInputRef = useRef(null);
 
-  const handleManualSubmit = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setStatus({ type: '', message: '' });
+    const handleInputChange = (e) => {
+        const { name, value } = e.target;
+        setFormData(prev => ({ ...prev, [name]: value }));
+    };
 
-    try {
-      const res = await apiFetch('/api/v1/envios/manual', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      });
+    const handleAddToTray = (e) => {
+        e.preventDefault();
+        if (!formData.origenIcao || !formData.destinoIcao) {
+            setStatus({ type: 'error', message: 'Debe seleccionar origen y destino.' });
+            return;
+        }
+        if (formData.origenIcao === formData.destinoIcao) {
+            setStatus({ type: 'error', message: 'El origen y destino no pueden ser iguales.' });
+            return;
+        }
 
-      if (res.ok) {
-        setStatus({ type: 'success', message: 'Envío registrado exitosamente.' });
-        setFormData({
-          fecha: '',
-          hora: '',
-          origenIcao: '',
-          destinoIcao: '',
-          cantidadMaletas: 1,
-          clienteId: ''
-        });
-      } else {
-        setStatus({ type: 'error', message: 'Error al registrar el envío.' });
-      }
-    } catch (err) {
-      setStatus({ type: 'error', message: 'Error de conexión con el servidor.' });
-    } finally {
-      setLoading(false);
-    }
-  };
+        const newShipment = {
+            idTemp: Date.now() + Math.random().toString(36).substr(2, 9),
+            ...formData,
+            clienteId: formData.clienteId || Math.floor(1000000 + Math.random() * 9000000).toString()
+        };
+        setTrayShipments(prev => [...prev, newShipment]);
+        setStatus({ type: '', message: '' });
 
-  const handleFileChange = (e) => {
-    setFile(e.target.files[0]);
-  };
+        // Dejar listo para el siguiente
+        setFormData(prev => ({ ...prev, cantidadMaletas: 1, destinoIcao: '' }));
+    };
 
-  const handleFileSubmit = async (e) => {
-    e.preventDefault();
-    if (!file) return;
+    const handleRemoveFromTray = (idTemp) => {
+        setTrayShipments(prev => prev.filter(s => s.idTemp !== idTemp));
+    };
 
-    setLoading(true);
-    setStatus({ type: '', message: '' });
+    const handleClearTray = () => {
+        setTrayShipments([]);
+    };
 
-    const formDataFile = new FormData();
-    formDataFile.append('file', file);
+    const handleTxtUpload = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
 
-    try {
-      // Usamos fetch directamente porque apiFetch podría no manejar FormData automáticamente si añade headers de JSON
-      // Pero apiFetch en este proyecto es solo un wrapper de fetch(apiUrl(path), options)
-      const res = await apiFetch('/api/v1/envios/archivo', {
-        method: 'POST',
-        body: formDataFile
-      });
+        const reader = new FileReader();
+        reader.onload = (evt) => {
+            const text = evt.target.result;
+            const lines = text.split('\n').map(l => l.trim()).filter(l => l && !l.startsWith('#') && !l.startsWith('fecha'));
 
-      if (res.ok) {
-        setStatus({ type: 'success', message: 'Archivo procesado exitosamente.' });
-        setFile(null);
-      } else {
-        setStatus({ type: 'error', message: 'Error al procesar el archivo.' });
-      }
-    } catch (err) {
-      setStatus({ type: 'error', message: 'Error de conexión con el servidor.' });
-    } finally {
-      setLoading(false);
-    }
-  };
+            const newItems = [];
+            let errCount = 0;
 
-  return (
-    <div className="registration-page" style={{ padding: '2rem', color: 'white', background: '#0f172a', minHeight: '100vh', fontFamily: 'sans-serif' }}>
-      <button 
-        onClick={() => navigate('/')} 
-        style={{ 
-          marginBottom: '2rem', 
-          background: 'rgba(59, 130, 246, 0.2)', 
-          color: '#60a5fa', 
-          border: '1px solid #3b82f6', 
-          padding: '0.6rem 1.2rem', 
-          borderRadius: '8px', 
-          cursor: 'pointer',
-          fontWeight: 'bold',
-          transition: 'all 0.2s'
-        }}
-        onMouseOver={(e) => e.target.style.background = 'rgba(59, 130, 246, 0.3)'}
-        onMouseOut={(e) => e.target.style.background = 'rgba(59, 130, 246, 0.2)'}
-      >
-        ← Volver al Centro de Control
-      </button>
+            lines.forEach(line => {
+                const parts = line.split(/[,;\t]/).map(p => p.trim());
+                if (parts.length >= 5) {
+                    newItems.push({
+                        idTemp: Date.now() + Math.random().toString(36).substr(2, 9),
+                        fecha: parts[0],
+                        hora: parts[1],
+                        origenIcao: parts[2].toUpperCase(),
+                        destinoIcao: parts[3].toUpperCase(),
+                        cantidadMaletas: parseInt(parts[4], 10) || 1,
+                        clienteId: parts[5] || Math.floor(1000000 + Math.random() * 9000000).toString()
+                    });
+                } else {
+                    errCount++;
+                }
+            });
+            setTrayShipments(prev => [...prev, ...newItems]);
 
-      <div style={{ maxWidth: '800px', margin: '0 auto' }}>
-        <h1 style={{ marginBottom: '0.5rem', color: '#f8fafc' }}>Registrar Nuevo Envío</h1>
-        <p style={{ marginBottom: '2rem', color: '#94a3b8' }}>Ingrese los datos del envío para su procesamiento en la red logística.</p>
+            if (errCount > 0) {
+                setStatus({
+                    type: 'amber',
+                    message: `Se cargaron ${newItems.length} envíos. Hubo ${errCount} líneas ignoradas por formato incorrecto.`
+                });
+            } else {
+                setStatus({
+                    type: 'success',
+                    message: `Se cargaron ${newItems.length} envíos desde el archivo .txt correctamente.`
+                });
+            }
 
-        <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '2.5rem', background: 'rgba(30, 41, 59, 0.5)', padding: '0.4rem', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.05)' }}>
-          <button 
-            onClick={() => setActiveTab('manual')}
-            style={{ 
-              flex: 1,
-              background: activeTab === 'manual' ? '#3b82f6' : 'transparent',
-              color: activeTab === 'manual' ? 'white' : '#94a3b8', 
-              border: 'none', 
-              padding: '0.8rem', 
-              borderRadius: '6px', 
-              cursor: 'pointer',
-              fontWeight: 'bold',
-              transition: 'all 0.3s'
-            }}
-          >
-            📋 Registro Individual
-          </button>
-          <button 
-            onClick={() => setActiveTab('file')}
-            style={{ 
-              flex: 1,
-              background: activeTab === 'file' ? '#3b82f6' : 'transparent',
-              color: activeTab === 'file' ? 'white' : '#94a3b8', 
-              border: 'none', 
-              padding: '0.8rem', 
-              borderRadius: '6px', 
-              cursor: 'pointer',
-              fontWeight: 'bold',
-              transition: 'all 0.3s'
-            }}
-          >
-            📁 Carga Masiva (CSV)
-          </button>
-        </div>
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        };
+        reader.readAsText(file);
+    };
 
-        {status.message && (
-          <div style={{ 
-            padding: '1.2rem', 
-            marginBottom: '2rem', 
-            borderRadius: '10px', 
-            background: status.type === 'success' ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-            border: `1px solid ${status.type === 'success' ? '#10b981' : '#ef4444'}`,
-            color: status.type === 'success' ? '#34d399' : '#f87171',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '10px'
-          }}>
-            <span style={{ fontSize: '1.2rem' }}>{status.type === 'success' ? '✅' : '❌'}</span>
-            {status.message}
-          </div>
-        )}
+    const handleUploadToLiveSystem = async () => {
+        if (trayShipments.length === 0) return;
 
-        <div style={{ background: 'rgba(30, 41, 59, 0.3)', padding: '2.5rem', borderRadius: '16px', border: '1px solid rgba(255,255,255,0.05)', boxShadow: '0 10px 25px rgba(0,0,0,0.2)' }}>
-          {activeTab === 'manual' ? (
-            <form onSubmit={handleManualSubmit} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1.5rem' }}>
-              <div style={{ gridColumn: 'span 1' }}>
-                <label style={{ display: 'block', marginBottom: '0.6rem', fontSize: '0.9rem', color: '#cbd5e1' }}>Fecha de Envío</label>
-                <input type="date" name="fecha" value={formData.fecha} onChange={handleInputChange} required style={{ width: '100%', padding: '0.8rem', borderRadius: '8px', background: '#0f172a', border: '1px solid #334155', color: 'white', boxSizing: 'border-box' }} />
-              </div>
-              <div style={{ gridColumn: 'span 1' }}>
-                <label style={{ display: 'block', marginBottom: '0.6rem', fontSize: '0.9rem', color: '#cbd5e1' }}>Hora de Envío</label>
-                <input type="time" name="hora" value={formData.hora} onChange={handleInputChange} required style={{ width: '100%', padding: '0.8rem', borderRadius: '8px', background: '#0f172a', border: '1px solid #334155', color: 'white', boxSizing: 'border-box' }} />
-              </div>
-              <div style={{ gridColumn: 'span 1' }}>
-                <label style={{ display: 'block', marginBottom: '0.6rem', fontSize: '0.9rem', color: '#cbd5e1' }}>Aeropuerto de Origen</label>
-                <select name="origenIcao" value={formData.origenIcao} onChange={handleInputChange} required style={{ width: '100%', padding: '0.8rem', borderRadius: '8px', background: '#0f172a', border: '1px solid #334155', color: 'white', boxSizing: 'border-box' }}>
-                  <option value="">Seleccione origen...</option>
-                  {AIRPORTS.sort((a,b) => a.city.localeCompare(b.city)).map(a => <option key={a.icao} value={a.icao}>{a.city} ({a.icao})</option>)}
-                </select>
-              </div>
-              <div style={{ gridColumn: 'span 1' }}>
-                <label style={{ display: 'block', marginBottom: '0.6rem', fontSize: '0.9rem', color: '#cbd5e1' }}>Aeropuerto de Destino</label>
-                <select name="destinoIcao" value={formData.destinoIcao} onChange={handleInputChange} required style={{ width: '100%', padding: '0.8rem', borderRadius: '8px', background: '#0f172a', border: '1px solid #334155', color: 'white', boxSizing: 'border-box' }}>
-                  <option value="">Seleccione destino...</option>
-                  {AIRPORTS.sort((a,b) => a.city.localeCompare(b.city)).map(a => <option key={a.icao} value={a.icao}>{a.city} ({a.icao})</option>)}
-                </select>
-              </div>
-              <div style={{ gridColumn: 'span 1' }}>
-                <label style={{ display: 'block', marginBottom: '0.6rem', fontSize: '0.9rem', color: '#cbd5e1' }}>Cantidad de Maletas</label>
-                <input type="number" name="cantidadMaletas" value={formData.cantidadMaletas} onChange={handleInputChange} min="1" required style={{ width: '100%', padding: '0.8rem', borderRadius: '8px', background: '#0f172a', border: '1px solid #334155', color: 'white', boxSizing: 'border-box' }} />
-              </div>
-              <div style={{ gridColumn: 'span 1' }}>
-                <label style={{ display: 'block', marginBottom: '0.6rem', fontSize: '0.9rem', color: '#cbd5e1' }}>Código de Cliente (7 dígitos)</label>
-                <input type="text" name="clienteId" value={formData.clienteId} onChange={handleInputChange} maxLength="7" pattern="\d{7}" required placeholder="Ej: 0000001" style={{ width: '100%', padding: '0.8rem', borderRadius: '8px', background: '#0f172a', border: '1px solid #334155', color: 'white', boxSizing: 'border-box' }} />
-              </div>
-              <div style={{ gridColumn: 'span 2', marginTop: '1rem' }}>
-                <button type="submit" disabled={loading} style={{ width: '100%', padding: '1rem', background: '#3b82f6', color: 'white', border: 'none', borderRadius: '10px', cursor: 'pointer', fontWeight: 'bold', fontSize: '1rem', boxShadow: '0 4px 12px rgba(59, 130, 246, 0.3)', transition: 'transform 0.2s' }} onMouseDown={(e) => e.target.style.transform = 'scale(0.98)'} onMouseUp={(e) => e.target.style.transform = 'scale(1)'}>
-                  {loading ? '⏳ Procesando Registro...' : '🚀 Confirmar y Registrar Envío'}
-                </button>
-              </div>
-            </form>
-          ) : (
-            <form onSubmit={handleFileSubmit} style={{ textAlign: 'center' }}>
-              <div 
-                style={{ 
-                  padding: '3rem 2rem', 
-                  border: '2px dashed #334155', 
-                  borderRadius: '16px', 
-                  background: 'rgba(15, 23, 42, 0.4)',
-                  cursor: 'pointer',
-                  transition: 'border-color 0.3s'
+        setLoading(true);
+        setStatus({ type: 'info', message: 'Subiendo envíos a la red en vivo...' });
+
+        let successCount = 0;
+        let failCount = 0;
+
+        await Promise.all(trayShipments.map(async (shipment) => {
+            try {
+                const airport = AIRPORTS.find(a => a.icao === shipment.origenIcao);
+                const gmtOffset = airport ? airport.gmtOffset : 0;
+                const mapOffset = (new Date().getTimezoneOffset() / -60);
+                const hoursDifference = gmtOffset - mapOffset;
+
+                const [y, mo, d] = shipment.fecha.split('-').map(Number);
+                const [h, m] = shipment.hora.split(':').map(Number);
+
+                const dateObj = new Date(Date.UTC(y, mo - 1, d, h, m, 0));
+                dateObj.setUTCMinutes(dateObj.getUTCMinutes() - (hoursDifference * 60));
+
+                const payload = {
+                    fecha: dateObj.toISOString().split('T')[0],
+                    hora: dateObj.toISOString().split('T')[1].substring(0, 5),
+                    origenIcao: shipment.origenIcao,
+                    destinoIcao: shipment.destinoIcao,
+                    cantidadMaletas: shipment.cantidadMaletas,
+                    clienteId: shipment.clienteId
+                };
+                const res = await apiFetch('/api/v1/envios/manual', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                if (res.ok) successCount++;
+                else failCount++;
+            } catch (err) {
+                failCount++;
+            }
+        }));
+
+        setLoading(false);
+
+        if (failCount === 0) {
+            setStatus({
+                type: 'success',
+                message: `✅ ¡Los ${successCount} envíos entraron a la red logística exitosamente!`
+            });
+            setTrayShipments([]);
+        } else {
+            setStatus({
+                type: 'error',
+                message: `Hubo ${failCount} errores al subir. Solo subieron ${successCount} envíos.`
+            });
+        }
+    }; // <--- AQUÍ SE CERRÓ CORRECTAMENTE LA FUNCIÓN ASÍNCRONA
+
+    return (
+        <div className="registration-page" style={{
+            padding: '2rem',
+            color: 'white',
+            background: '#080e1e',
+            minHeight: '100vh',
+            fontFamily: 'sans-serif'
+        }}>
+            <button
+                onClick={() => navigate('/')}
+                style={{
+                    marginBottom: '2rem', background: 'rgba(56, 189, 248, 0.1)',
+                    color: '#38bdf8',
+                    border: '1px solid rgba(56, 189, 248, 0.3)',
+                    padding: '0.6rem 1.2rem',
+                    borderRadius: '8px',
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    transition: 'all 0.2s'
                 }}
-                onMouseOver={(e) => e.currentTarget.style.borderColor = '#3b82f6'}
-                onMouseOut={(e) => e.currentTarget.style.borderColor = '#334155'}
-              >
-                <span style={{ fontSize: '3rem', display: 'block', marginBottom: '1rem' }}>📄</span>
-                <input type="file" accept=".csv" onChange={handleFileChange} style={{ marginBottom: '1.5rem', color: '#94a3b8' }} />
-                <p style={{ fontSize: '0.95rem', color: '#94a3b8', lineHeight: '1.6' }}>
-                  Seleccione un archivo <strong>CSV</strong> con el siguiente formato de columnas:<br />
-                  <code style={{ background: '#0f172a', padding: '0.4rem 0.8rem', borderRadius: '6px', fontSize: '0.85rem', marginTop: '10px', display: 'inline-block', border: '1px solid rgba(255,255,255,0.05)' }}>
-                    fecha(YYYY-MM-DD), hora(HH:MM), origen(ICAO), destino(ICAO), cantidad, clienteID
-                  </code>
-                </p>
-              </div>
-              <button type="submit" disabled={!file || loading} style={{ marginTop: '2rem', width: '100%', padding: '1rem', background: file ? '#10b981' : '#334155', color: 'white', border: 'none', borderRadius: '10px', cursor: file ? 'pointer' : 'not-allowed', fontWeight: 'bold', fontSize: '1rem', boxShadow: file ? '0 4px 12px rgba(16, 185, 129, 0.3)' : 'none' }}>
-                {loading ? '⏳ Subiendo y Procesando...' : '📤 Subir Archivo CSV'}
-              </button>
-            </form>
-          )}
-        </div>
+            >
+                ← Volver al Mapa de Control
+            </button>
 
-        <div style={{ marginTop: '3rem', padding: '1.5rem', background: 'rgba(245, 158, 11, 0.05)', borderRadius: '12px', border: '1px solid rgba(245, 158, 11, 0.2)', color: '#f59e0b' }}>
-          <h4 style={{ margin: '0 0 0.5rem 0', display: 'flex', alignItems: 'center', gap: '8px' }}>💡 Nota sobre el Código de Seguimiento</h4>
-          <p style={{ margin: 0, fontSize: '0.85rem', opacity: 0.8 }}>Para mantener la concordancia con el sistema, cada registro manual o por lote generará automáticamente un <strong>código de envío aleatorio de 9 dígitos</strong>.</p>
+            <div style={{ maxWidth: '1000px', margin: '0 auto', display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
+
+                {/* PANEL IZQUIERDO: Ingreso Manual y Archivo */}
+                <div style={{ flex: '1 1 350px', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                    <div>
+                        <h1 style={{ margin: '0 0 0.5rem 0', color: '#f8fafc', fontSize: '24px' }}>Data Entry Aduanas</h1>
+                        <p style={{ margin: 0, color: '#94a3b8', fontSize: '13px', lineHeight: 1.5 }}>
+                            Agrega envíos a tu bandeja temporal. Cuando estés listo, súbelos de golpe a la red global.
+                        </p>
+                    </div>
+
+                    <div style={{
+                        background: 'rgba(15, 23, 42, 0.8)',
+                        border: '1px solid rgba(56,189,248,0.2)',
+                        padding: '1.5rem',
+                        borderRadius: '12px'
+                    }}>
+                        <h3 style={{ margin: '0 0 1rem 0', color: '#38bdf8', fontSize: '14px' }}>✍️ Ingreso Manual</h3>
+                        <form onSubmit={handleAddToTray} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                            <div style={{ gridColumn: 'span 1' }}>
+                                <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '11px', color: '#94a3b8' }}>FECHA (LOCAL)</label>
+                                <input type="date" name="fecha" value={formData.fecha} onChange={handleInputChange} required style={inputStyle} />
+                            </div>
+                            <div style={{ gridColumn: 'span 1' }}>
+                                <label style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem', fontSize: '11px', color: '#94a3b8' }}>
+                                    <span>HORA (LOCAL)</span>
+                                    {formData.hora && formData.origenIcao && (
+                                        <span style={{ color: '#38bdf8' }} title="Hora equivalente en el reloj del mapa de la matriz">
+                                            Mapa: {
+                                            (() => {
+                                                const airport = AIRPORTS.find(a => a.icao === formData.origenIcao);
+                                                if (!airport) return '--:--';
+                                                const mapOffset = (new Date().getTimezoneOffset() / -60);
+                                                const hoursDifference = airport.gmtOffset - mapOffset;
+                                                const [h, m] = formData.hora.split(':').map(Number);
+                                                const dateObj = new Date(Date.UTC(2026, 0, 1, h, m, 0));
+                                                dateObj.setUTCMinutes(dateObj.getUTCMinutes() - (hoursDifference * 60));
+                                                return dateObj.toISOString().split('T')[1].substring(0, 5);
+                                            })()
+                                        }
+                                        </span>
+                                    )}
+                                </label>
+                                <input type="time" name="hora" value={formData.hora} onChange={handleInputChange} required style={inputStyle} />
+                            </div>
+                            <div style={{ gridColumn: 'span 2' }}>
+                                <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '11px', color: '#94a3b8' }}>AEROPUERTO ORIGEN</label>
+                                <select name="origenIcao" value={formData.origenIcao} onChange={handleInputChange} required style={inputStyle}>
+                                    <option value="">Seleccione origen...</option>
+                                    {[...AIRPORTS].sort((a, b) => a.city.localeCompare(b.city)).map(a => (
+                                        <option key={`orig-${a.icao}`} value={a.icao}>{a.city} ({a.icao})</option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <div style={{ gridColumn: 'span 2' }}>
+                                <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '11px', color: '#94a3b8' }}>AEROPUERTO DESTINO</label>
+                                <select name="destinoIcao" value={formData.destinoIcao} onChange={handleInputChange} required style={inputStyle}>
+                                    <option value="">Seleccione destino...</option>
+                                    {[...AIRPORTS].sort((a, b) => a.city.localeCompare(b.city)).map(a => (
+                                        <option key={`dest-${a.icao}`} value={a.icao}>{a.city} ({a.icao})</option>
+                                    ))}
+                                </select>
+                            </div>
+                            <div style={{ gridColumn: 'span 2' }}>
+                                <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '11px', color: '#94a3b8' }}>CANTIDAD DE MALETAS (SuperLote)</label>
+                                <input type="number" name="cantidadMaletas" value={formData.cantidadMaletas} onChange={handleInputChange} min="1" required style={inputStyle} />
+                            </div>
+                            <div style={{ gridColumn: 'span 2' }}>
+                                <label style={{ display: 'block', marginBottom: '0.6rem', fontSize: '11px', color: '#94a3b8' }}>Código de Cliente (7 dígitos)</label>
+                                <input type="text" name="clienteId" value={formData.clienteId} onChange={handleInputChange} maxLength="7" pattern="\d{7}" required placeholder="Ej: 0000001" style={{
+                                    width: '100%', padding: '0.6rem 0.8rem', borderRadius: '6px', background: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', boxSizing: 'border-box', fontSize: '12px', outline: 'none'
+                                }} />
+                            </div>
+                            <div style={{ gridColumn: 'span 2', marginTop: '0.5rem' }}>
+                                <button type="submit" style={{
+                                    width: '100%', padding: '10px', background: 'rgba(56, 189, 248, 0.15)', color: '#38bdf8', border: '1px solid rgba(56,189,248,0.4)', borderRadius: '8px', cursor: 'pointer', fontWeight: 'bold', fontSize: '13px', transition: 'all 0.2s'
+                                }}>
+                                    + Agregar a la Bandeja
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+
+                    {/* Carga por Archivo TXT */}
+                    <div style={{
+                        background: 'rgba(15, 23, 42, 0.8)',
+                        border: '1px dashed rgba(148, 163, 184, 0.3)',
+                        padding: '1.5rem',
+                        borderRadius: '12px'
+                    }}>
+                        <h3 style={{ margin: '0 0 0.5rem 0', color: '#e2e8f0', fontSize: '14px' }}>📄 Carga desde archivo (.TXT)</h3>
+                        <p style={{ margin: '0 0 1rem 0', fontSize: '11px', color: '#64748b' }}>Formato: YYYY-MM-DD, HH:mm, ORIGEN, DESTINO, CANTIDAD</p>
+                        <input type="file" accept=".txt,.csv" onChange={handleTxtUpload} ref={fileInputRef} style={{ width: '100%', color: '#94a3b8', fontSize: '12px' }} />
+                    </div>
+                </div>
+
+                {/* PANEL DERECHO: Bandeja Temporal */}
+                <div style={{ flex: '1 1 500px', display: 'flex', flexDirection: 'column' }}>
+                    <div style={{
+                        background: '#0f172a',
+                        border: '1px solid rgba(255,255,255,0.05)',
+                        borderRadius: '12px',
+                        flexGrow: 1,
+                        display: 'flex',
+                        flexDirection: 'column',
+                        overflow: 'hidden',
+                        boxShadow: '0 10px 30px rgba(0,0,0,0.3)'
+                    }}>
+                        <div style={{
+                            padding: '1rem 1.5rem',
+                            borderBottom: '1px solid rgba(255,255,255,0.05)',
+                            display: 'flex',
+                            justifyContent: 'space-between',
+                            alignItems: 'center',
+                            background: 'rgba(255,255,255,0.02)'
+                        }}>
+                            <div>
+                                <h2 style={{ margin: 0, fontSize: '16px', color: '#f8fafc' }}>Bandeja Temporal</h2>
+                                <span style={{ fontSize: '11px', color: '#64748b' }}>{trayShipments.length} envíos listos para subir</span>
+                            </div>
+                            {trayShipments.length > 0 && (
+                                <button onClick={handleClearTray} style={{ background: 'transparent', border: 'none', color: '#ef4444', fontSize: '12px', cursor: 'pointer', textDecoration: 'underline' }}>
+                                    Limpiar todo
+                                </button>
+                            )}
+                        </div>
+
+                        <div style={{ flexGrow: 1, overflowY: 'auto', padding: '1rem', maxHeight: '400px' }}>
+                            {trayShipments.length === 0 ? (
+                                <div style={{ textAlign: 'center', color: '#475569', fontSize: '13px', marginTop: '3rem' }}>
+                                    <div style={{ fontSize: '2rem', marginBottom: '1rem' }}>📦</div>
+                                    La bandeja está vacía.<br />Ingresa envíos a la izquierda para encolarlos aquí.
+                                </div>
+                            ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                                    {trayShipments.map((s) => (
+                                        <div key={s.idTemp} style={{
+                                            display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', background: 'rgba(30, 41, 59, 0.4)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '8px'
+                                        }}>
+                                            <div style={{ flexGrow: 1 }}>
+                                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                                                    <span style={{ fontSize: '14px', fontWeight: 'bold', color: '#38bdf8' }}>{s.origenIcao} ➔ {s.destinoIcao}</span>
+                                                    <span style={{ background: 'rgba(16, 185, 129, 0.15)', color: '#34d399', padding: '2px 6px', borderRadius: '4px', fontSize: '10px', fontWeight: 'bold' }}>
+                                                        {s.cantidadMaletas} maletas
+                                                    </span>
+                                                </div>
+                                                <div style={{ fontSize: '11px', color: '#94a3b8' }}>
+                                                    Salida: {s.fecha} a las {s.hora}
+                                                </div>
+                                            </div>
+                                            <button onClick={() => handleRemoveFromTray(s.idTemp)} style={{ background: 'transparent', border: 'none', color: '#ef4444', cursor: 'pointer', fontSize: '14px', padding: '4px' }}>
+                                                ✕
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+
+                        {/* Mensajes de Estado */}
+                        {status.message && (
+                            <div style={{
+                                padding: '12px 16px', margin: '0 1rem 1rem 1rem', borderRadius: '8px', fontSize: '12px',
+                                background: status.type === 'success' ? 'rgba(16,185,129,0.1)' : status.type === 'error' ? 'rgba(239,68,68,0.1)' : status.type === 'amber' ? 'rgba(245,158,11,0.1)' : 'rgba(56,189,248,0.1)',
+                                border: `1px solid ${status.type === 'success' ? '#10b981' : status.type === 'error' ? '#ef4444' : status.type === 'amber' ? '#f59e0b' : '#38bdf8'}`,
+                                color: status.type === 'success' ? '#34d399' : status.type === 'error' ? '#f87171' : status.type === 'amber' ? '#fbbf24' : '#7dd3fc'
+                            }}>
+                                {status.message}
+                            </div>
+                        )}
+
+                        <div style={{ padding: '1rem 1.5rem', background: 'rgba(255,255,255,0.02)', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+                            <button
+                                onClick={handleUploadToLiveSystem}
+                                disabled={trayShipments.length === 0 || loading}
+                                style={{
+                                    width: '100%', padding: '14px',
+                                    background: trayShipments.length === 0 ? '#1e293b' : 'linear-gradient(135deg, #10b981, #059669)',
+                                    color: trayShipments.length === 0 ? '#475569' : 'white',
+                                    border: 'none', borderRadius: '10px',
+                                    cursor: trayShipments.length === 0 || loading ? 'not-allowed' : 'pointer',
+                                    fontWeight: 'bold', fontSize: '14px',
+                                    boxShadow: trayShipments.length > 0 ? '0 4px 15px rgba(16, 185, 129, 0.4)' : 'none',
+                                    transition: 'all 0.2s'
+                                }}
+                            >
+                                {loading ? '⏳ TRANSMITIENDO...' : `🚀 SUBIR AL SISTEMA EN VIVO (${trayShipments.length})`}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-      </div>
-    </div>
-  );
+    );
+};
+
+const inputStyle = {
+    width: '100%', padding: '0.6rem 0.8rem', borderRadius: '6px',
+    background: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.1)',
+    color: 'white', boxSizing: 'border-box', fontSize: '12px', outline: 'none'
 };
 
 export default ShipmentRegistrationPage;

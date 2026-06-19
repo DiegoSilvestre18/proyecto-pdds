@@ -143,9 +143,9 @@
 
 .ct-kpi-strip {
   display: grid;
-  grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 8px;
-  padding: 8px 12px;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 6px;
+  padding: 4px 8px;
   background: linear-gradient(180deg, rgba(9, 29, 49, 0.98), rgba(6, 22, 38, 0.98));
   border-bottom: 1px solid #1e3f5f;
 }
@@ -200,14 +200,14 @@
 .ct-kpi-card {
   background: rgba(7, 25, 42, 0.86);
   border: 1px solid #275070;
-  border-radius: 10px;
-  padding: 8px 10px;
+  border-radius: 6px;
+  padding: 4px 8px;
   min-width: 0;
 }
 
 .ct-kpi-title {
   margin: 0;
-  font-size: 0.6rem;
+  font-size: 0.55rem;
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: #95afc7;
@@ -215,9 +215,9 @@
 
 .ct-kpi-value {
   display: block;
-  margin-top: 3px;
+  margin-top: 2px;
   color: #eef7ff;
-  font-size: 0.9rem;
+  font-size: 0.8rem;
   font-weight: 700;
   line-height: 1.2;
   white-space: nowrap;
@@ -226,9 +226,9 @@
 }
 
 .ct-kpi-subtitle {
-  margin: 3px 0 0;
+  margin: 1px 0 0;
   color: #abc3d9;
-  font-size: 0.61rem;
+  font-size: 0.55rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1308,8 +1308,8 @@
 .ct-sim-controls {
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 7px 14px;
+  gap: 10px;
+  padding: 4px 10px;
   background: linear-gradient(180deg, #0f2a42, #0b1f34);
   border-bottom: 1px solid #1a3b5a;
   flex-wrap: wrap;
@@ -1321,8 +1321,8 @@
 }
 
 .ct-sim-btn {
-  width: 32px;
-  height: 28px;
+  width: 26px;
+  height: 24px;
   border: 1px solid #345e85;
   border-radius: 6px;
   background: rgba(15, 45, 72, 0.9);
@@ -1379,9 +1379,9 @@
   border-radius: 999px;
   background: rgba(12, 38, 62, 0.85);
   color: #a0c0dc;
-  font-size: 0.62rem;
+  font-size: 0.6rem;
   font-weight: 700;
-  padding: 3px 8px;
+  padding: 2px 6px;
   cursor: pointer;
 }
 
@@ -1404,7 +1404,7 @@
 }
 
 .ct-sim-clock-item strong {
-  font-size: 0.72rem;
+  font-size: 0.65rem;
   color: #d8ecff;
 }
 

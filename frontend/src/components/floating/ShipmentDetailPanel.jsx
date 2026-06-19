@@ -13,10 +13,25 @@ const STATUS_LABELS = {
   cancelled: "Cancelado",
 };
 
-function ShipmentDetailPanel({ isVisible, onHide, searchedShipment, selectedAircraft = null, airportByCode = {} }) {      
+function ShipmentDetailPanel({ 
+  isVisible, 
+  onHide, 
+  searchedShipment, 
+  selectedAircraft = null, 
+  airportByCode = {},
+  onSearch = () => {},
+  isSearching = false
+}) {      
+  const [searchValue, setSearchValue] = React.useState("");
+
   if (!isVisible) {
     return null
   }
+
+  const handleSearch = (e) => {
+    e.preventDefault();
+    onSearch(searchValue);
+  };
 
   const fromAirport = selectedAircraft ? airportByCode[selectedAircraft.from] : null;
   const toAirport = selectedAircraft ? airportByCode[selectedAircraft.to] : null;
@@ -53,9 +68,49 @@ function ShipmentDetailPanel({ isVisible, onHide, searchedShipment, selectedAirc
         </button>
       </div>
 
+      <div style={{ padding: '12px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+        <form onSubmit={handleSearch} style={{ position: "relative", width: "100%" }}>
+          <input 
+            type="text" 
+            placeholder="Buscar ID de envío..." 
+            value={searchValue}
+            onChange={(e) => setSearchValue(e.target.value)}
+            style={{
+              background: "rgba(15, 23, 42, 0.6)",
+              border: "1px solid rgba(255,255,255,0.1)",
+              borderRadius: "6px",
+              padding: "8px 12px",
+              paddingRight: "35px",
+              color: "white",
+              fontSize: "12px",
+              width: "100%",
+              outline: "none",
+              boxSizing: "border-box"
+            }}
+          />
+          <button 
+            type="submit"
+            disabled={isSearching}
+            style={{
+              position: "absolute",
+              right: "8px",
+              top: "50%",
+              transform: "translateY(-50%)",
+              background: "transparent",
+              border: "none",
+              color: "#94a3b8",
+              cursor: "pointer",
+              fontSize: "14px"
+            }}
+          >
+            {isSearching ? "⏳" : "🔍"}
+          </button>
+        </form>
+      </div>
+
       {!s && !selectedAircraft ? (
-        <div style={{ padding: '20px', textAlign: 'center', color: '#94a3b8' }}>
-          Ingrese un ID en el buscador superior o seleccione un vuelo en el mapa para ver detalles.
+        <div style={{ padding: '20px', textAlign: 'center', color: '#94a3b8', fontSize: '13px' }}>
+          Ingrese un ID en el buscador superior para localizar un envío específico o seleccione un vuelo del mapa.
         </div>
       ) : (
         <div className="ct-shipment-detail">

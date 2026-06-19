@@ -132,7 +132,11 @@ const WorldMap = ({
   currentEpochTime = 0,
   systemClock = "--:--:--",
   simState = "idle",
+  isDayToDay = false,
 }) => {
+  // ── Filtros de Visibilidad Día a Día ─────────────────────────────────────
+  const [showEmptyFlights, setShowEmptyFlights] = useState(true);
+  const [showTestFlights, setShowTestFlights] = useState(true);
   // ── Selection Bridge ─────────────────────────────────────────────────────
   const {
     focusedEntity,
@@ -240,6 +244,20 @@ const WorldMap = ({
         onAircraftSelect(null);
       }}
     >
+      {/* ── Control de Visibilidad (Día a Día) ────────────────────────────── */}
+      {isDayToDay && (
+          <div style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(15, 23, 42, 0.85)', padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(56, 189, 248, 0.2)', zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '10px', boxShadow: '0 4px 15px rgba(0,0,0,0.5)', backdropFilter: 'blur(5px)' }}>
+            <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 'bold', marginBottom: '2px', letterSpacing: '0.5px' }}>FILTROS DE TRÁFICO (EN VIVO)</div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '12px', color: '#cbd5e1' }}>
+              <input type="checkbox" checked={showEmptyFlights} onChange={(e) => setShowEmptyFlights(e.target.checked)} style={{ accentColor: '#64748b', cursor: 'pointer', width: '14px', height: '14px' }} />
+              <span>👁️ Mostrar Vuelos Normales (Vacíos/Grises)</span>
+            </label>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '12px', color: '#cbd5e1' }}>
+              <input type="checkbox" checked={showTestFlights} onChange={(e) => setShowTestFlights(e.target.checked)} style={{ accentColor: '#f97316', cursor: 'pointer', width: '14px', height: '14px' }} />
+              <span>👁️ Mostrar Vuelos de Prueba (Naranjas)</span>
+            </label>
+          </div>
+      )}
       {/* ── Botón Flotante de Leyenda ( ⓘ ) ────────────────────────────────── */}
       <LegendButton />
 
@@ -280,35 +298,7 @@ const WorldMap = ({
         </button>
       )}
 
-      {/* Floating clock overlay on the map */}
-      {systemClock && systemClock !== "--:--:--" && systemClock !== "--:--" && (
-        <div style={{
-          position: "absolute",
-          top: "20px",
-          right: "20px",
-          zIndex: 10,
-          background: "rgba(15, 23, 42, 0.85)",
-          border: isCollapseScenario ? "1.5px solid #ef4444" : "1.5px solid #3b82f6",
-          borderRadius: "8px",
-          padding: "8px 16px",
-          color: "white",
-          fontFamily: "'Courier New', Courier, monospace",
-          boxShadow: "0 4px 20px rgba(0,0,0,0.5)",
-          backdropFilter: "blur(6px)",
-          display: "flex",
-          flexDirection: "column",
-          gap: "2px",
-          alignItems: "flex-end",
-          pointerEvents: "none"
-        }}>
-          <div style={{ fontSize: "10px", color: isCollapseScenario ? "#ef4444" : "#60a5fa", fontWeight: "bold", textTransform: "uppercase", letterSpacing: "1px" }}>
-            {isCollapseScenario ? "⚠️ Simulación Colapso" : "🕒 Hora Operativa"}
-          </div>
-          <div style={{ fontSize: "18px", fontWeight: "bold", letterSpacing: "0.5px" }}>
-            {systemClock}
-          </div>
-        </div>
-      )}
+
 
       <ComposableMap
         projection="geoMercator"
@@ -503,6 +493,9 @@ const WorldMap = ({
 
                 {/* ── Aviones con ícono limpio y sombra ── */}
                 {activeAircraft.map((plane) => {
+                  const isEmpty = !plane.ocupacionReal || plane.ocupacionReal === 0;
+                  if (isDayToDay && isEmpty && !showEmptyFlights) return null;
+                  if (isDayToDay && !isEmpty && !showTestFlights) return null;
                   const from = airportByIcao[plane.from];
                   const to   = airportByIcao[plane.to];
                   if (!from || !to) return null;
@@ -672,14 +665,14 @@ const WorldMap = ({
                   x={-85}
                   y={tooltipY}
                   width={170}
-                  height={75}
+                  height={170}
                   style={{ pointerEvents: "auto", overflow: "visible" }}
                 >
                   <div style={{
                     background: "rgba(15, 23, 42, 0.96)",
                     border: `1.5px solid ${getStrokeColor(selectedPlane.status, selectedPlane.ocupacionReal, selectedPlane.capacidadMax)}`,
                     borderRadius: "6px",
-                    padding: "6px 8px",
+                    padding: "8px",
                     color: "white",
                     fontSize: "12px",
                     boxShadow: "0 4px 15px rgba(0,0,0,0.6)",
@@ -690,7 +683,7 @@ const WorldMap = ({
                     <div style={{ fontWeight: "bold", color: "#60a5fa", marginBottom: "2px" }}>
                       ✈️ Vuelo {selectedPlane.id.toString().replace("vuelo-", "").split("-")[0]}
                     </div>
-                    <div style={{ fontSize: "11px", color: "#e2e8f0" }}>
+                    <div style={{ fontSize: "11px", color: "#e2e8f0", marginBottom: "4px" }}>
                       {selectedPlane.from} ➔ {selectedPlane.to}
                     </div>
                     <div style={{ fontSize: "10px", color: "#9ca3af", marginTop: "2px" }}>

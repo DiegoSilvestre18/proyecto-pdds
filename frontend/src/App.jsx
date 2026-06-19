@@ -25,6 +25,7 @@ import PeriodSimConfig from "./components/scenarios/PeriodSimConfig";
 import CollapseSimConfig from "./components/scenarios/CollapseSimConfig";
 import DraggableWindow from "./components/common/DraggableWindow";
 import AirportConfigPanel from "./components/floating/AirportConfigPanel";
+import PendingShipmentsPanel from "./components/scenarios/PendingShipmentsPanel";
 import BloqueoPanel from "./components/floating/BloqueoPanel";
 import { AIRPORTS } from "./data/airportsData";
 import { useControlTowerController } from "./hooks/useControlTowerController";
@@ -203,34 +204,41 @@ targetPlaybackMinutes,
         systemClock={summary.systemClock}
         selectedAlgorithm={selectedAlgorithm}
         onAlgorithmChange={setSelectedAlgorithm}
-        onSearch={searchShipment}
-        isSearching={isSearching}
       />
 
       <div className="ct-kpi-region">
-        <KpiStrip isCollapsed={isKpiCollapsed} kpiCards={kpiCards.map(kpi => {
-          if (kpi.key === "progress" && activeTab === "vivo") {
-            return {
-              ...kpi,
-              title: "Estado Operativo",
-              value: "TRANSMISIÓN EN VIVO",
-              subtitle: "Monitoreo continuo",
-              progress: undefined
-            };
-          }
-          return kpi;
-        })} />
-        <SimulationControls
-          isVisible={isSimScenario || (activeTab === "vivo" && simState !== "idle")}
-          simState={isCollapseScenario ? "collapsed" : simState}
-          simulatedClock={summary.systemClock}
-          elapsedReal={elapsedOperationTime}
-          speed={simSpeed}
-          onStart={() => setSimState("running")}
-          onPause={() => setSimState("paused")}
-          onStop={() => setSimState("idle")}
-          onSpeedChange={setSimSpeed}
-        />
+          <KpiStrip isCollapsed={isKpiCollapsed} kpiCards={[
+              ...kpiCards.map(kpi => {
+                  if (kpi.key === "progress" && activeTab === "vivo") {
+                      return {
+                          ...kpi,
+                          title: "Estado Operativo",
+                          value: "TRANSMISIÓN EN VIVO",
+                          subtitle: "Monitoreo continuo",
+                          progress: undefined
+                      };
+                  }
+                  return kpi;
+              }),
+              ...(isSimScenario || (activeTab === "vivo" && simState !== "idle") ? [
+
+                  {
+                      key: "sim_real_time",
+                      title: "Tiempo Real",
+                      value: elapsedOperationTime,
+                      subtitle: "Transcurrido",
+                      status: "default"
+                  },
+                  {
+                      key: "sim_clock",
+                      title: "Hora Operativa",
+                      value: summary.systemClock,
+                      subtitle: "Reloj del sistema",
+                      status: "default"
+                  }
+              ] : [])
+          ]} />
+
         <KpiControls isCollapsed={isKpiCollapsed} onToggle={toggleKpiStrip} />
       </div>
 
@@ -293,7 +301,13 @@ targetPlaybackMinutes,
       )}
       {isWindowOpen("shipmentDetail") && (
         <DraggableWindow title="Envío y Despacho" onClose={() => handleToggleWindow("shipmentDetail")} initialPosition={{x: 140, y: 270}} isActive={openWindowsQueue[openWindowsQueue.length-1] === "shipmentDetail"} onFocus={() => handleFocusWindow("shipmentDetail")}>
-          <ShipmentDetailPanel isVisible={true} onHide={() => handleToggleWindow("shipmentDetail")} searchedShipment={searchedShipment} />
+          <ShipmentDetailPanel 
+            isVisible={true} 
+            onHide={() => handleToggleWindow("shipmentDetail")} 
+            searchedShipment={searchedShipment} 
+            onSearch={searchShipment}
+            isSearching={isSearching}
+          />
         </DraggableWindow>
       )}
       {isWindowOpen("reports") && (
@@ -436,12 +450,19 @@ targetPlaybackMinutes,
         </section>
       </main>
 
+      <PendingShipmentsPanel
+          isOpen={isWindowOpen("pendingShipments")}
+          onClose={() => handleToggleWindow("pendingShipments")}
+          sessionId={sessionId}
+      />
+
       <ControlDock
         isCollapsed={isDockCollapsed}
         isScenarioConfigOpen={isScenarioConfigOpen}
         panelVisibility={{
           telemetry: isWindowOpen("telemetry"),
           entities: isWindowOpen("entities"),
+          pendingShipments: isWindowOpen("pendingShipments"),
           occupancy: isWindowOpen("occupancy"),
           transitInventory: isWindowOpen("transitInventory"),
           comparison: isWindowOpen("comparison"),
@@ -457,124 +478,7 @@ targetPlaybackMinutes,
         setMaxWindows={setMaxWindows}
       />
 
-{/* Sección de Paneles Desplegables en la parte inferior */}
-      {sessionId && (
-        <div className="ct-bottom-accordions" style={{
-          padding: "10px 14px",
-          background: "rgba(10, 25, 47, 0.95)",
-          borderTop: "1px solid rgba(56, 189, 248, 0.2)",
-          display: "flex",
-          flexDirection: "column",
-          gap: "8px",
-          zIndex: 10
-        }}>
-          {/* Accordion 1: Reporte Ejecutivo */}
-          <div style={{
-            border: "1px solid rgba(96, 165, 250, 0.3)",
-            borderRadius: "8px",
-            background: "rgba(15, 23, 42, 0.6)",
-            overflow: "hidden"
-          }}>
-            <button
-              onClick={() => {
-                const nextState = !isReportOpen;
-                setIsReportOpen(nextState);
-                if (nextState && !reportText) {
-                  fetchReportText();
-                }
-              }}
-              style={{
-                width: "100%",
-                padding: "12px 16px",
-                background: "rgba(30, 41, 59, 0.5)",
-                border: "none",
-                color: "#93c5fd",
-                fontWeight: "bold",
-                textAlign: "left",
-                cursor: "pointer",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center"
-              }}
-            >
-              <span>📋 PANEL DE REPORTE EJECUTIVO (.MD)</span>
-              <span style={{ fontSize: "10px" }}>{isReportOpen ? "▲ OCULTAR" : "▼ EXTENDER"}</span>
-            </button>
-            {isReportOpen && (
-              <div style={{ padding: "16px", background: "rgba(15, 23, 42, 0.8)" }}>
-                {reportLoading ? (
-                  <div style={{ color: "#94a3b8", fontSize: "12px" }}>Generando reporte ejecutivo...</div>
-                ) : (
-                  <pre style={{
-                    whiteSpace: "pre-wrap",
-                    wordBreak: "break-word",
-                    fontFamily: "monospace",
-                    fontSize: "12px",
-                    color: "#e2e8f0",
-                    background: "#0f172a",
-                    padding: "16px",
-                    borderRadius: "6px",
-                    border: "1px solid rgba(255,255,255,0.05)",
-                    maxHeight: "300px",
-                    overflowY: "auto",
-                    margin: 0
-                  }}>
-                    {reportText || "Ejecute y complete la simulación para visualizar el reporte."}
-                  </pre>
-                )}
-              </div>
-            )}
-          </div>
 
-          {/* Accordion 2: Consola de Eventos (Logs) */}
-          <div style={{
-            border: "1px solid rgba(96, 165, 250, 0.3)",
-            borderRadius: "8px",
-            background: "rgba(15, 23, 42, 0.6)",
-            overflow: "hidden"
-          }}>
-            <button
-              onClick={() => setIsSecondaryPanelsOpen(!isSecondaryPanelsOpen)}
-              style={{
-                width: "100%",
-                padding: "12px 16px",
-                background: "rgba(30, 41, 59, 0.5)",
-                border: "none",
-                color: "#93c5fd",
-                fontWeight: "bold",
-                textAlign: "left",
-                cursor: "pointer",
-                display: "flex",
-                justifyContent: "space-between",
-                alignItems: "center"
-              }}
-            >
-              <span>🖥️ CONSOLA DE EVENTOS (LOGS)</span>
-              <span style={{ fontSize: "10px" }}>{isSecondaryPanelsOpen ? "▲ OCULTAR" : "▼ EXTENDER"}</span>
-            </button>
-            {isSecondaryPanelsOpen && (
-              <div style={{ padding: "16px", background: "rgba(15, 23, 42, 0.8)" }}>
-                {eventLog && eventLog.length > 0 ? (
-                  <div className="ct-panel ct-panel--event-log" style={{ maxHeight: '200px', overflowY: 'auto', background: 'rgba(15, 23, 42, 0.85)', width: "100%", borderRadius: "6px", border: "1px solid rgba(255,255,255,0.05)" }}>
-                    <div className="ct-panel-header" style={{ borderBottom: "1px solid rgba(255,255,255,0.08)", padding: "8px 12px" }}>
-                      <p style={{ margin: 0, fontSize: "11px", fontWeight: "bold", color: "#38bdf8" }}>BITÁCORA DE OPERACIONES</p>
-                    </div>
-                    <div style={{ padding: '0.75rem', fontSize: '11px', fontFamily: 'monospace', color: '#9ca3af', display: 'flex', flexDirection: 'column-reverse' }}>
-                      {eventLog.map((log, i) => (
-                        <div key={i} style={{ marginBottom: '6px', borderBottom: '1px solid rgba(255,255,255,0.03)', paddingBottom: '4px' }}>
-                          {log.toString().replace(/vuelo-(\d+)(-\d+)?/gi, (match, id) => `Vuelo ${id}`)}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <div style={{ color: "#64748b", fontSize: "12px", fontStyle: "italic" }}>Esperando eventos de simulación...</div>
-                )}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       <footer className="ct-footer-minimal">
         <span style={{ opacity: 0.4 }}>TASFB2B Control Tower</span>

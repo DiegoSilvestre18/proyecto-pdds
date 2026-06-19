@@ -10,6 +10,9 @@ import java.util.stream.Stream;
 
 public interface EnvioRepository extends CrudRepository<Envio, Long> {
 
+    @Query("SELECT e FROM Envio e JOIN FETCH e.origen JOIN FETCH e.destino WHERE e.fecha BETWEEN :inicio AND :fin")
+    List<Envio> findByFechaBetween(@Param("inicio") java.time.LocalDate inicio, @Param("fin") java.time.LocalDate fin);
+
     @org.springframework.transaction.annotation.Transactional
     void deleteByFechaBetween(java.time.LocalDate inicio, java.time.LocalDate fin);
 

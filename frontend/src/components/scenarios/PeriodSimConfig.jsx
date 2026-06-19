@@ -46,8 +46,6 @@ function PeriodSimConfig({
   const [tempDay, setTempDay] = useState("all");
 
   const PLAYBACK_OPTIONS = [
-    { label: "Modo Rayo", value: 1, sub: "1 min" },
-    { label: "Rápido", value: 5, sub: "5 min" },
     { label: "Balanceado", value: 15, sub: "15 min" },
     { label: "Análisis", value: 30, sub: "30 min" },
     { label: "Detallado", value: 60, sub: "60 min" },
