@@ -8,10 +8,9 @@ const NAV_ITEMS = [
   { key: 'pendingShipments', icon: '📦', label: 'Envíos Pendientes' },
   { key: 'transitInventory', icon: '🎒', label: 'Inventario' },
   { key: 'comparison',     icon: '⚖',  label: 'Comparativa' },
+  { key: 'airportConfig',  icon: '🏢', label: 'Almacenes' },
   { key: 'shipmentDetail', icon: '✉',  label: 'Envío' },
   { key: 'cancellation', icon: '❌',  label: 'Cancelaciones' },
-  { key: 'airportConfig',  icon: '🏢', label: 'Almacenes' },
-  { key: 'bloqueos',       icon: '🚧', label: 'Bloqueos' },
   { key: 'reports',        icon: '📑', label: 'Reportes' },
 ];
 
@@ -33,14 +32,13 @@ const ControlDock = ({
       style={{
         position: 'fixed',
         left: 0,
-        top: '50%',
-        transform: 'translateY(-50%)',
+        top: 160,
         zIndex: 400,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        gap: '4px',
-        padding: '8px 6px',
+        gap: '2px',
+        padding: '6px 4px',
         background: 'rgba(8, 14, 30, 0.88)',
         backdropFilter: 'blur(12px)',
         borderRight: '1px solid rgba(56, 189, 248, 0.18)',
@@ -74,7 +72,7 @@ const ControlDock = ({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '18px',
+                fontSize: '16px',
                 background: isActive
                   ? 'rgba(56, 189, 248, 0.18)'
                   : 'transparent',
@@ -92,7 +90,6 @@ const ControlDock = ({
               {item.icon}
             </button>
 
-            {/* Tooltip lateral (solo al hacer hover) */}
             {hovered === item.key && (
               <div style={{
                 position: 'absolute',
@@ -113,7 +110,6 @@ const ControlDock = ({
                 boxShadow: '2px 4px 12px rgba(0,0,0,0.5)',
               }}>
                 {item.label}
-                {/* Flecha */}
                 <span style={{
                   position: 'absolute',
                   right: '100%',
@@ -150,21 +146,6 @@ const ControlDock = ({
         >–</button>
       </div>
 
-      {/* Botón colapso */}
-      <button
-        type="button"
-        onClick={onToggleDock}
-        aria-label={isCollapsed ? 'Expandir sidebar' : 'Colapsar sidebar'}
-        style={{
-          ...btnStyle,
-          marginTop: '4px',
-          fontSize: '12px',
-          color: '#64748b',
-        }}
-        title={isCollapsed ? 'Expandir' : 'Colapsar'}
-      >
-        {isCollapsed ? '▶' : '◀'}
-      </button>
     </aside>
   );
 };

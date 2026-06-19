@@ -649,21 +649,17 @@ const WorldMap = ({
 
           {/* ── Tooltip Interactivo Flotante sobre Avión Seleccionado (foreignObject) ── */}
           {selectedPlane && (() => {
-            console.log("DEBUG selectedPlane:", selectedPlane);
             const from = airportByIcao[selectedPlane.from];
             const to   = airportByIcao[selectedPlane.to];
             if (!from || !to) return null;
             const progress = selectedPlane.progress ?? 0;
             const position = interpolateCoordinates(from, to, progress);
-            
-            const isNearBottomEdge = position[1] < -20;
-            const tooltipY = isNearBottomEdge ? 20 : -55;
 
             return (
               <Marker coordinates={position}>
                 <foreignObject
-                  x={-85}
-                  y={tooltipY}
+                  x={20}
+                  y={-40}
                   width={170}
                   height={170}
                   style={{ pointerEvents: "auto", overflow: "visible" }}

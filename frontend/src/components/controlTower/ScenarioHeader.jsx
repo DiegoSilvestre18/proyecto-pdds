@@ -7,8 +7,6 @@ const ScenarioHeader = ({
   onTabChange = () => {},
   tabs = [],
   systemClock = "--:--:--",
-  selectedAlgorithm = "hga",
-  onAlgorithmChange = () => {},
 }) => {
   const navigate = useNavigate();
 
@@ -37,34 +35,6 @@ const ScenarioHeader = ({
             </button>
           ))}
         </nav>
-      </div>
-
-      <div style={{ position: "absolute", left: "50%", transform: "translateX(-50%)", display: "flex", alignItems: "center", gap: "8px", background: "rgba(15, 23, 42, 0.6)", padding: "4px 8px", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.05)" }}>
-        <span style={{ fontSize: "11px", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase" }}>Algoritmo:</span>
-        <div style={{ display: "flex", gap: "4px" }}>
-          <button
-            onClick={() => onAlgorithmChange("alns")}
-            style={{
-              background: selectedAlgorithm === "alns" ? "#10b981" : "transparent",
-              color: selectedAlgorithm === "alns" ? "white" : "#cbd5e1",
-              border: "none", borderRadius: "6px", padding: "4px 10px",
-              fontSize: "12px", fontWeight: "bold", cursor: "pointer"
-            }}
-          >
-            ALNS
-          </button>
-          <button
-            onClick={() => onAlgorithmChange("hga")}
-            style={{
-              background: selectedAlgorithm === "hga" ? "#3b82f6" : "transparent",
-              color: selectedAlgorithm === "hga" ? "white" : "#cbd5e1",
-              border: "none", borderRadius: "6px", padding: "4px 10px",
-              fontSize: "12px", fontWeight: "bold", cursor: "pointer"
-            }}
-          >
-            HGA
-          </button>
-        </div>
       </div>
 
       <div className="ct-header-actions">

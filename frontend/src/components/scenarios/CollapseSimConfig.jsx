@@ -1,9 +1,9 @@
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 
 
 // Fecha mínima = hoy, máxima = 31 dic 2026
 
-function CollapseSimConfig({ isOpen, onClose, selectedAlgorithm, onAlgorithmChange, onStart, liveStatus, onReset, sessionId, simState }) {
+function CollapseSimConfig({ isOpen, onClose, onStart, liveStatus, onReset, sessionId, simState }) {
   const [activeSection, setActiveSection] = useState('config')
 const [isStarting, setIsStarting]       = useState(false)
   const [startDate, setStartDate]         = useState('2026-04-09')
@@ -182,36 +182,13 @@ const [isStarting, setIsStarting]       = useState(false)
 
 
 
-            {/* ── Algoritmo ─────────────────────────────────────────────── */}
-            <div className="ct-config-section">
-              <p className="ct-config-section__title">⚙️ ALGORITMO DE RESPUESTA</p>
-              <div style={{ background: 'rgba(15,23,42,0.5)', borderRadius: 10, padding: '10px 12px', marginTop: 6 }}>
-                {[
-                  { val: 'alns', label: 'ALNS — Recomendado ★', sub: 'Rescata vuelos cancelados en ~6.5 s', color: '#818cf8' },
-                  { val: 'hga',  label: 'HGA — Comparación',    sub: 'Pierde maletas de rutas canceladas', color: '#6b7280' },
-                ].map(opt => (
-                  <label key={opt.val} className="ct-algorithm-option" style={{ marginBottom: 8, display: 'flex', alignItems: 'flex-start', gap: 10, cursor: 'pointer' }}>
-                    <input
-                      type="radio" name="algo-collapse" value={opt.val}
-                      checked={selectedAlgorithm === opt.val}
-                      onChange={() => onAlgorithmChange(opt.val)}
-                      style={{ marginTop: 3, accentColor: opt.color }}
-                    />
-                    <div>
-                      <strong style={{ color: selectedAlgorithm === opt.val ? opt.color : '#e2e8f0', fontSize: 12 }}>{opt.label}</strong>
-                      <span style={{ display: 'block', fontSize: 10, color: '#9ca3af', marginTop: 2 }}>{opt.sub}</span>
-                    </div>
-                  </label>
-                ))}
-              </div>
-            </div>
 
-            {/* Parámetros Avanzados del Algoritmo */}
+
+            {/* Parámetros del Algoritmo ALNS */}
             <div className="ct-config-section" style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 12 }}>
               <p className="ct-config-section__title">⚙️ PARÁMETROS DEL ALGORITMO</p>
               
-              {selectedAlgorithm === "alns" ? (
-                <div style={{ background: "rgba(15,23,42,0.4)", border: "1px solid rgba(129,140,248,0.25)", borderRadius: 10, padding: "12px 14px", marginTop: 8 }}>
+              <div style={{ background: "rgba(15,23,42,0.4)", border: "1px solid rgba(129,140,248,0.25)", borderRadius: 10, padding: "12px 14px", marginTop: 8 }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
                     <span style={{ fontSize: 11, color: "#9ca3af" }}>Fracción de Destrucción (Destroy %)</span>
                     <span style={{ fontSize: 13, fontWeight: "bold", color: "#818cf8" }}>{destroyFraction}%</span>
@@ -252,7 +229,6 @@ const [isStarting, setIsStarting]       = useState(false)
                     <p style={{ margin: "2px 0" }}>▸ <strong>Elite:</strong> 5 mejores individuos (Preservación directa)</p>
                   </div>
                 </div>
-              )}
             </div>
 
 
@@ -263,7 +239,7 @@ const [isStarting, setIsStarting]       = useState(false)
             }}>
               <p style={{ margin: '0 0 6px 0', color: '#fca5a5', fontWeight: 700, fontSize: 12 }}>📤 Qué pondrás · 📥 Qué saldrá</p>
               <div style={{ color: '#9ca3af', lineHeight: 1.7 }}>
-                <p style={{ margin: 0 }}>▸ <strong style={{ color: '#e2e8f0' }}>Entrada:</strong> Fecha {startDate}, algoritmo {(selectedAlgorithm || 'alns').toUpperCase()}, hasta 90 días continuos</p>
+                <p style={{ margin: 0 }}>▸ <strong style={{ color: '#e2e8f0' }}>Entrada:</strong> Fecha {startDate}, algoritmo ALNS, hasta 90 días continuos</p>
                 <p style={{ margin: 0 }}>▸ <strong style={{ color: '#e2e8f0' }}>Salida:</strong> Rutas rescatadas, E_cap, colapso computacional (Ta≥Sa), SLA violado</p>
               </div>
             </div>
