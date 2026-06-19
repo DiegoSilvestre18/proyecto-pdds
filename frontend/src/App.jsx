@@ -3,7 +3,6 @@ import { useSelectionBridge } from "./hooks/useSelectionBridge";
 import { AIRPORT_BY_ICAO } from "./data/airportsData";
 import { useNavigate } from "react-router-dom";
 import WorldMap from "./components/map/WorldMap";
-import AirportDetailPanel from "./components/controlTower/AirportDetailPanel";
 
 import ControlDock from "./components/controlTower/ControlDock";
 import ScenarioHeader from "./components/controlTower/ScenarioHeader";
@@ -26,7 +25,6 @@ import CollapseSimConfig from "./components/scenarios/CollapseSimConfig";
 import DraggableWindow from "./components/common/DraggableWindow";
 import AirportConfigPanel from "./components/floating/AirportConfigPanel";
 import PendingShipmentsPanel from "./components/scenarios/PendingShipmentsPanel";
-import BloqueoPanel from "./components/floating/BloqueoPanel";
 import { AIRPORTS } from "./data/airportsData";
 import { useControlTowerController } from "./hooks/useControlTowerController";
 import "./App.css";
@@ -42,14 +40,10 @@ const App = () => {
     airportNodes,
     comparisonData,
     elapsedOperationTime,
-    eventLog,
     currentEpochTime,
     totalBagsWaiting,
     activeShipments,
     handleTabChange,
-    handleSelectAircraft,
-    hideAirportDetail,
-    isAirportDetailOpen,
     isCollapseScenario,
     isDockCollapsed,
     isKpiCollapsed,
@@ -57,30 +51,20 @@ const App = () => {
     isSimScenario,
     kpiCards,
     liveStatus,
-    selectedAircraft,
     selectedAircraftId,
-    selectedAirport,
     selectedAirportCode,
-    selectedAirportLevel,
-    selectedAirportMetrics,
-    selectedAlgorithm,
     selectedFromAirport,
     selectedToAirport,
+    selectedAlgorithm,
     sessionId,
-    isFluidMode,
-    setIsFluidMode,
-targetPlaybackMinutes,
+    setSelectedAlgorithm,
+    simState,
+    targetPlaybackMinutes,
     setTargetPlaybackMinutes,
     searchShipment,
     searchedShipment,
     isSearching,
     setSelectedAircraftId,
-    setSelectedAlgorithm,
-    setSimSpeed,
-    setSimState,
-    showAirportDetail,
-    simSpeed,
-    simState,
     startDayToDaySimulation,
     startCollapseSimulation,
     exportSimulationExcel,
@@ -92,7 +76,6 @@ targetPlaybackMinutes,
     toggleDock,
     toggleKpiStrip,
     toggleScenarioConfig,
-    cancelFlight,
     trackedRouteData,
     masterPlan,
   } = useControlTowerController();
@@ -112,17 +95,16 @@ targetPlaybackMinutes,
   const handleToggleWindow = (panelKey) => {
     setOpenWindowsQueue(prev => {
       if (prev.includes(panelKey)) {
-        return prev.filter(p => p !== panelKey); // Cerrar
+        return prev.filter(p => p !== panelKey);
       }
       const next = [...prev, panelKey];
       while (next.length > maxWindows) {
-        next.shift(); // FIFO: remover el más antiguo
+        next.shift();
       }
       return next;
     });
   };
 
-  // Traer la ventana al frente
   const handleFocusWindow = (panelKey) => {
     setOpenWindowsQueue(prev => {
       if (!prev.includes(panelKey)) return prev;
@@ -143,32 +125,6 @@ targetPlaybackMinutes,
 
   const [mapZoom, setMapZoom] = useState(1);
   const [mapCenter, setMapCenter] = useState([0, 20]);
-
-
-  // Estados para los paneles de reporte ejecutivo y totales consolidados
-  const [isReportOpen, setIsReportOpen] = useState(false);
-  const [isTotalsOpen, setIsTotalsOpen] = useState(false);
-  const [isSecondaryPanelsOpen, setIsSecondaryPanelsOpen] = useState(false);
-  const [reportText, setReportText] = useState("");
-  const [reportLoading, setReportLoading] = useState(false);
-
-  const fetchReportText = async () => {
-    if (!sessionId) return;
-    setReportLoading(true);
-    try {
-      const res = await fetch(`/api/v1/simulation/export-details/${sessionId}`);
-      if (res.ok) {
-        const txt = await res.text();
-        setReportText(txt);
-      } else {
-        setReportText("No se pudo obtener el reporte de la sesión activa.");
-      }
-    } catch (err) {
-      setReportText("Error al conectarse con el servidor para obtener el reporte.");
-    } finally {
-      setReportLoading(false);
-    }
-  };
 
   return (
     <div
@@ -202,8 +158,6 @@ targetPlaybackMinutes,
         isCollapseScenario={isCollapseScenario}
         onTabChange={handleTabChange}
         systemClock={summary.systemClock}
-        selectedAlgorithm={selectedAlgorithm}
-        onAlgorithmChange={setSelectedAlgorithm}
       />
 
       <div className="ct-kpi-region">
@@ -259,25 +213,6 @@ targetPlaybackMinutes,
         </DraggableWindow>
       )}
 
-      {isWindowOpen("airportDetail") && (
-        <DraggableWindow 
-          title={`Detalle: ${selectedAirportCode || 'Aeropuerto'}`} 
-          onClose={() => handleToggleWindow("airportDetail")}
-          initialPosition={{x: window.innerWidth - 320, y: 100}}
-          isActive={openWindowsQueue[openWindowsQueue.length - 1] === "airportDetail"}
-          onFocus={() => handleFocusWindow("airportDetail")}
-        >
-          <AirportDetailPanel
-            isOpen={true}
-            selectedAirport={AIRPORT_BY_ICAO[selectedAirportCode]}
-            selectedAirportMetrics={selectedAirportMetrics}
-            selectedAirportLevel={selectedAirportLevel}
-            isCollapseScenario={isCollapseScenario}
-            onClose={() => handleToggleWindow("airportDetail")}
-          />
-        </DraggableWindow>
-      )}
-
       {/* Renderizado de ventanas flotantes dinámicas desde DraggableWindow */}
       {isWindowOpen("telemetry") && (
         <DraggableWindow title="Telemetría en Tiempo Real" onClose={() => handleToggleWindow("telemetry")} initialPosition={{x: 20, y: 150}} isActive={openWindowsQueue[openWindowsQueue.length-1] === "telemetry"} onFocus={() => handleFocusWindow("telemetry")}>
@@ -300,7 +235,7 @@ targetPlaybackMinutes,
         </DraggableWindow>
       )}
       {isWindowOpen("shipmentDetail") && (
-        <DraggableWindow title="Envío y Despacho" onClose={() => handleToggleWindow("shipmentDetail")} initialPosition={{x: 140, y: 270}} isActive={openWindowsQueue[openWindowsQueue.length-1] === "shipmentDetail"} onFocus={() => handleFocusWindow("shipmentDetail")}>
+        <DraggableWindow title="Envío y Despacho" onClose={() => handleToggleWindow("shipmentDetail")} initialPosition={{x: 60, y: 350}} isActive={openWindowsQueue[openWindowsQueue.length-1] === "shipmentDetail"} onFocus={() => handleFocusWindow("shipmentDetail")}>
           <ShipmentDetailPanel 
             isVisible={true} 
             onHide={() => handleToggleWindow("shipmentDetail")} 
@@ -337,17 +272,11 @@ targetPlaybackMinutes,
         </DraggableWindow>
       )}
 
-      {isWindowOpen("bloqueos") && (
-        <DraggableWindow title="Gestión de Bloqueos y Averías" onClose={() => handleToggleWindow("bloqueos")} initialPosition={{x: 240, y: 180}} isActive={openWindowsQueue[openWindowsQueue.length-1] === "bloqueos"} onFocus={() => handleFocusWindow("bloqueos")}>
-          <BloqueoPanel activeAircraft={activeAircraft} />
-        </DraggableWindow>
-      )}
-
       {selectedAircraftId && (
         <DraggableWindow 
           title="Información del Vuelo" 
           onClose={() => setSelectedAircraftId(null)} 
-          initialPosition={{x: window.innerWidth - 300, y: window.innerHeight - 300}} 
+          initialPosition={{x: window.innerWidth - 340, y: 80}} 
           isActive={true}
         >
           <FlightDetailPanel flightId={selectedAircraftId} activeAircraft={activeAircraft} />
@@ -362,7 +291,6 @@ targetPlaybackMinutes,
             </div>
           )}
 
-          {/* Indicador de carga inicial (algoritmo y datos txt) */}
           {simState === "running" && (!liveStatus?.interpolatedTime || liveStatus.interpolatedTime === 0) && (
             <div style={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', background: 'rgba(15, 23, 42, 0.90)', padding: '24px 36px', borderRadius: '16px', border: '1px solid rgba(56, 189, 248, 0.4)', color: 'white', textAlign: 'center', zIndex: 100, backdropFilter: 'blur(8px)', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '16px', boxShadow: '0 10px 40px rgba(0,0,0,0.5)' }}>
               <div style={{ width: '40px', height: '40px', border: '4px solid rgba(56, 189, 248, 0.2)', borderTop: '4px solid #38bdf8', borderRadius: '50%', animation: 'ct-spin 1s linear infinite' }}></div>
@@ -383,14 +311,18 @@ targetPlaybackMinutes,
             selectedAirportCode={selectedAirportCode}
             selectedFromAirport={selectedFromAirport}
             selectedToAirport={selectedToAirport}
-            onAirportSelect={(icao) => {
-                if (!isWindowOpen("airportDetail")) handleToggleWindow("airportDetail");
-                handleFocusWindow("airportDetail");
+            onAirportSelect={() => {
+                if (!isWindowOpen("entities")) handleToggleWindow("entities");
+                handleFocusWindow("entities");
             }}
             selectedAircraftId={selectedAircraftId}
             onAircraftSelect={(id) => {
                 if (!isWindowOpen("shipmentDetail")) handleToggleWindow("shipmentDetail");
                 handleFocusWindow("shipmentDetail");
+                if (id) {
+                    if (!isWindowOpen("entities")) handleToggleWindow("entities");
+                    handleFocusWindow("entities");
+                }
             }}
             showCityLabels={activeAircraft.length < 80}
             zoom={mapZoom}
@@ -437,8 +369,6 @@ targetPlaybackMinutes,
           <CollapseSimConfig
             isOpen={isScenarioConfigOpen && activeTab === "colapso"}
             onClose={toggleScenarioConfig}
-            selectedAlgorithm={selectedAlgorithm}
-            onAlgorithmChange={setSelectedAlgorithm}
             onStart={startCollapseSimulation}
             liveStatus={liveStatus}
             onReset={resetSimulation}
@@ -468,7 +398,6 @@ targetPlaybackMinutes,
           comparison: isWindowOpen("comparison"),
           shipmentDetail: isWindowOpen("shipmentDetail"),
           airportConfig: isWindowOpen("airportConfig"),
-          bloqueos: isWindowOpen("bloqueos"),
           cancellation: isWindowOpen("cancellation")
         }}
         onToggleScenarioConfig={toggleScenarioConfig}
@@ -477,8 +406,6 @@ targetPlaybackMinutes,
         maxWindows={maxWindows}
         setMaxWindows={setMaxWindows}
       />
-
-
 
       <footer className="ct-footer-minimal">
         <span style={{ opacity: 0.4 }}>TASFB2B Control Tower</span>

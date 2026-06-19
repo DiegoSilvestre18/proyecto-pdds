@@ -64,64 +64,49 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
   const [whSort, setWhSort] = useState('occupancy_desc');
   const [expandedWh, setExpandedWh] = useState(null);
 
-  // ── Refs para scroll automático (Paso 3: Mapa→Panel) ────────────────────
+  // ── Refs para scroll automático ────────────────────────────────────────
   const utRefsMap = useRef({});
   const whRefsMap = useRef({});
   const scrollContainerRef = useRef(null);
+  const lastMapSelectionRef = useRef(null);
 
-  // ── Paso 3: Responder a selección desde el mapa ─────────────────────────
+  // ── Responder a selección desde el mapa ────────────────────────────────
   useEffect(() => {
     if (!focusedEntity || focusedEntity.source !== 'map') return;
 
     if (focusedEntity.type === 'flight') {
       setActiveTab('ut');
-      // Scroll al vuelo después de un tick para que el tab se renderice
-      requestAnimationFrame(() => {
-        const ref = utRefsMap.current[focusedEntity.id];
-        if (ref) {
-          ref.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          // Aplicar efecto highlight temporal
-          ref.classList.add('ct-entity-highlighted');
-          setTimeout(() => ref.classList.remove('ct-entity-highlighted'), 2500);
-        }
-      });
+      setExpandedUt(focusedEntity.id);
+      lastMapSelectionRef.current = { type: 'flight', id: focusedEntity.id };
     }
 
     if (focusedEntity.type === 'airport') {
       setActiveTab('wh');
-      requestAnimationFrame(() => {
-        const ref = whRefsMap.current[focusedEntity.id];
-        if (ref) {
-          ref.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          ref.classList.add('ct-entity-highlighted');
-          setTimeout(() => ref.classList.remove('ct-entity-highlighted'), 2500);
-        }
-      });
+      setExpandedWh(focusedEntity.id);
+      lastMapSelectionRef.current = { type: 'airport', id: focusedEntity.id };
     }
   }, [focusedEntity]);
 
-  // ── Paso 2: Clic en panel → enfocar en mapa ────────────────────────────
+  // ── Scroll AFTER DOM listo (activeTab/expandedWh renderizados) ──────────
+  useEffect(() => {
+    const last = lastMapSelectionRef.current;
+    if (!last) return;
+
+    const refMap = last.type === 'flight' ? utRefsMap : whRefsMap;
+    const ref = refMap.current[last.id];
+
+    if (ref) {
+      ref.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      ref.classList.add('ct-entity-highlighted');
+      setTimeout(() => ref.classList.remove('ct-entity-highlighted'), 2500);
+      lastMapSelectionRef.current = null;
+    }
+  }, [activeTab, expandedWh, expandedUt]);
+
+  // ── Clic en panel → enfocar en mapa ────────────────────────────────────
   const handleSelectUT = useCallback((ut) => {
-    const from = airports?.find(a => a.icao === ut.from);
-    const to   = airports?.find(a => a.icao === ut.to);
-    if (!from && !to) return;
-
-    // Calcular posición del avión para centrar el mapa
-    const progress = ut.progress ?? 0.5;
-    const target = from && to
-      ? [
-          from.coordinates[0] + (to.coordinates[0] - from.coordinates[0]) * progress,
-          from.coordinates[1] + (to.coordinates[1] - from.coordinates[1]) * progress,
-        ]
-      : (from?.coordinates || to?.coordinates);
-
     setFocusedEntity('flight', ut.id, 'panel');
-    dispatchMapCommand('flyTo', {
-      coordinates: target,
-      zoom: 4,
-      targetId: ut.id,
-    });
-  }, [airports, setFocusedEntity, dispatchMapCommand]);
+  }, [setFocusedEntity]);
 
   const handleSelectWarehouse = useCallback((wh) => {
     setFocusedEntity('airport', wh.icao, 'panel');
