@@ -1,0 +1,18 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: pdds-backend
+    ports:
+      # Exponemos el contenedor en el puerto 8081 para no chocar con el Tomcat en el 8080
+      - "8081:8080"
+    restart: unless-stopped
+    volumes:
+      # Directorio para que los datos (ej. H2 DB, archivos Excel exportados) no se pierdan si el contenedor se reinicia
+      - backend-data:/app/data
+
+volumes:
+  backend-data:
