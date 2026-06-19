@@ -15,13 +15,13 @@ cd proyecto-pdds
 ### 2. Construir el Frontend (Sin instalar Node.js)
 Estando en la carpeta `proyecto-pdds`, ejecuta este comando de Docker. Lo que hace es levantar un contenedor temporal de Node.js, instalar dependencias (`npm install`) y compilar React (`npm run build`), y luego el contenedor se elimina, dejando la carpeta compilada `frontend/dist`.
 ```bash
-docker run --rm -v $(pwd)/frontend:/app -w /app node:20 /bin/bash -c "npm install && npm run build"
+sudo docker run --rm -v $(pwd)/frontend:/app -w /app node:20 /bin/bash -c "npm install && npm run build"
 ```
 
 ### 3. Levantar el Backend (Con Docker Compose)
 Estando en la misma carpeta raíz `proyecto-pdds`, ejecuta:
 ```bash
-docker compose up -d --build
+sudo docker compose up -d --build
 ```
 Esto creará la imagen del backend y la dejará corriendo en segundo plano exponiendo el puerto `8081`. 
 
