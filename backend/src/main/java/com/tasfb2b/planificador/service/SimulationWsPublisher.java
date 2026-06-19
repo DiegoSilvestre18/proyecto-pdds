@@ -222,6 +222,8 @@ public class SimulationWsPublisher {
                     .errorMessage(frame.errorMessage())
                     .startEpoch(frame.startEpoch())
                     .algorithm(frame.algorithm())
+                    .taMs(frame.taMs())
+                    .saMinutes(frame.saMinutes())
                     .build();
         }
 
@@ -243,6 +245,8 @@ public class SimulationWsPublisher {
                 .errorMessage(session.getErrorMessage())
                 .startEpoch(session.getStartEpoch())
                 .algorithm(session.getAlgorithm())
+                .taMs(session.getLastTaMs())
+                .saMinutes(session.getCurrentSaMinutes())
                 .build();
     }
 

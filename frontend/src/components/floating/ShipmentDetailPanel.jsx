@@ -1,9 +1,5 @@
 import React from 'react';
 
-const REPLAN_HISTORY = [
-  { date: '2026-04-09 18:42', reason: 'Cancelación vuelo BOG→MEX', oldRoute: 'LIM→BOG→MEX→MAD', newRoute: 'LIM→BOG→IAD→LHR→MAD' },
-]
-
 const STATUS_LABELS = {
   normal: "En tránsito",
   high: "Carga alta",
@@ -15,12 +11,11 @@ const STATUS_LABELS = {
 
 function ShipmentDetailPanel({ 
   isVisible, 
-  onHide, 
   searchedShipment, 
   selectedAircraft = null, 
-  airportByCode = {},
   onSearch = () => {},
-  isSearching = false
+  isSearching = false,
+  onCancelFlight = () => {},
 }) {      
   const [searchValue, setSearchValue] = React.useState("");
 
@@ -33,8 +28,8 @@ function ShipmentDetailPanel({
     onSearch(searchValue);
   };
 
-  const fromAirport = selectedAircraft ? airportByCode[selectedAircraft.from] : null;
-  const toAirport = selectedAircraft ? airportByCode[selectedAircraft.to] : null;
+  const s = searchedShipment;
+
   const routeLabel = selectedAircraft ? `${selectedAircraft.from} → ${selectedAircraft.to}` : "--";
   const statusLabel = selectedAircraft
     ? (STATUS_LABELS[selectedAircraft.status] ?? selectedAircraft.status ?? "En tránsito")
@@ -42,47 +37,52 @@ function ShipmentDetailPanel({
   const progressPct = selectedAircraft
     ? Math.round((selectedAircraft.progress ?? 0) * 100)
     : 0;
+
+  const bagsLabel = s?.totalBags
+    ?? (selectedAircraft ? `${selectedAircraft.ocupacionReal} / ${selectedAircraft.capacidadMax}` : '—');
+
+  const fmtEpoch = (ep) => ep ? new Date(ep).toLocaleString() : '—';
+
+  const arrivalLabel = s?.arrival
+    ? new Date(s.arrival).toLocaleString()
+    : fmtEpoch(selectedAircraft?.arrivalTime);
+
   const travelPlan = selectedAircraft ? [
     {
       airport: selectedAircraft.from,
-      arrived: "—",
-      departed: "—",
+      label: 'Salida',
+      time: fmtEpoch(selectedAircraft.departureTime),
       status: progressPct > 10 ? "completado" : "en escala",
     },
     {
       airport: selectedAircraft.to,
-      arrived: "—",
-      departed: "—",
+      label: 'Llegada',
+      time: fmtEpoch(selectedAircraft.arrivalTime),
       status: progressPct > 85 ? "en escala" : "pendiente",
     },
   ] : [];
-  const showMockHistory = !selectedAircraft;
-  const s = searchedShipment;
 
   return (
-    <aside className="ct-panel ct-panel--shipment" aria-label="Detalle de envío">
-      <div className="ct-panel-header">
-        <p>DETALLE DE ENVÍO {s?.isLocal ? '⚡ ACTIVO' : '🏛️ HISTÓRICO'}</p>
-        <button type="button" className="ct-panel-close" onClick={onHide}>
-          Ocultar
-        </button>
+    <aside className="ct-panel--shipment" aria-label="Detalle de envío">
+      <div style={{ padding: '0 0 4px', fontSize: '9px', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        DETALLE DE ENVÍO {s?.isLocal ? '⚡ ACTIVO' : '🏛️ HISTÓRICO'}
       </div>
 
-      <div style={{ padding: '12px', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+      <div style={{ padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         <form onSubmit={handleSearch} style={{ position: "relative", width: "100%" }}>
           <input 
             type="text" 
-            placeholder="Buscar ID de envío..." 
+            placeholder="Buscar ID..." 
             value={searchValue}
             onChange={(e) => setSearchValue(e.target.value)}
             style={{
               background: "rgba(15, 23, 42, 0.6)",
               border: "1px solid rgba(255,255,255,0.1)",
-              borderRadius: "6px",
-              padding: "8px 12px",
-              paddingRight: "35px",
+              borderRadius: "4px",
+              padding: "5px 10px",
+              paddingRight: "30px",
               color: "white",
-              fontSize: "12px",
+              fontSize: "11px",
               width: "100%",
               outline: "none",
               boxSizing: "border-box"
@@ -93,14 +93,15 @@ function ShipmentDetailPanel({
             disabled={isSearching}
             style={{
               position: "absolute",
-              right: "8px",
+              right: "6px",
               top: "50%",
               transform: "translateY(-50%)",
               background: "transparent",
               border: "none",
               color: "#94a3b8",
               cursor: "pointer",
-              fontSize: "14px"
+              fontSize: "12px",
+              padding: "2px"
             }}
           >
             {isSearching ? "⏳" : "🔍"}
@@ -109,8 +110,8 @@ function ShipmentDetailPanel({
       </div>
 
       {!s && !selectedAircraft ? (
-        <div style={{ padding: '20px', textAlign: 'center', color: '#94a3b8', fontSize: '13px' }}>
-          Ingrese un ID en el buscador superior para localizar un envío específico o seleccione un vuelo del mapa.
+        <div style={{ padding: '12px', textAlign: 'center', color: '#94a3b8', fontSize: '11px' }}>
+          Ingrese un ID en el buscador o seleccione un vuelo del mapa.
         </div>
       ) : (
         <div className="ct-shipment-detail">
@@ -125,7 +126,7 @@ function ShipmentDetailPanel({
             </div>
             <div className="ct-shipment-detail__field">
               <span>Maletas / Capacidad</span>
-              <strong>{s?.totalBags || '—'}</strong>
+              <strong>{bagsLabel}</strong>
             </div>
             <div className="ct-shipment-detail__field">
               <span>Estado</span>
@@ -135,9 +136,19 @@ function ShipmentDetailPanel({
             </div>
             <div className="ct-shipment-detail__field">
               <span>Llegada</span>
-              <strong>{s?.arrival ? new Date(s.arrival).toLocaleString() : '—'}</strong>
+              <strong>{arrivalLabel}</strong>
             </div>
           </div>
+
+          {selectedAircraft && !s && (
+            <button onClick={onCancelFlight} style={{
+              width: '100%', marginTop: 6, padding: '5px', borderRadius: 4,
+              background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)',
+              color: '#fca5a5', fontSize: 11, fontWeight: 700, cursor: 'pointer',
+            }}>
+              🚫 Cancelar / Reprogramar Vuelo
+            </button>
+          )}
 
           {s?.route && s.route.length > 0 && (
             <div className="ct-config-section">
@@ -166,8 +177,7 @@ function ShipmentDetailPanel({
                     <div className="ct-travel-stop__dot" />
                     <div className="ct-travel-stop__info">
                       <strong>{stop.airport}</strong>
-                      <span>Llegada: {stop.arrived}</span>
-                      <span>Salida: {stop.departed}</span>
+                      <span>{stop.label}: {stop.time}</span>
                     </div>
                     <span className={`ct-travel-stop__status ct-travel-stop__status--${stop.status === 'completado' ? 'done' : stop.status === 'en escala' ? 'current' : 'pending'}`}>
                       {stop.status}
@@ -179,8 +189,8 @@ function ShipmentDetailPanel({
           )}
           
           {s && !s.isLocal && (
-            <div style={{ marginTop: '12px', fontSize: '10px', color: '#94a3b8', fontStyle: 'italic', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '8px' }}>
-              * Este envío ya no está en la telemetría activa. Datos obtenidos del servidor.
+            <div style={{ marginTop: '8px', fontSize: '9px', color: '#94a3b8', fontStyle: 'italic', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '6px' }}>
+              * Envío histórico (no está en telemetría activa).
             </div>
           )}
         </div>

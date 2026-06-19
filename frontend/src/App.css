@@ -2837,12 +2837,15 @@
 }
 
 /* ── Nested panel removal (inside DraggableWindow) ── */
-.draggable-content-wrapper .ct-panel {
+.draggable-content-wrapper .ct-panel,
+.draggable-content-wrapper .ct-panel--shipment {
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
   padding: 0 !important;
   color: #f8fafc !important;
+  width: 100% !important;
+  max-height: none !important;
 }
 
 .draggable-content-wrapper .ct-metrics-grid span,
@@ -2858,6 +2861,120 @@
 
 .draggable-content-wrapper .ct-panel-header {
   display: none !important;
+}
+
+/* ── ShipmentDetailPanel dark-theme overrides ── */
+.draggable-content-wrapper .ct-shipment-detail {
+  padding: 8px 0 !important;
+}
+
+.draggable-content-wrapper .ct-shipment-detail__summary {
+  border-bottom-color: rgba(255,255,255,0.06) !important;
+  text-align: center;
+  gap: 6px !important;
+  padding-bottom: 8px !important;
+  margin-bottom: 8px !important;
+}
+
+.draggable-content-wrapper .ct-shipment-detail__field {
+  align-items: center;
+  gap: 1px !important;
+}
+
+.draggable-content-wrapper .ct-shipment-detail__field span {
+  color: #94a3b8 !important;
+  font-size: 0.52rem !important;
+}
+
+.draggable-content-wrapper .ct-shipment-detail__field strong {
+  color: #f8fafc !important;
+  font-size: 0.68rem !important;
+}
+
+.draggable-content-wrapper .ct-shipment-detail__field .ct-text-red {
+  color: #f87171 !important;
+}
+
+.draggable-content-wrapper .ct-shipment-detail__field .ct-text-amber {
+  color: #fbbf24 !important;
+}
+
+.draggable-content-wrapper .ct-config-section {
+  border-bottom-color: rgba(255,255,255,0.06) !important;
+  padding: 6px 0 !important;
+}
+
+.draggable-content-wrapper .ct-config-section__title {
+  color: #94a3b8 !important;
+  margin: 0 0 6px !important;
+  font-size: 0.58rem !important;
+}
+
+.draggable-content-wrapper .ct-travel-stop__info strong {
+  color: #f8fafc !important;
+}
+
+.draggable-content-wrapper .ct-travel-stop__info span {
+  color: #94a3b8 !important;
+}
+
+.draggable-content-wrapper .ct-travel-stop__status--done {
+  background: rgba(23, 198, 101, 0.15) !important;
+  color: #4ade80 !important;
+}
+
+.draggable-content-wrapper .ct-travel-stop__status--current {
+  background: rgba(58, 144, 208, 0.15) !important;
+  color: #60a5fa !important;
+}
+
+.draggable-content-wrapper .ct-travel-stop__status--pending {
+  background: rgba(255,255,255,0.06) !important;
+  color: #94a3b8 !important;
+}
+
+.draggable-content-wrapper .ct-travel-stop--done .ct-travel-stop__dot {
+  background: #4ade80 !important;
+}
+
+.draggable-content-wrapper .ct-travel-stop--current .ct-travel-stop__dot {
+  background: #60a5fa !important;
+}
+
+.draggable-content-wrapper .ct-travel-stop--pending .ct-travel-stop__dot {
+  background: #64748b !important;
+}
+
+.draggable-content-wrapper .ct-travel-plan {
+  padding-left: 10px !important;
+}
+
+.draggable-content-wrapper .ct-travel-plan::before {
+  background: rgba(255,255,255,0.1) !important;
+}
+
+.draggable-content-wrapper .ct-travel-stop {
+  padding: 4px 0 !important;
+  gap: 8px !important;
+}
+
+.draggable-content-wrapper .ct-travel-stop__dot {
+  width: 8px !important;
+  height: 8px !important;
+  margin-top: 2px !important;
+}
+
+.draggable-content-wrapper .ct-travel-stop__info strong {
+  font-size: 0.68rem !important;
+}
+
+.draggable-content-wrapper .ct-travel-stop__info span {
+  font-size: 0.55rem !important;
+}
+
+.draggable-content-wrapper .ct-travel-stop__status {
+  font-size: 0.5rem !important;
+  padding: 1px 5px !important;
 }
 
 .ct-header form input::placeholder {

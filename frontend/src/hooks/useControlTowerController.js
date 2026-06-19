@@ -3,8 +3,6 @@ import { apiFetch } from "./api";
 import { createStompClient } from "./ws";
 import {
   AIRPORT_NODES,
-  AIRPORT_ROWS,
-  COLLAPSE_AIRPORT_ROWS,
   SCENARIO_TABS,
 } from "../data/controlTowerData";
 import { AIRPORT_BY_ICAO, buildAirportMetrics, AIRPORTS } from "../data/airportsData";
@@ -44,13 +42,10 @@ export const useControlTowerController = () => {
   const [isKpiCollapsed, setIsKpiCollapsed] = useState(readStoredKpiCollapsed);
   const [selectedAircraftId, setSelectedAircraftId] = useState(null);
   const [selectedAirportCode, setSelectedAirportCode] = useState(null);
-  const [isAirportDetailOpen, setIsAirportDetailOpen] = useState(false);
   const [isDockCollapsed, setIsDockCollapsed] = useState(false);
   const [isScenarioConfigOpen, setIsScenarioConfigOpen] = useState(false);
   const [selectedAlgorithm, setSelectedAlgorithm] = useState("alns");
   const [simState, setSimState] = useState("idle");
-  const [simSpeed, setSimSpeed] = useState(1);
-  const [isFluidMode, setIsFluidMode] = useState(false);
   const [targetPlaybackMinutes, setTargetPlaybackMinutes] = useState(30);
 
   const [sessionId, setSessionId] = useState(() => {
@@ -83,7 +78,8 @@ export const useControlTowerController = () => {
   });
   const [kpis, setKpis] = useState({
     slaPercent: 0, globalOccupancy: 0, criticalNodes: 0,
-    totalBagsWaiting: 0, rescuedFlights: 0, comparisonResults: null
+    totalBagsWaiting: 0, rescuedFlights: 0, comparisonResults: null,
+    taMs: 0, saMinutes: 10
   });
   const [airportLoads, setAirportLoads] = useState({});
   const [aircraft, setAircraft] = useState([]);
@@ -216,13 +212,15 @@ export const useControlTowerController = () => {
                setMeta(prev => ({ ...prev, startEpoch: data.startEpoch }));
            }
            setKpis({
-               slaPercent: data.slaPercent,
-               globalOccupancy: data.globalOccupancy,
-               criticalNodes: data.criticalNodes,
-               totalBagsWaiting: data.totalBagsWaiting,
-               rescuedFlights: data.rescuedFlights,
-               comparisonResults: data.comparisonResults || null,
-           });
+                slaPercent: data.slaPercent,
+                globalOccupancy: data.globalOccupancy,
+                criticalNodes: data.criticalNodes,
+                totalBagsWaiting: data.totalBagsWaiting,
+                rescuedFlights: data.rescuedFlights,
+                comparisonResults: data.comparisonResults || null,
+                taMs: data.taMs ?? 0,
+                saMinutes: data.saMinutes ?? 10,
+            });
            setMeta(prev => ({
                ...prev,
                status: data.status,
@@ -274,11 +272,6 @@ export const useControlTowerController = () => {
 
   const toggleDock = useCallback(() => {
     setIsDockCollapsed((current) => !current);
-  }, []);
-
-  const handleSelectAircraft = useCallback((aircraftId) => {
-    if (!aircraftId) return;
-    setSelectedAircraftId(aircraftId);
   }, []);
 
   const resetSimulation = useCallback(() => {
@@ -488,16 +481,6 @@ export const useControlTowerController = () => {
       console.error("[Tasf.B2B] Error al exportar Excel:", err);
     }
   }, []);
-
-  const handleSetSimSpeed = useCallback((speed) => {
-    setSimSpeed(speed);
-    if (speed === 1) setIsFluidMode(false);
-    else setIsFluidMode(true);
-    
-    if (sessionId) {
-      apiFetch(`/api/v1/simulation/speed/${sessionId}?speed=${speed}`, { method: "POST" }).catch(e => console.error("Error setting speed:", e));
-    }
-  }, [sessionId]);
 
   const exportSimulationReportMd = useCallback(async (sid, name = "Escenario") => {
     if (!sid) return;
@@ -761,8 +744,7 @@ const envelope = JSON.parse(msg.body);
   }, [airportLoads]);
 
   const activeAirportRows = useMemo(() => {
-    const base = isCollapseScenario ? COLLAPSE_AIRPORT_ROWS : AIRPORT_ROWS;
-    if (!airportLoads || Object.keys(airportLoads).length === 0) return base;
+    if (!airportLoads || Object.keys(airportLoads).length === 0) return [];
     return Object.entries(airportLoads)
       .sort(([, a], [, b]) => (b.occupancy || 0) - (a.occupancy || 0))
       .slice(0, 8)
@@ -936,9 +918,6 @@ if (selected && !finalSelection.some((p) => p.id === selected.id)) {
 
   const selectedFromAirport = selectedAircraft ? (AIRPORT_BY_ICAO[selectedAircraft.from] ?? null) : null;
   const selectedToAirport = selectedAircraft ? (AIRPORT_BY_ICAO[selectedAircraft.to] ?? null) : null;
-  const selectedAirport = selectedAirportCode ? (AIRPORT_BY_ICAO[selectedAirportCode] ?? null) : null;
-  const selectedAirportMetrics = selectedAirport ? (activeMetrics[selectedAirport.icao] ?? null) : null;
-  const selectedAirportLevel = selectedAirportMetrics?.level ?? "green";
 
   const globalOccupancyCalculated = useMemo(() => {
     const loads = Object.values(airportLoads);
@@ -1115,7 +1094,6 @@ if (selected && !finalSelection.some((p) => p.id === selected.id)) {
     return null;
   }, [kpis.comparisonResults]);
 
-  const eventLog = logs;
   const totalBagsWaiting = kpis.totalBagsWaiting ?? 0;
 
 
@@ -1134,7 +1112,6 @@ activeAircraft,
     airportNodes: AIRPORT_NODES,
     comparisonData,
     elapsedOperationTime,
-    eventLog,
     currentEpochTime,
     totalBagsWaiting,
     activeShipments,
@@ -1149,22 +1126,15 @@ activeAircraft,
     masterPlan,
     selectedAircraftId,
     selectedAirportCode,
-    selectedAirport,
-    selectedAirportLevel,
-    selectedAirportMetrics,
     selectedAlgorithm,
     selectedFromAirport,
     selectedToAirport,
     sessionId,
-    isFluidMode,
-    setIsFluidMode,
     searchShipment,
     searchedShipment,
     isSearching,
     setSelectedAircraftId,
     setSelectedAlgorithm,
-    setSimSpeed: handleSetSimSpeed,
-    simSpeed,
     simState,
     startSimulation,
     startDayToDaySimulation,
@@ -1173,18 +1143,15 @@ activeAircraft,
     exportSimulationReportMd,
     exportDetailedSimulationReport,
     resetSimulation,
+    cancelFlight,
     summary,
     tabs: SCENARIO_TABS,
     toggleDock,
     toggleKpiStrip,
     toggleScenarioConfig,
-    setSimState,
-    selectedAircraft,
     trackedRouteData,
     targetPlaybackMinutes,
-    setTargetPlaybackMinutes,
-    cancelFlight,
-    handleSelectAircraft
+    setTargetPlaybackMinutes
   };
 };
 

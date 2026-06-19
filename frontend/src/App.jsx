@@ -7,7 +7,6 @@ import WorldMap from "./components/map/WorldMap";
 import ControlDock from "./components/controlTower/ControlDock";
 import ScenarioHeader from "./components/controlTower/ScenarioHeader";
 import TelemetryPanel from "./components/floating/TelemetryPanel";
-import CapacityLegendPanel from "./components/floating/CapacityLegendPanel";
 import TopAirportsPanel from "./components/floating/TopAirportsPanel";
 import TransitInventoryPanel from "./components/floating/TransitInventoryPanel";
 import AlgorithmComparisonPanel from "./components/floating/AlgorithmComparisonPanel";
@@ -15,10 +14,8 @@ import ShipmentDetailPanel from "./components/floating/ShipmentDetailPanel";
 import FlightCancellationPanel from "./components/scenarios/FlightCancellationPanel";
 import ReportsPanel from "./components/floating/ReportsPanel";
 import EntitiesListPanel from "./components/floating/EntitiesListPanel";
-import FlightDetailPanel from "./components/floating/FlightDetailPanel";
 import KpiStrip from "./components/kpi/KpiStrip";
 import KpiControls from "./components/kpi/KpiControls";
-import SimulationControls from "./components/kpi/SimulationControls";
 import DayToDayConfig from "./components/scenarios/DayToDayConfig";
 import PeriodSimConfig from "./components/scenarios/PeriodSimConfig";
 import CollapseSimConfig from "./components/scenarios/CollapseSimConfig";
@@ -87,6 +84,8 @@ const App = () => {
       setTrackedRoute(trackedRouteData);
     }
   }, [trackedRouteData, setTrackedRoute]);
+
+  const currentFlight = activeAircraft.find(p => p.id === selectedAircraftId) ?? null;
 
   // ── Lógica FIFO de Paneles (Draggable Windows) ──
   const [maxWindows, setMaxWindows] = useState(1);
@@ -235,13 +234,19 @@ const App = () => {
         </DraggableWindow>
       )}
       {isWindowOpen("shipmentDetail") && (
-        <DraggableWindow title="Envío y Despacho" onClose={() => handleToggleWindow("shipmentDetail")} initialPosition={{x: 60, y: 350}} isActive={openWindowsQueue[openWindowsQueue.length-1] === "shipmentDetail"} onFocus={() => handleFocusWindow("shipmentDetail")}>
+        <DraggableWindow title="Envío y Despacho" onClose={() => { handleToggleWindow("shipmentDetail"); setSelectedAircraftId(null); }} initialPosition={{x: 60, y: 350}} isActive={openWindowsQueue[openWindowsQueue.length-1] === "shipmentDetail"} onFocus={() => handleFocusWindow("shipmentDetail")}>
           <ShipmentDetailPanel 
             isVisible={true} 
-            onHide={() => handleToggleWindow("shipmentDetail")} 
+            selectedAircraft={currentFlight}
             searchedShipment={searchedShipment} 
             onSearch={searchShipment}
             isSearching={isSearching}
+            onCancelFlight={() => {
+              if (selectedAircraftId) {
+                if (!isWindowOpen("cancellation")) handleToggleWindow("cancellation");
+                handleFocusWindow("cancellation");
+              }
+            }}
           />
         </DraggableWindow>
       )}
@@ -268,18 +273,8 @@ const App = () => {
             activeAircraft={activeAircraft} 
             airports={AIRPORTS} 
             airportMetrics={activeMetrics} 
+            onSelectFlight={setSelectedAircraftId}
           />
-        </DraggableWindow>
-      )}
-
-      {selectedAircraftId && (
-        <DraggableWindow 
-          title="Información del Vuelo" 
-          onClose={() => setSelectedAircraftId(null)} 
-          initialPosition={{x: window.innerWidth - 340, y: 80}} 
-          isActive={true}
-        >
-          <FlightDetailPanel flightId={selectedAircraftId} activeAircraft={activeAircraft} />
         </DraggableWindow>
       )}
 
@@ -317,6 +312,7 @@ const App = () => {
             }}
             selectedAircraftId={selectedAircraftId}
             onAircraftSelect={(id) => {
+                setSelectedAircraftId(id);
                 if (!isWindowOpen("shipmentDetail")) handleToggleWindow("shipmentDetail");
                 handleFocusWindow("shipmentDetail");
                 if (id) {
@@ -334,6 +330,7 @@ const App = () => {
             currentEpochTime={liveStatus?.interpolatedTime || currentEpochTime}
             systemClock={summary.systemClock}
             simState={simState}
+            onBackgroundClick={() => setSelectedAircraftId(null)}
             />
 
           <DayToDayConfig

@@ -3,13 +3,12 @@ import { useState } from 'react'
 
 // Fecha mínima = hoy, máxima = 31 dic 2026
 
-function CollapseSimConfig({ isOpen, onClose, onStart, liveStatus, onReset, sessionId, simState }) {
+function CollapseSimConfig({ isOpen, onClose, onStart, liveStatus, onReset, sessionId }) {
   const [activeSection, setActiveSection] = useState('config')
 const [isStarting, setIsStarting]       = useState(false)
   const [startDate, setStartDate]         = useState('2026-04-09')
   const [startTime, setStartTime]         = useState('00:00')
   const [destroyFraction, setDestroyFraction] = useState(20)
-  const [mutationRate, setMutationRate]       = useState(15)
 
   const isRunning = liveStatus?.status === 'RUNNING'
   const isCompleted = liveStatus?.status === 'DONE'
@@ -206,27 +205,6 @@ const [isStarting, setIsStarting]       = useState(false)
                     <p style={{ margin: "2px 0" }}>▸ <strong>Criterio de Parada:</strong> Tiempo límite (6.5 segundos Sa)</p>
                     <p style={{ margin: "2px 0" }}>▸ <strong>Enfriamiento (Cooling Rate):</strong> 0.997 (Enfriamiento Simulado)</p>
                     <p style={{ margin: "2px 0" }}>▸ <strong>Tamaño Segmento:</strong> 100 iteraciones (Actualización de pesos)</p>
-                  </div>
-                </div>
-              ) : (
-                <div style={{ background: "rgba(15,23,42,0.4)", border: "1px solid rgba(107,114,128,0.25)", borderRadius: 10, padding: "12px 14px", marginTop: 8 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                    <span style={{ fontSize: 11, color: "#9ca3af" }}>Tasa de Mutación (Mutation Rate)</span>
-                    <span style={{ fontSize: 13, fontWeight: "bold", color: "#9ca3af" }}>{mutationRate}%</span>
-                  </div>
-                  <input
-                    type="range" min="5" max="30" step="5"
-                    value={mutationRate}
-                    onChange={e => setMutationRate(Number(e.target.value))}
-                    style={{ width: "100%", accentColor: "#9ca3af" }}
-                  />
-                  <p style={{ fontSize: 10, color: "#6b7280", margin: "6px 0 0 0" }}>
-                    Probabilidad de aplicar mutación de intercambio a los descendientes de la población.
-                  </p>
-                  <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", marginTop: 8, paddingTop: 8, fontSize: 10, color: "#9ca3af" }}>
-                    <p style={{ margin: "2px 0" }}>▸ <strong>Criterio de Parada:</strong> Tiempo límite (6.5 segundos Sa)</p>
-                    <p style={{ margin: "2px 0" }}>▸ <strong>Tamaño Población:</strong> 50 individuos</p>
-                    <p style={{ margin: "2px 0" }}>▸ <strong>Elite:</strong> 5 mejores individuos (Preservación directa)</p>
                   </div>
                 </div>
             </div>

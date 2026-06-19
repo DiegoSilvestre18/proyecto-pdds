@@ -54,14 +54,15 @@ export const SelectionBridgeProvider = ({ children }) => {
     setExceptionHighlight(null);
   }, []);
 
-  // ── 5. Filtros visuales por semáforo ─────────────────────────────────────
+  // ── 5. Filtros visuales (semáforo, estado vuelo, continente) ─────────────
   const [activeFilters, setActiveFilters] = useState({
     semaphoreLevel: null, // null = todos, 'green', 'amber', 'red'
     flightStatus: null,   // null = todos, 'normal', 'critical', 'rescued', 'cancelled'
+    continent: null,      // null = todos, 'america', 'europe', 'asia'
   });
 
   const resetFilters = useCallback(() => {
-    setActiveFilters({ semaphoreLevel: null, flightStatus: null });
+    setActiveFilters({ semaphoreLevel: null, flightStatus: null, continent: null });
   }, []);
 
   const value = {

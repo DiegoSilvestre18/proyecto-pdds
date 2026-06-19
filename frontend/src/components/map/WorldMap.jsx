@@ -133,6 +133,7 @@ const WorldMap = ({
   systemClock = "--:--:--",
   simState = "idle",
   isDayToDay = false,
+  onBackgroundClick = () => {},
 }) => {
   // ── Filtros de Visibilidad Día a Día ─────────────────────────────────────
   const [showEmptyFlights, setShowEmptyFlights] = useState(true);
@@ -213,11 +214,15 @@ const WorldMap = ({
   };
 
   const airportPassesFilter = useCallback((airportIcao) => {
+    if (activeFilters.continent) {
+      const ap = airports.find(a => a.icao === airportIcao);
+      if (ap && ap.continent !== activeFilters.continent) return false;
+    }
     if (!activeFilters.semaphoreLevel) return true;
     const metrics = activeMetrics[airportIcao];
     const level = metrics?.level ?? "green";
     return level === activeFilters.semaphoreLevel;
-  }, [activeFilters.semaphoreLevel, activeMetrics]);
+  }, [activeFilters.semaphoreLevel, activeFilters.continent, activeMetrics, airports]);
 
   const flightPassesFilter = useCallback((status) => {
     if (!activeFilters.flightStatus) return true;
@@ -304,6 +309,7 @@ const WorldMap = ({
         projection="geoMercator"
         projectionConfig={PROJECTION_CONFIG}
         className="ct-world-map__svg"
+        onClick={(e) => { if (e.target === e.currentTarget && onBackgroundClick) onBackgroundClick(); }}
       >
         <ZoomableGroup zoom={zoom} center={center} onMoveEnd={onMoveEnd} maxZoom={8}>
           
