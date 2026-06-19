@@ -49,6 +49,7 @@ public class SimulationController {
     private final EnvioService               envioService;
     private final FlightCancellationService  flightCancellationService;
     private final SimulationWsPublisher      wsPublisher;
+    private final EnvioRepository envioRepository;
 
     @PostMapping("/run/{dias}")
     public ResponseEntity<Map<String, String>> startSimulation(
@@ -61,6 +62,9 @@ public class SimulationController {
             @RequestParam(required = false, defaultValue = "1440") int saMinutes,
             @RequestParam(required = false, defaultValue = "240") int planningHorizon,
             @RequestParam(required = false, defaultValue = "false") boolean isRealTime) {
+
+        //Limpiamos caché al inicio así limpiamos los envíos de la BD de otros escenarios
+        envioRepository.deleteAllEnvios();
 
         int totalDays = (dias != null && dias > 0) ? dias : 5;
         String sessionId = UUID.randomUUID().toString();
@@ -110,7 +114,8 @@ public class SimulationController {
             @RequestParam(required = false) String preCancelledFlightIds,
             @RequestParam(required = false, defaultValue = "00:00:00") String startTime,
             @RequestParam(required = false, defaultValue = "1440") int saMinutes) {
-
+        //Limpiamos también
+        envioRepository.deleteAllEnvios();
         // En modo colapso, buscamos el punto de quiebre, por lo que usamos un límite alto de días (1000)
         int totalDays = 1000; //DEspués dse cambiará
 
