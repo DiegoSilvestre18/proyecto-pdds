@@ -95,7 +95,18 @@ const PendingShipmentsPanel = ({ isOpen, onClose, sessionId }) => {
                         </tr>
                         </thead>
                         <tbody>
-                        {shipments.map((s, idx) => (
+                        {shipments
+                            .sort((a, b) => {
+                                // 1. Primero por estado: En vuelo (asignados) primero, luego pendientes
+                                const aAsignado = a.vueloAsignado !== 'En proceso';
+                                const bAsignado = b.vueloAsignado !== 'En proceso';
+                                if (aAsignado && !bAsignado) return -1;
+                                if (!aAsignado && bAsignado) return 1;
+                                
+                                // 2. Luego por cantidad de maletas (Mayor a menor)
+                                return b.cantidad - a.cantidad;
+                            })
+                            .map((s, idx) => (
                             <tr key={s.id || idx} style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', transition: 'background 0.2s' }}>
                                 <td style={{ padding: '10px 4px', color: '#e2e8f0', fontFamily: 'monospace', fontSize: '11px' }}>
                                     {s.id ? s.id.split('-')[0] + '...' : 'N/A'}
@@ -115,7 +126,7 @@ const PendingShipmentsPanel = ({ isOpen, onClose, sessionId }) => {
                                             borderRadius: '4px',
                                             fontSize: '10px',
                                             fontWeight: 'bold'
-                                        }}>⏳ En proceso</span>
+                                        }}>⏳ Pendiente</span>
                                     ) : (
                                         <span style={{
                                             background: 'rgba(56, 189, 248, 0.15)',
