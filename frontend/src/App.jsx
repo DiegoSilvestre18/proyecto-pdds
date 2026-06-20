@@ -297,6 +297,7 @@ const App = () => {
           )}
 
           <WorldMap
+            isDayToDay={activeTab === 'dia-a-dia'}
             airports={airportNodes}
             activeMetrics={activeMetrics}
             activeAircraft={activeAircraft}
