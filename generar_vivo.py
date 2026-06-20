@@ -8,7 +8,13 @@ AEROPUERTOS_TODOS = [
     "LATI", "EDDI", "LOWW", "EBCI", "UMMS", "LBSF", "LKPR", "LDZA", "EKCH", "EHAM",
     "VIDP", "OSDI", "OERK", "OMDB", "OAKB", "OOMS", "OYSN", "OPKC", "UBBB", "OJAI"
 ]
-OFFSETS = {"EHAM": 2, "SGAS": -4, "UBBB": 2}
+OFFSETS = {
+    "SKBO": -5, "SEQM": -5, "SVMI": -4, "SBBR": -3, "SPIM": -5, "SLLP": -4, 
+    "SCEL": -3, "SABE": -3, "SGAS": -4, "SUAA": -3, "LATI": +2, "EDDI": +2, 
+    "LOWW": +2, "EBCI": +2, "UMMS": +3, "LBSF": +3, "LKPR": +2, "LDZA": +2, 
+    "EKCH": +2, "EHAM": +2, "VIDP": +5, "OSDI": +3, "OERK": +3, "OMDB": +4, 
+    "OAKB": +4, "OOMS": +4, "OYSN": +3, "OPKC": +5, "UBBB": +2, "OJAI": +3
+}
 
 def generar_datos_vivo():
     print("=== Generador VIVO: Aviones y Maletas Sincronizados ===")
@@ -29,13 +35,17 @@ def generar_datos_vivo():
         # La maleta llega al aeropuerto 1 minuto antes del despegue
         llegada_maleta_real = despegue_real - datetime.timedelta(minutes=1)
         
-        # Aplicamos el GMT offset para "engañar" al backend
+        # Aplicamos el GMT offset del ORIGEN al despegue
         despegue_ajustado = despegue_real + datetime.timedelta(hours=OFFSETS[origen])
         llegada_maleta_ajustada = llegada_maleta_real + datetime.timedelta(hours=OFFSETS[origen])
         
         # VUELO
+        # La llegada real a su destino es 5-8 mins despues
+        llegada_vuelo_real = despegue_real + datetime.timedelta(minutes=random.randint(5, 8))
+        # Pero el archivo TXT requiere la HORA LOCAL del DESTINO, asi que le sumamos el offset del destino
+        llegada_vuelo_ajustada = llegada_vuelo_real + datetime.timedelta(hours=OFFSETS[destino])
+        
         str_despegue = despegue_ajustado.strftime("%H:%M")
-        llegada_vuelo_ajustada = despegue_ajustado + datetime.timedelta(minutes=random.randint(5, 8))
         str_llegada = llegada_vuelo_ajustada.strftime("%H:%M")
         vuelos_extra.append(f"{origen}-{destino}-{str_despegue}-{str_llegada}-999\n")
         
