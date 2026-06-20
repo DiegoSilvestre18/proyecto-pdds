@@ -30,8 +30,8 @@ def generar_datos_vivo():
         destinos_validos = [a for a in AEROPUERTOS_TODOS if a != origen]
         destino = random.choice(destinos_validos)
         
-        # El avión despega en (i + 2) minutos para asegurar margen de tiempo
-        despegue_real = ahora + datetime.timedelta(minutes=i + 2)
+        # El avión despega en (i + 10) minutos para asegurar margen de tiempo para compilar y subir
+        despegue_real = ahora + datetime.timedelta(minutes=i + 10)
         # La maleta llega al aeropuerto 1 minuto antes del despegue
         llegada_maleta_real = despegue_real - datetime.timedelta(minutes=1)
         
