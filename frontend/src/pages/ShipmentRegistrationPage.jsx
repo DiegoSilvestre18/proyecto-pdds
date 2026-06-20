@@ -5,6 +5,7 @@ import { apiFetch } from '../hooks/api';
 
 const ShipmentRegistrationPage = () => {
     const navigate = useNavigate();
+    const [globalOrigenIcao, setGlobalOrigenIcao] = useState('');
     const [trayShipments, setTrayShipments] = useState([]);
     const [selectedFile, setSelectedFile] = useState(null);
 
@@ -12,7 +13,6 @@ const ShipmentRegistrationPage = () => {
     const [formData, setFormData] = useState({
         fecha: new Date().toLocaleDateString('en-CA'), // Formato YYYY-MM-DD
         hora: new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }),
-        origenIcao: '',
         destinoIcao: '',
         cantidadMaletas: 1,
         clienteId: ''
@@ -29,11 +29,11 @@ const ShipmentRegistrationPage = () => {
 
     const handleAddToTray = (e) => {
         e.preventDefault();
-        if (!formData.origenIcao || !formData.destinoIcao) {
+        if (!globalOrigenIcao || !formData.destinoIcao) {
             setStatus({ type: 'error', message: 'Debe seleccionar origen y destino.' });
             return;
         }
-        if (formData.origenIcao === formData.destinoIcao) {
+        if (globalOrigenIcao === formData.destinoIcao) {
             setStatus({ type: 'error', message: 'El origen y destino no pueden ser iguales.' });
             return;
         }
@@ -41,6 +41,7 @@ const ShipmentRegistrationPage = () => {
         const newShipment = {
             idTemp: Date.now() + Math.random().toString(36).substr(2, 9),
             ...formData,
+            origenIcao: globalOrigenIcao,
             clienteId: formData.clienteId || Math.floor(1000000 + Math.random() * 9000000).toString()
         };
         setTrayShipments(prev => [...prev, newShipment]);
@@ -59,19 +60,21 @@ const ShipmentRegistrationPage = () => {
     };
 
     const handleBulkUpload = async () => {
-        if (!selectedFile) return;
+        if (!selectedFile || !globalOrigenIcao) return;
 
         try {
             setLoading(true);
 
-            const formData = new FormData();
-            formData.append("file", selectedFile);
+            const renamedFile = new File([selectedFile], `_envios_${globalOrigenIcao}_.txt`, { type: selectedFile.type });
+
+            const formDataData = new FormData();
+            formDataData.append("file", renamedFile);
 
             const res = await apiFetch(
-                "/api/v1/envios/archivo",
+                "/api/v1/envios/carga",
                 {
                     method: "POST",
-                    body: formData
+                    body: formDataData
                 }
             );
 
@@ -188,6 +191,20 @@ const ShipmentRegistrationPage = () => {
 
             <div style={{ maxWidth: '1000px', margin: '0 auto', display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
 
+                {/* GLOBAL ORIGIN SELECTION */}
+                <div style={{ width: '100%', padding: '1.5rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(56,189,248,0.4)', borderRadius: '12px' }}>
+                    <h2 style={{ margin: '0 0 1rem 0', color: '#f8fafc', fontSize: '20px' }}>📍 Seleccione el Aeropuerto de Origen</h2>
+                    <p style={{ margin: '0 0 1rem 0', color: '#94a3b8', fontSize: '13px' }}>Todos los envíos manuales y archivos TXT cargados a continuación se asignarán a este aeropuerto.</p>
+                    <select value={globalOrigenIcao} onChange={(e) => setGlobalOrigenIcao(e.target.value)} style={{ width: '100%', padding: '1rem', borderRadius: '6px', background: 'rgba(15, 23, 42, 0.9)', border: '1px solid #38bdf8', color: 'white', fontSize: '16px', outline: 'none' }}>
+                        <option value="">-- Seleccione un aeropuerto --</option>
+                        {[...AIRPORTS].sort((a, b) => a.city.localeCompare(b.city)).map(a => (
+                            <option key={`orig-global-${a.icao}`} value={a.icao}>{a.city} ({a.icao})</option>
+                        ))}
+                    </select>
+                </div>
+
+                {globalOrigenIcao && (
+                    <>
                 {/* PANEL IZQUIERDO: Ingreso Manual y Archivo */}
                 <div style={{ flex: '1 1 350px', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
                     <div>
@@ -212,11 +229,11 @@ const ShipmentRegistrationPage = () => {
                             <div style={{ gridColumn: 'span 1' }}>
                                 <label style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem', fontSize: '11px', color: '#94a3b8' }}>
                                     <span>HORA (LOCAL)</span>
-                                    {formData.hora && formData.origenIcao && (
+                                    {formData.hora && globalOrigenIcao && (
                                         <span style={{ color: '#38bdf8' }} title="Hora equivalente en el reloj del mapa de la matriz">
                                             Mapa: {
                                             (() => {
-                                                const airport = AIRPORTS.find(a => a.icao === formData.origenIcao);
+                                                const airport = AIRPORTS.find(a => a.icao === globalOrigenIcao);
                                                 if (!airport) return '--:--';
                                                 const [h, m] = formData.hora.split(':').map(Number);
 
@@ -232,21 +249,12 @@ const ShipmentRegistrationPage = () => {
                                         </span>
                                     )}
                                 </label>
-                                <input type="time" name="hora" value={formData.hora} onChange={handleInputChange} required style={inputStyle} />
-                            </div>
-                            <div style={{ gridColumn: 'span 2' }}>
-                                <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '11px', color: '#94a3b8' }}>AEROPUERTO ORIGEN</label>
-                                <select name="origenIcao" value={formData.origenIcao} onChange={handleInputChange} required style={inputStyle}>
-                                    <option value="">Seleccione origen...</option>
-                                    {[...AIRPORTS].sort((a, b) => a.city.localeCompare(b.city)).map(a => (
-                                        <option key={`orig-${a.icao}`} value={a.icao}>{a.city} ({a.icao})</option>
-                                    ))}
-                                </select>
+                                <input type="time" name="hora" value={formData.hora} onChange={handleInputChange} required style={{ width: '100%', padding: '0.6rem 0.8rem', borderRadius: '6px', background: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', boxSizing: 'border-box', fontSize: '13px', outline: 'none' }} />
                             </div>
 
                             <div style={{ gridColumn: 'span 2' }}>
                                 <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '11px', color: '#94a3b8' }}>AEROPUERTO DESTINO</label>
-                                <select name="destinoIcao" value={formData.destinoIcao} onChange={handleInputChange} required style={inputStyle}>
+                                <select name="destinoIcao" value={formData.destinoIcao} onChange={handleInputChange} required style={{ width: '100%', padding: '0.6rem 0.8rem', borderRadius: '6px', background: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', boxSizing: 'border-box', fontSize: '13px', outline: 'none' }}>
                                     <option value="">Seleccione destino...</option>
                                     {[...AIRPORTS].sort((a, b) => a.city.localeCompare(b.city)).map(a => (
                                         <option key={`dest-${a.icao}`} value={a.icao}>{a.city} ({a.icao})</option>
@@ -255,7 +263,7 @@ const ShipmentRegistrationPage = () => {
                             </div>
                             <div style={{ gridColumn: 'span 2' }}>
                                 <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '11px', color: '#94a3b8' }}>CANTIDAD DE MALETAS (SuperLote)</label>
-                                <input type="number" name="cantidadMaletas" value={formData.cantidadMaletas} onChange={handleInputChange} min="1" required style={inputStyle} />
+                                <input type="number" name="cantidadMaletas" value={formData.cantidadMaletas} onChange={handleInputChange} min="1" required style={{ width: '100%', padding: '0.6rem 0.8rem', borderRadius: '6px', background: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', boxSizing: 'border-box', fontSize: '13px', outline: 'none' }} />
                             </div>
                             <div style={{ gridColumn: 'span 2' }}>
                                 <label style={{ display: 'block', marginBottom: '0.6rem', fontSize: '11px', color: '#94a3b8' }}>Código de Cliente (7 dígitos)</label>
@@ -281,7 +289,7 @@ const ShipmentRegistrationPage = () => {
                         borderRadius: '12px'
                     }}>
                         <h3 style={{ margin: '0 0 0.5rem 0', color: '#e2e8f0', fontSize: '14px' }}>📄 Carga desde archivo (.TXT)</h3>
-                        <p style={{ margin: '0 0 1rem 0', fontSize: '11px', color: '#64748b' }}>Formato: YYYY-MM-DD, HH:mm, ORIGEN, DESTINO, CANTIDAD</p>
+                        <p style={{ margin: '0 0 1rem 0', fontSize: '11px', color: '#64748b' }}>Formato: id_envío-aaaammdd-hh-mm-dest-###-IdClien</p>
                         <input type="file" accept=".txt,.csv" onChange={handleTxtUpload} ref={fileInputRef} style={{ width: '100%', color: '#94a3b8', fontSize: '12px' }} />
                         {selectedFile && (
                             <button
@@ -402,6 +410,8 @@ const ShipmentRegistrationPage = () => {
                         </div>
                     </div>
                 </div>
+                </>
+                )}
             </div>
         </div>
     );

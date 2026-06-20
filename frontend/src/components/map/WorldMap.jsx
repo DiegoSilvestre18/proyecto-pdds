@@ -465,7 +465,7 @@ const WorldMap = ({
                   const traveledPath = progress > 0.02 ? getStraightPath(from.coordinates, position) : null;
 
                   return (
-                    <>
+                    <React.Fragment key={plane.id}>
                       {/* Tramo recorrido (estela) — línea sólida tenue */}
                       {traveledPath && (
                         <Line
@@ -493,7 +493,7 @@ const WorldMap = ({
                           pointerEvents: "none"
                         }}
                       />
-                    </>
+                    </React.Fragment>
                   );
                 })}
 

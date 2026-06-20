@@ -106,20 +106,14 @@ function DayToDayConfig({
               </p>
             </div>
 
-            <button
-              id="dtd-btn-start"
-              type="button"
-              onClick={() => onStartDayToDay && onStartDayToDay(selectedDate, 1, preCancelledFlightIds, null, { isRealTime: true, planningHorizon: 30 })}
-              style={{
-                width: "100%", padding: "12px 0", borderRadius: 8, border: "none",
-                background: "linear-gradient(135deg, #10b981, #059669)",
-                color: "white", fontWeight: 700, fontSize: 14, cursor: "pointer",
-                boxShadow: "0 4px 15px rgba(16,185,129,0.35)",
-                letterSpacing: 0.5,
-              }}
-            >
-              📡 CONECTAR Y MONITOREAR EN VIVO
-            </button>
+            <div style={{
+              width: "100%", padding: "12px 0", borderRadius: 8,
+              background: "rgba(16,185,129,0.1)",
+              color: "#10b981", fontWeight: 700, fontSize: 13, textAlign: "center",
+              letterSpacing: 0.5, border: "1px solid rgba(16,185,129,0.2)"
+            }}>
+              Estableciendo conexión en vivo...
+            </div>
           </>
         ) : isRunning ? (
           <div style={{ textAlign: "center", padding: "8px 0" }}>

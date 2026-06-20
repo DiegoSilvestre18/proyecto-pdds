@@ -169,7 +169,7 @@ public class SimulationService {
                 List<Vuelo> todosLosVuelos = vueloRepo.findAllWithAirports();
                 updateProgress(session, 1, dias, 0, "Inicializando...", 100.0,
                         new SimulationState(new ArrayList<>(airportMap.values()), new ArrayList<>(), initialDisplayTime, bloqueoService),
-                        airportMap, new ArrayList<>(), initialDisplayTime, startTime, algorithm, null, new ArrayList<>(), todosLosVuelos);
+                        airportMap, new ArrayList<>(), initialDisplayTime, startTime, algorithm, null, new ArrayList<>(), todosLosVuelos, null, false);
 
                 wsPublisher.pushImmediate(session.getSessionId(), session);
 
@@ -238,7 +238,7 @@ public class SimulationService {
                         List<Route> masterPlan = new ArrayList<>();
 
                         while (currentSimMinuteOfDay < 1440) {
-                                int currentSa = saMinutes;
+                                int currentSa = isRealTime ? 1 : saMinutes;
                                 if (currentSimMinuteOfDay + currentSa > 1440) currentSa = 1440 - currentSimMinuteOfDay;
                                 session.setCurrentSaMinutes(currentSa);
 
@@ -304,7 +304,7 @@ public class SimulationService {
 
                                         int mPercent = (int) ((((day * 1440.0) + currentSimMinuteOfDay + step) / (dias * 1440.0)) * 100);
                                         if (microEnd >= targetEpoch) {
-                                                updateProgress(session, day + 1, dias, mPercent, simulatedTimeStr, slaPercent, globalState, airportMap, inTransitRoutes, microEnd, startTime, algorithm, session.getCurrentPlanId(), masterPlan, todosLosVuelos);
+                                                updateProgress(session, day + 1, dias, mPercent, simulatedTimeStr, slaPercent, globalState, airportMap, inTransitRoutes, microEnd, startTime, algorithm, session.getCurrentPlanId(), masterPlan, todosLosVuelos, planifiablePool, isRealTime);
                                         }
 
                                         long workTimeMs = (System.nanoTime() - tMicroStart) / 1_000_000;
@@ -330,18 +330,30 @@ public class SimulationService {
                 return new SuperLot(lot.getId(), lot.getOrigenIcao(), lot.getDestinoIcao(), lot.getTotalMaletas(), currentTime + 86400000L, lot.getSla(), lot.isIntercontinental(), Integer.MAX_VALUE);
         }
 
-        private void updateProgress(SimulationProgressHolder.SimulationSessionState session, int completedDays, int totalDays, int currentPercent, String simulatedTime, double slaPercent, SimulationState state, Map<String, Aeropuerto> airportMap, List<Route> activeRoutesList, long currentSimTime, long baseTime, String algorithm, String planId, List<Route> masterPlan, List<Vuelo> todosLosVuelos) {
+        private void updateProgress(SimulationProgressHolder.SimulationSessionState session, int completedDays, int totalDays, int currentPercent, String simulatedTime, double slaPercent, SimulationState state, Map<String, Aeropuerto> airportMap, List<Route> activeRoutesList, long currentSimTime, long baseTime, String algorithm, String planId, List<Route> masterPlan, List<Vuelo> todosLosVuelos, Map<Integer, SuperLot> planifiablePool, boolean isRealTime) {
                 session.setCurrentDay(completedDays);
                 session.setPercent(currentPercent);
                 session.setSimulatedTime(simulatedTime);
                 session.setSlaPercent(slaPercent);
                 session.setCurrentEpochTime(currentSimTime);
 
+                Map<String, Integer> airportBags = new HashMap<>();
+                if (isRealTime && planifiablePool != null) {
+                        for (SuperLot lot : planifiablePool.values()) {
+                                airportBags.put(lot.getOrigenIcao(), airportBags.getOrDefault(lot.getOrigenIcao(), 0) + lot.getTotalMaletas());
+                        }
+                }
+
                 Map<String, Map<String, Object>> loads = new HashMap<>();
+                int totalWaitingBags = 0;
                 for (String icao : airportMap.keySet()) {
                     Map<String, Object> data = new HashMap<>();
-                    data.put("bags", state.getLoadAt(icao));
-                    data.put("occupancy", state.getOccupancyPercent(icao, airportMap));
+                    int bags = isRealTime ? airportBags.getOrDefault(icao, 0) : state.getLoadAt(icao);
+                    totalWaitingBags += bags;
+                    Aeropuerto ap = airportMap.get(icao);
+                    double occ = ap.getStorageCapacity() > 0 ? (bags * 100.0) / ap.getStorageCapacity() : 0;
+                    data.put("bags", bags);
+                    data.put("occupancy", occ);
                     loads.put(icao, data);
                 }
                 session.setAirportLoads(loads);
@@ -414,7 +426,7 @@ public class SimulationService {
 
                 double fleetOcc = totalCap == 0 ? 0 : (totalCarga * 100.0) / totalCap;
                 session.setActiveRoutes(active);
-                session.setWsFrame(new SimulationProgressHolder.WsFrame(session.getSessionId(), session.getStatus().name(), currentSimTime, simulatedTime, currentPercent, completedDays, totalDays, slaPercent, (int)loads.values().stream().filter(d -> (int)d.get("occupancy") >= 90).count(), loads, state.getCargaAeropuerto().values().stream().mapToInt(i -> i).sum(), session.isCollapseMode(), session.getRescuedFlights(), session.getErrorMessage(), session.getStartEpoch(), active, algorithm, session.getLastTaMs(), session.getCurrentSaMinutes(), planId, new ArrayList<>(), fleetOcc));
+                session.setWsFrame(new SimulationProgressHolder.WsFrame(session.getSessionId(), session.getStatus().name(), currentSimTime, simulatedTime, currentPercent, completedDays, totalDays, slaPercent, (int)loads.values().stream().filter(d -> (double)d.get("occupancy") >= 90).count(), loads, totalWaitingBags, session.isCollapseMode(), session.getRescuedFlights(), session.getErrorMessage(), session.getStartEpoch(), active, algorithm, session.getLastTaMs(), session.getCurrentSaMinutes(), planId, new ArrayList<>(), fleetOcc));
         }
 
         private Map<String, Object> createAvionMap(Vuelo v, long dep, long arr, long now, String status) {

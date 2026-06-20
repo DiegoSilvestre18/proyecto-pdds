@@ -374,7 +374,7 @@ export const useControlTowerController = () => {
       setSmoothSimTime(0);
 
       // startEpoch siempre al inicio del día (00:00) para que el reloj muestre la hora correcta
-      const startEpoch = new Date(`${startDate}T00:00:00`).getTime();
+      const startEpoch = new Date(`${finalStartDate}T00:00:00`).getTime();
       setMeta({
         status: "RUNNING",
         percent: 0,
@@ -405,6 +405,14 @@ export const useControlTowerController = () => {
       setSimState("idle");
     }
   }, [selectedAlgorithm, targetPlaybackMinutes]);
+
+  useEffect(() => {
+    if (activeTab === "vivo" && simState === "idle" && !sessionId) {
+      const now = new Date();
+      const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      startDayToDaySimulation(today, 1, [], null, { isRealTime: true, planningHorizon: 30 });
+    }
+  }, [activeTab, simState, sessionId, startDayToDaySimulation]);
 
   const startCollapseSimulation = useCallback(async (dias = 90, startDate = null, stressFactor = 5, endCondition = "FAILED_DELIVERY") => {
     try {
