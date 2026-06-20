@@ -30,8 +30,8 @@ def generar_datos_vivo():
         destinos_validos = [a for a in AEROPUERTOS_TODOS if a != origen]
         destino = random.choice(destinos_validos)
         
-        # El avión despega en (i + 10) minutos para asegurar margen de tiempo para compilar y subir
-        despegue_real = ahora + datetime.timedelta(minutes=i + 10)
+        # El avión despega en (i + 2) minutos como pediste
+        despegue_real = ahora + datetime.timedelta(minutes=i + 2)
         # La maleta llega al aeropuerto 1 minuto antes del despegue
         llegada_maleta_real = despegue_real - datetime.timedelta(minutes=1)
         
@@ -40,8 +40,8 @@ def generar_datos_vivo():
         llegada_maleta_ajustada = llegada_maleta_real + datetime.timedelta(hours=OFFSETS[origen])
         
         # VUELO
-        # La llegada real a su destino es 5-8 mins despues
-        llegada_vuelo_real = despegue_real + datetime.timedelta(minutes=random.randint(5, 8))
+        # La llegada real a su destino es 2-3 mins despues para que sea súper rápido
+        llegada_vuelo_real = despegue_real + datetime.timedelta(minutes=random.randint(2, 3))
         # Pero el archivo TXT requiere la HORA LOCAL del DESTINO, asi que le sumamos el offset del destino
         llegada_vuelo_ajustada = llegada_vuelo_real + datetime.timedelta(hours=OFFSETS[destino])
         
