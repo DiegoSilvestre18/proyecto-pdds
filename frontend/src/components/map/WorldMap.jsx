@@ -49,26 +49,33 @@ const LegendButton = () => {
 const MapZoomControls = ({ zoom, center, onMoveEnd }) => (
   <div className="map-zoom-controls">
     <button
-      title="Acercar"
-      onClick={() => onMoveEnd({ zoom: Math.min(zoom + 0.5, 8), coordinates: center })}
+      title="Acercar (+)"
+      onClick={() => onMoveEnd({ zoom: clampZoom(zoom * 1.3), coordinates: center })}
     >+</button>
     <button
-      title="Alejar"
-      onClick={() => onMoveEnd({ zoom: Math.max(zoom - 0.5, 1), coordinates: center })}
+      title="Alejar (-)"
+      onClick={() => onMoveEnd({ zoom: clampZoom(zoom / 1.3), coordinates: center })}
     >−</button>
     <button
       title="Centrar vista"
-      onClick={() => onMoveEnd({ zoom: 1, coordinates: [0, 20] })}
+      onClick={() => onMoveEnd({ zoom: 1.1, coordinates: [22, 15] })}
     >◎</button>
   </div>
 );
 
 
 const PROJECTION_CONFIG = {
-  rotate: [-20, 0, 0],
-  scale: 220,
-  center: [15, 10],
+  rotate: [-15, 0, 0],
+  scale: 270,
+  center: [22, 15],
 };
+
+// Zoom continuo con wheel — factor suavizado
+const ZOOM_SPEED = 0.0012;
+const MIN_ZOOM = 0.9;
+const MAX_ZOOM = 12;
+
+const clampZoom = (z) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
 
 const MapBackground = React.memo(({ isCollapseScenario }) => (
   <Geographies geography={GEO_URL}>
@@ -247,6 +254,44 @@ const WorldMap = ({
       onClick={() => {
         setSelectedPlaneId(null);
         onAircraftSelect(null);
+      }}
+      // Zoom continuo con rueda
+      onWheel={(e) => {
+        e.preventDefault();
+        const delta = -e.deltaY * ZOOM_SPEED;
+        const factor = 1 + delta * (e.ctrlKey ? 3 : 1);
+        onMoveEnd({ zoom: clampZoom(zoom * factor), coordinates: center });
+      }}
+      // Pan con clic de rueda (botón central)
+      onMouseDown={(e) => {
+        if (e.button !== 1) return;
+        e.preventDefault();
+        const startX = e.clientX;
+        const startY = e.clientY;
+        const startCenter = [...center];
+
+        // Factor de conversión px → grados (aproximado para la proyección actual)
+        const pxPerDeg = (window.innerWidth / 360) * zoom;
+
+        const onMove = (mv) => {
+          const dx = (mv.clientX - startX) / pxPerDeg;
+          const dy = -(mv.clientY - startY) / pxPerDeg * 0.7;
+          onMoveEnd({
+            zoom,
+            coordinates: [
+              startCenter[0] - dx,
+              Math.max(-80, Math.min(80, startCenter[1] - dy)),
+            ],
+          });
+        };
+        const onUp = () => {
+          window.removeEventListener('mousemove', onMove);
+          window.removeEventListener('mouseup', onUp);
+          document.body.style.cursor = '';
+        };
+        document.body.style.cursor = 'grabbing';
+        window.addEventListener('mousemove', onMove);
+        window.addEventListener('mouseup', onUp);
       }}
     >
       {/* ── Control de Visibilidad (Día a Día) ────────────────────────────── */}

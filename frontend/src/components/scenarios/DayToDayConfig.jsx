@@ -92,18 +92,22 @@ function DayToDayConfig({
         <div className="ct-config-section" style={{ marginBottom: 0 }}>
           {!isRunning && !isCompleted ? (
           <>
-            {/* Info de Monitoreo en Vivo */}
+            {/* Card de estado */}
             <div style={{
-              background: 'rgba(16,185,129,0.05)', border: '1px solid rgba(16,185,129,0.2)',
-              borderRadius: 10, padding: '14px 16px', marginBottom: 16, textAlign: 'center'
+              background: 'linear-gradient(135deg, rgba(16,185,129,0.08), rgba(5,150,105,0.05))',
+              border: '1px solid rgba(16,185,129,0.22)',
+              borderRadius: 8, padding: '10px 12px', marginBottom: 10,
+              display: 'flex', alignItems: 'center', gap: 10
             }}>
-              <div style={{ fontSize: 28, marginBottom: 8 }}>📡</div>
-              <p style={{ margin: 0, fontSize: 13, fontWeight: 800, color: '#10b981', textTransform: 'uppercase', letterSpacing: 1 }}>
-                Sincronización en Vivo
-              </p>
-              <p style={{ margin: '8px 0 0 0', fontSize: 12, color: '#64748b', lineHeight: 1.5 }}>
-                El sistema utilizará la fecha actual (<strong>{todayStr}</strong>) y sincronizará la hora automáticamente con el reloj del servidor para el monitoreo en tiempo real.
-              </p>
+              <div style={{ fontSize: 20, flexShrink: 0 }}>📡</div>
+              <div>
+                <p style={{ margin: 0, fontSize: 11, fontWeight: 800, color: '#10b981', letterSpacing: 0.5 }}>
+                  Sincronización en Vivo
+                </p>
+                <p style={{ margin: '3px 0 0', fontSize: 10, color: '#64748b', lineHeight: 1.4 }}>
+                  Fecha: <strong style={{ color: '#94a3b8' }}>{todayStr}</strong> · Hora sincronizada con servidor
+                </p>
+              </div>
             </div>
 
             <div style={{
@@ -157,12 +161,16 @@ function DayToDayConfig({
           <>
             <div className="ct-config-section">
               <p className="ct-config-section__title">📦 MALETAS EN ESPERA</p>
-              <div style={{ padding: "14px", background: "rgba(255,255,255,0.04)", borderRadius: 8, textAlign: "center" }}>
-                <span style={{ fontSize: 26, fontWeight: 800, color: "#10b981" }}>
+              <div style={{
+                padding: "10px 12px", background: "rgba(16,185,129,0.07)",
+                borderRadius: 7, textAlign: "center",
+                border: '1px solid rgba(16,185,129,0.18)',
+              }}>
+                <span style={{ fontSize: 22, fontWeight: 800, color: "#10b981" }}>
                   {(totalBagsWaiting ?? 0).toLocaleString("es-PE")}
                 </span>
-                <span style={{ display: "block", fontSize: 11, opacity: 0.6, marginTop: 4 }}>
-                  maletas esperando en almacenes
+                <span style={{ display: "block", fontSize: 10, color: '#64748b', marginTop: 2 }}>
+                  maletas en almacenes
                 </span>
               </div>
             </div>
@@ -235,13 +243,15 @@ function DayToDayConfig({
                     },
                   ].map(item => (
                     <div key={item.label} style={{
-                      background: 'rgba(255,255,255,0.04)', borderRadius: 8,
-                      padding: '8px 10px', textAlign: 'center',
+                      background: 'rgba(255,255,255,0.04)',
+                      border: `1px solid ${item.color}22`,
+                      borderRadius: 6,
+                      padding: '6px 8px', textAlign: 'center',
                     }}>
-                      <p style={{ margin: 0, fontSize: 18, fontWeight: 800, color: item.color }}>
+                      <p style={{ margin: 0, fontSize: 15, fontWeight: 800, color: item.color }}>
                         {item.value}
                       </p>
-                      <p style={{ margin: 0, fontSize: 9, color: '#64748b', marginTop: 2, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+                      <p style={{ margin: 0, fontSize: 8, color: '#64748b', marginTop: 1, textTransform: 'uppercase', letterSpacing: 0.4 }}>
                         {item.label}
                       </p>
                     </div>

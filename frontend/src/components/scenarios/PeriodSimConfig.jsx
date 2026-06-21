@@ -202,48 +202,7 @@ function PeriodSimConfig({
               </div>
             </div>
 
-            {/* Número de días — fijo en 5 */}
-
-            <div className="ct-config-section">
-              <p className="ct-config-section__title">🗓 PERÍODO DE SIMULACIÓN</p>
-              <div style={{
-                display: "flex", alignItems: "center", justifyContent: "center",
-                gap: 12, marginTop: 8,
-                background: "rgba(99,102,241,0.08)", borderRadius: 8, padding: "12px",
-              }}>
-                <span style={{ fontSize: 32, fontWeight: 800, color: "#818cf8" }}>5</span>
-                <div>
-                  <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#e2e8f0" }}>días</p>
-                  <p style={{ margin: 0, fontSize: 10, color: "#475569" }}>valor académico fijo</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Duración del Playback (Nuevo) */}
-            <div className="ct-config-section">
-              <p className="ct-config-section__title">⏱ DURACIÓN DEL PLAYBACK (5 DÍAS EN...)</p>
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6, marginTop: 8 }}>
-                {PLAYBACK_OPTIONS.map(opt => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setTargetPlaybackMinutes(opt.value)}
-                    style={{
-                      padding: "8px 4px", borderRadius: 8, border: "none",
-                      background: targetPlaybackMinutes === opt.value
-                        ? "linear-gradient(135deg, #4f46e5, #7c3aed)"
-                        : "rgba(255,255,255,0.06)",
-                      color: targetPlaybackMinutes === opt.value ? "white" : "#94a3b8",
-                      cursor: "pointer", fontSize: 11, fontWeight: 700,
-                      transition: "all 0.2s"
-                    }}
-                  >
-                    {opt.label}
-                    <span style={{ display: "block", fontSize: 9, opacity: 0.7, fontWeight: 400 }}>{opt.sub}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
+            {/* Playback fijo en 30 min — sin controles visibles para el usuario */}
 
             {/* Selector de algoritmo */}
             {/* EXPERIMENTAL MODE - DISABLED FOR BUSINESS UI
@@ -276,224 +235,7 @@ function PeriodSimConfig({
             </div>
             */}
 
-            {/* Parámetros Avanzados del Algoritmo */}
-            <div className="ct-config-section" style={{ borderTop: "1px solid rgba(255,255,255,0.06)", paddingTop: 12 }}>
-              <p className="ct-config-section__title">⚙️ PARÁMETROS DEL ALGORITMO</p>
-              
-              {selectedAlgorithm === "alns" ? (
-                <div style={{ background: "rgba(99,102,241,0.05)", borderRadius: 8, padding: "12px", marginTop: 8 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                    <span style={{ fontSize: 11, color: "#94a3b8" }}>Fracción de Destrucción (Destroy %)</span>
-                    <span style={{ fontSize: 13, fontWeight: "bold", color: "#818cf8" }}>{destroyFraction}%</span>
-                  </div>
-                  <input
-                    type="range" min="10" max="40" step="5"
-                    value={destroyFraction}
-                    onChange={e => setDestroyFraction(Number(e.target.value))}
-                    style={{ width: "100%", accentColor: "#818cf8" }}
-                  />
-                  <p style={{ fontSize: 10, color: "#64748b", margin: "6px 0 0 0" }}>
-                    Porcentaje de la solución que se destruye y reconstruye en cada iteración del vecindario.
-                  </p>
-                  <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", marginTop: 8, paddingTop: 8, fontSize: 10, color: "#94a3b8" }}>
-                    <p style={{ margin: "2px 0" }}>▸ <strong>Criterio de Parada:</strong> Tiempo límite (6.5 segundos Sa)</p>
-                    <p style={{ margin: "2px 0" }}>▸ <strong>Enfriamiento (Cooling Rate):</strong> 0.997 (Enfriamiento Simulado)</p>
-                    <p style={{ margin: "2px 0" }}>▸ <strong>Tamaño Segmento:</strong> 100 iteraciones (Actualización de pesos)</p>
-                  </div>
-                </div>
-              ) : (
-                <div style={{ background: "rgba(100,116,139,0.05)", borderRadius: 8, padding: "12px", marginTop: 8 }}>
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                    <span style={{ fontSize: 11, color: "#94a3b8" }}>Tasa de Mutación (Mutation Rate)</span>
-                    <span style={{ fontSize: 13, fontWeight: "bold", color: "#94a3b8" }}>{mutationRate}%</span>
-                  </div>
-                  <input
-                    type="range" min="5" max="30" step="5"
-                    value={mutationRate}
-                    onChange={e => setMutationRate(Number(e.target.value))}
-                    style={{ width: "100%", accentColor: "#94a3b8" }}
-                  />
-                  <p style={{ fontSize: 10, color: "#64748b", margin: "6px 0 0 0" }}>
-                    Probabilidad de aplicar mutación de intercambio a los descendientes de la población.
-                  </p>
-                  <div style={{ borderTop: "1px solid rgba(255,255,255,0.05)", marginTop: 8, paddingTop: 8, fontSize: 10, color: "#94a3b8" }}>
-                    <p style={{ margin: "2px 0" }}>▸ <strong>Criterio de Parada:</strong> Tiempo límite (6.5 segundos Sa)</p>
-                    <p style={{ margin: "2px 0" }}>▸ <strong>Tamaño Población:</strong> 50 individuos</p>
-                    <p style={{ margin: "2px 0" }}>▸ <strong>Elite:</strong> 5 mejores individuos (Preservación directa)</p>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Configurar pre-cancelaciones (DESHABILITADO POR REQUERIMIENTO) */}
-            <div className="ct-config-section" style={{
-              background: 'rgba(15, 23, 42, 0.85)',
-              borderRadius: '12px',
-              border: '1px solid rgba(99, 102, 241, 0.3)',
-              padding: '14px 16px',
-              opacity: 0.6,
-              pointerEvents: 'none',
-              userSelect: 'none'
-            }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                marginBottom: '10px',
-                fontSize: '13px',
-                fontWeight: 600,
-                color: '#818cf8',
-                letterSpacing: '0.5px',
-              }}>
-                ⚙️ CANCELACIONES PROGRAMADAS (DESHABILITADO)
-              </div>
-              <p style={{ fontSize: '11px', color: '#64748b', margin: '0 0 12px 0', lineHeight: '1.4' }}>
-                Esta función ha sido deshabilitada. Utiliza el panel de control durante la simulación para cancelaciones manuales.
-              </p>
-
-              {/* 
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
-                <input
-                  type="number"
-                  placeholder="ID de vuelo"
-                  value={tempFlightId}
-                  onChange={(e) => setTempFlightId(e.target.value)}
-                  style={{
-                    flex: '1.5',
-                    background: 'rgba(30, 41, 59, 0.8)',
-                    border: '1px solid rgba(100, 116, 139, 0.4)',
-                    borderRadius: '8px',
-                    padding: '8px 10px',
-                    color: '#e2e8f0',
-                    fontSize: '12px',
-                    outline: 'none',
-                    minWidth: '70px',
-                  }}
-                />
-                <select
-                  value={tempDay}
-                  onChange={(e) => setTempDay(e.target.value)}
-                  style={{
-                    flex: '2',
-                    background: 'rgba(30, 41, 59, 0.8)',
-                    border: '1px solid rgba(100, 116, 139, 0.4)',
-                    borderRadius: '8px',
-                    padding: '8px 10px',
-                    color: '#e2e8f0',
-                    fontSize: '12px',
-                    outline: 'none',
-                  }}
-                >
-                  <option value="all">Todos los días</option>
-                  <option value="1">Día 1</option>
-                  <option value="2">Día 2</option>
-                  <option value="3">Día 3</option>
-                  <option value="4">Día 4</option>
-                  <option value="5">Día 5</option>
-                </select>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const fId = tempFlightId.trim();
-                    if (!fId) return;
-                    const entry = tempDay === "all" ? fId : `${fId}:${tempDay}`;
-                    if (!preCancelledFlights.includes(entry)) {
-                      setPreCancelledFlights([...preCancelledFlights, entry]);
-                    }
-                    setTempFlightId("");
-                  }}
-                  disabled={!tempFlightId}
-                  style={{
-                    flex: '1',
-                    background: !tempFlightId
-                      ? 'rgba(100, 116, 139, 0.4)'
-                      : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: '8px',
-                    padding: '8px 12px',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    cursor: !tempFlightId ? 'not-allowed' : 'pointer',
-                    transition: 'all 0.2s ease',
-                  }}
-                >
-                  ➕
-                </button>
-              </div>
-
-              {preCancelledFlights.length > 0 ? (
-                <div>
-                  <div style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', marginBottom: '6px' }}>
-                    Vuelos programados para cancelar:
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                    {preCancelledFlights.map(entry => {
-                      const hasDay = entry.includes(":");
-                      const parts = entry.split(":");
-                      const fid = parts[0];
-                      const dayLabel = hasDay ? `Día ${parts[1]}` : "Todos";
-                      return (
-                        <div
-                          key={`pre-p-${entry}`}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            background: 'rgba(239, 68, 68, 0.15)',
-                            border: '1px solid rgba(239, 68, 68, 0.3)',
-                            borderRadius: '20px',
-                            padding: '4px 10px',
-                            fontSize: '11px',
-                            color: '#ef4444',
-                            fontWeight: 700,
-                          }}
-                        >
-                          <span>Vuelo {fid} ({dayLabel})</span>
-                          <button
-                            type="button"
-                            onClick={() => setPreCancelledFlights(preCancelledFlights.filter(e => e !== entry))}
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              color: '#ef4444',
-                              cursor: 'pointer',
-                              fontWeight: 'bold',
-                              padding: 0,
-                              fontSize: '12px',
-                              lineHeight: 1,
-                            }}
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setPreCancelledFlights([])}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: '#64748b',
-                      fontSize: '10px',
-                      cursor: 'pointer',
-                      marginTop: '10px',
-                      padding: 0,
-                      textDecoration: 'underline',
-                    }}
-                  >
-                    Limpiar lista
-                  </button>
-                </div>
-              ) : (
-                <div style={{ fontSize: '11px', color: '#64748b', fontStyle: 'italic', textAlign: 'center', padding: '8px 0' }}>
-                  Ningún vuelo programado.
-                </div>
-              )}
-              */}
-            </div>
+            {/* Parámetros del algoritmo y cancelaciones — ocultos para usuario final */}
 
             {/* Botón iniciar */}
             <div style={{ paddingBottom: 8 }}>
@@ -503,18 +245,19 @@ function PeriodSimConfig({
                 onClick={handleStart}
                 disabled={isStarting}
                 style={{
-                  width: "100%", padding: "14px 0", borderRadius: 10, border: "none",
+                  width: "100%", padding: "11px 0", borderRadius: 8, border: "none",
                   background: isStarting
-                    ? "rgba(16,185,129,0.4)"
-                    : "linear-gradient(135deg, #10b981, #059669)",
-                  color: "white", fontWeight: 700, fontSize: 15, cursor: isStarting ? "default" : "pointer",
-                  letterSpacing: 1, boxShadow: "0 4px 20px rgba(16,185,129,0.35)",
-                  transition: "transform 0.15s",
+                    ? "rgba(5,150,105,0.4)"
+                    : "linear-gradient(135deg, #059669, #047857)",
+                  color: "white", fontWeight: 700, fontSize: 12, cursor: isStarting ? "default" : "pointer",
+                  letterSpacing: 0.8, boxShadow: "0 4px 16px rgba(5,150,105,0.32)",
+                  transition: "transform 0.15s, box-shadow 0.15s",
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                 }}
-                onMouseEnter={e => !isStarting && (e.currentTarget.style.transform = "translateY(-2px)")}
+                onMouseEnter={e => !isStarting && (e.currentTarget.style.transform = "translateY(-1px)")}
                 onMouseLeave={e => (e.currentTarget.style.transform = "translateY(0)")}
               >
-                {isStarting ? "⏳ Iniciando..." : `▶ EJECUTAR SIMULACIÓN — 5 DÍAS`}
+                {isStarting ? "⏳ Iniciando..." : "▶ EJECUTAR SIMULACIÓN — 5 DÍAS"}
               </button>
               {!onStart && (
                 <p style={{ fontSize: 11, color: "#f59e0b", marginTop: 6, textAlign: "center" }}>

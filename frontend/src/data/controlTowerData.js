@@ -16,6 +16,6 @@ export { AIRPORTS as AIRPORT_NODES, AIRPORT_BY_ICAO as AIRPORT_BY_CODE };
 // ── Pestañas de escenario ──────────────────────────────────────────────────────
 export const SCENARIO_TABS = [
   { key: "vivo", label: "Operación Día a Día" },
-  { key: "periodo", label: "Simulación Periodo" },
+  { key: "periodo", label: "Simulación 5d" },
   { key: "colapso", label: "Simulación Colapso" },
 ];

@@ -122,8 +122,8 @@ const App = () => {
     }
   }, [searchedShipment]);
 
-  const [mapZoom, setMapZoom] = useState(1);
-  const [mapCenter, setMapCenter] = useState([0, 20]);
+  const [mapZoom, setMapZoom] = useState(1.1);
+  const [mapCenter, setMapCenter] = useState([22, 15]);
 
   return (
     <div
@@ -331,6 +331,7 @@ const App = () => {
             currentEpochTime={liveStatus?.interpolatedTime || currentEpochTime}
             systemClock={summary.systemClock}
             simState={simState}
+            isDayToDay={activeTab === "vivo"}
             onBackgroundClick={() => setSelectedAircraftId(null)}
             />
 
