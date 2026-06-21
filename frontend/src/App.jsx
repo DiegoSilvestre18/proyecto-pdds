@@ -122,7 +122,7 @@ const App = () => {
     }
   }, [searchedShipment]);
 
-  const [mapZoom, setMapZoom] = useState(1.1);
+  const [mapZoom, setMapZoom] = useState(2.0);
   const [mapCenter, setMapCenter] = useState([22, 15]);
 
   return (
