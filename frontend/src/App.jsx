@@ -227,23 +227,19 @@ const App = () => {
           <AlgorithmComparisonPanel isVisible={true} onHide={() => handleToggleWindow("comparison")} sessionId={sessionId} comparisonData={comparisonData} />
         </DraggableWindow>
       )}
-      {isWindowOpen("shipmentDetail") && (
-        <DraggableWindow title="Envío y Despacho" onClose={() => { handleToggleWindow("shipmentDetail"); setSelectedAircraftId(null); }} initialPosition={{x: 60, y: 350}} isActive={openWindowsQueue[openWindowsQueue.length-1] === "shipmentDetail"} onFocus={() => handleFocusWindow("shipmentDetail")}>
-          <ShipmentDetailPanel 
-            isVisible={true} 
-            selectedAircraft={currentFlight}
-            searchedShipment={searchedShipment} 
-            onSearch={searchShipment}
-            isSearching={isSearching}
-            onCancelFlight={() => {
-              if (selectedAircraftId) {
-                if (!isWindowOpen("cancellation")) handleToggleWindow("cancellation");
-                handleFocusWindow("cancellation");
-              }
-            }}
-          />
-        </DraggableWindow>
-      )}
+      <ShipmentDetailPanel 
+        isVisible={!!currentFlight || !!searchedShipment} 
+        selectedAircraft={currentFlight}
+        searchedShipment={searchedShipment} 
+        onSearch={searchShipment}
+        isSearching={isSearching}
+        onCancelFlight={() => {
+          if (selectedAircraftId) {
+            if (!isWindowOpen("cancellation")) handleToggleWindow("cancellation");
+            handleFocusWindow("cancellation");
+          }
+        }}
+      />
       {isWindowOpen("reports") && (
         <DraggableWindow title="Reportes y Exportación" onClose={() => handleToggleWindow("reports")} initialPosition={{x: window.innerWidth / 2 - 200, y: window.innerHeight / 2 - 150}} isActive={openWindowsQueue[openWindowsQueue.length-1] === "reports"} onFocus={() => handleFocusWindow("reports")}>
           <ReportsPanel 
