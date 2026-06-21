@@ -2691,13 +2691,9 @@
   outline: none;
 }
 
-.ct-airport-marker__ring {
-  fill: currentColor;
-  opacity: 0.22;
-}
-
-.ct-airport-marker__dot {
-  fill: currentColor;
+.ct-airport-marker__tower {
+  transform-box: fill-box;
+  transform-origin: center;
 }
 
 /* Semáforo: verde */
@@ -2726,15 +2722,30 @@
 }
 
 /* Seleccionado */
-.ct-airport-marker--selected .ct-airport-marker__ring {
-  opacity: 0.45;
-  r: 10;
+.ct-airport-marker--selected .ct-airport-marker__tower {
+  filter: drop-shadow(0 0 4px currentColor);
+}
+
+.ct-airport-marker__selection-ring {
+  animation: ct-selection-pulse 1.8s ease-in-out infinite;
+  transform-origin: center;
+  pointer-events: none;
+}
+
+@keyframes ct-selection-pulse {
+  0%, 100% { stroke-opacity: 0.4; r: 16; }
+  50%      { stroke-opacity: 1;   r: 20; }
+}
+
+.ct-airport-marker--selected .ct-airport-marker__label {
+  fill: #ffffff;
+  filter: drop-shadow(0 0 3px currentColor);
 }
 
 /* Etiqueta ICAO */
 .ct-airport-marker__label {
   font-family: ui-monospace, Consolas, monospace;
-  font-size: 8px;
+  font-size: 7px;
   font-weight: 800;
   fill: #e6f7ff;
   letter-spacing: 0.03em;
@@ -2747,7 +2758,7 @@
 /* Inventario Numérico */
 .ct-airport-marker__inventory {
   font-family: ui-monospace, Consolas, monospace;
-  font-size: 7px;
+  font-size: 6px;
   font-weight: 800;
   paint-order: stroke fill;
   stroke: #061828;
@@ -2760,7 +2771,7 @@
 
 /* Nombre de ciudad */
 .ct-airport-marker__city {
-  font-size: 6px;
+  font-size: 5px;
   fill: #a8d8f0;
   pointer-events: none;
   paint-order: stroke fill;
