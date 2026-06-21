@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState, useCallback } from "react";
+import React, { useRef, useEffect, useState, useCallback, useMemo } from "react";
 import { ComposableMap, Geographies, Geography, Marker, Line, ZoomableGroup } from "react-simple-maps";
 import { interpolateCoordinates, AIRPORT_BY_ICAO } from "../../data/airportsData";
 import { useSelectionBridge } from "../../hooks/useSelectionBridge";
@@ -58,7 +58,7 @@ const MapZoomControls = ({ zoom, center, onMoveEnd }) => (
     >−</button>
     <button
       title="Centrar vista"
-      onClick={() => onMoveEnd({ zoom: 1.1, coordinates: [22, 15] })}
+      onClick={() => onMoveEnd({ zoom: 2.0, coordinates: [22, 15] })}
     >◎</button>
   </div>
 );
@@ -66,13 +66,13 @@ const MapZoomControls = ({ zoom, center, onMoveEnd }) => (
 
 const PROJECTION_CONFIG = {
   rotate: [-15, 0, 0],
-  scale: 270,
+  scale: 350,
   center: [22, 15],
 };
 
 // Zoom continuo con wheel — factor suavizado
 const ZOOM_SPEED = 0.0012;
-const MIN_ZOOM = 0.9;
+const MIN_ZOOM = 1.2;
 const MAX_ZOOM = 12;
 
 const clampZoom = (z) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
@@ -96,7 +96,7 @@ const MapBackground = React.memo(({ isCollapseScenario }) => (
 // Esto evita que react-simple-maps dibuje arcos geodésicos curvos.
 const getStraightPath = (start, end) => {
   if (!start || !end) return [];
-  const steps = 6; // Suficientes puntos para que parezca recta en cualquier zoom
+  const steps = 100; // Suficientes puntos para una curva suave en proyección Mercator
   const path = [];
   for (let i = 0; i <= steps; i++) {
     const t = i / steps;
@@ -107,6 +107,8 @@ const getStraightPath = (start, end) => {
   }
   return path;
 };
+
+
 
 /**
  * WorldMap — Componente raíz del mapa interactivo.
@@ -158,10 +160,6 @@ const WorldMap = ({
     activeFilters,
   } = useSelectionBridge();
 
-  // Estados para Tooltip de Aviones
-  const [selectedPlaneId, setSelectedPlaneId] = useState(null);
-  const selectedPlane = activeAircraft.find(p => p.id === selectedPlaneId) || null;
-  
   const [highlightedId, setHighlightedId] = useState(null);
   const highlightTimerRef = useRef(null);
 
@@ -193,6 +191,24 @@ const WorldMap = ({
   useEffect(() => {
     return () => clearTimeout(highlightTimerRef.current);
   }, []);
+
+  const nearbyOffsets = useMemo(() => {
+    const offsets = {};
+    for (let i = 0; i < airports.length; i++) {
+      for (let j = i + 1; j < airports.length; j++) {
+        const a = airports[i];
+        const b = airports[j];
+        const dLng = a.coordinates[0] - b.coordinates[0];
+        const dLat = a.coordinates[1] - b.coordinates[1];
+        const dist = Math.sqrt(dLng * dLng + dLat * dLat);
+        if (dist < 2.5) {
+          offsets[a.icao] = a.icao < b.icao ? 'left' : 'right';
+          offsets[b.icao] = a.icao < b.icao ? 'right' : 'left';
+        }
+      }
+    }
+    return offsets;
+  }, [airports]);
 
   const getStrokeColor = (status, ocupacion = 0, capacidadMax = 0) => {
     switch (status) {
@@ -252,7 +268,6 @@ const WorldMap = ({
       aria-label="Mapa de operaciones global" 
       style={{ position: "relative", width: "100%", height: "100%" }}
       onClick={() => {
-        setSelectedPlaneId(null);
         onAircraftSelect(null);
       }}
       // Zoom continuo con rueda
@@ -294,20 +309,18 @@ const WorldMap = ({
         window.addEventListener('mouseup', onUp);
       }}
     >
-      {/* ── Control de Visibilidad (Día a Día) ────────────────────────────── */}
-      {isDayToDay && (
-          <div style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(15, 23, 42, 0.85)', padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(56, 189, 248, 0.2)', zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '10px', boxShadow: '0 4px 15px rgba(0,0,0,0.5)', backdropFilter: 'blur(5px)' }}>
-            <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 'bold', marginBottom: '2px', letterSpacing: '0.5px' }}>FILTROS DE TRÁFICO (EN VIVO)</div>
+      {/* ── Control de Visibilidad de Vuelos ──────────────────────────────── */}
+        <div style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(15, 23, 42, 0.85)', padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(56, 189, 248, 0.2)', zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '10px', boxShadow: '0 4px 15px rgba(0,0,0,0.5)', backdropFilter: 'blur(5px)' }}>
+            <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 'bold', marginBottom: '2px', letterSpacing: '0.5px' }}>FILTROS DE VUELOS</div>
             <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '12px', color: '#cbd5e1' }}>
               <input type="checkbox" checked={showEmptyFlights} onChange={(e) => setShowEmptyFlights(e.target.checked)} style={{ accentColor: '#64748b', cursor: 'pointer', width: '14px', height: '14px' }} />
-              <span>👁️ Mostrar Vuelos Normales (Vacíos/Grises)</span>
+              <span>👁️ Mostrar vuelos sin envíos</span>
             </label>
             <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '12px', color: '#cbd5e1' }}>
               <input type="checkbox" checked={showTestFlights} onChange={(e) => setShowTestFlights(e.target.checked)} style={{ accentColor: '#f97316', cursor: 'pointer', width: '14px', height: '14px' }} />
-              <span>👁️ Mostrar Vuelos de Prueba (Naranjas)</span>
+              <span>👁️ Mostrar vuelos con envíos</span>
             </label>
           </div>
-      )}
       {/* ── Botón Flotante de Leyenda ( ⓘ ) ────────────────────────────────── */}
       <LegendButton />
 
@@ -483,8 +496,8 @@ const WorldMap = ({
 
           {/* ── Lógica de atenuación (Focus) + Filtros + Estela ── */}
           {(() => {
-            const hasSelection = selectedAircraftId != null || selectedPlane != null;
-            const isPlaneSelected = (planeId) => selectedAircraftId === planeId || (selectedPlane?.id === planeId);
+            const hasSelection = selectedAircraftId != null;
+            const isPlaneSelected = (planeId) => selectedAircraftId === planeId;
             const getOpacity = (planeId, baseOpacity) => hasSelection ? (isPlaneSelected(planeId) ? baseOpacity : 0.15) : baseOpacity;
 
             return (
@@ -518,7 +531,8 @@ const WorldMap = ({
                           key={`trail-${plane.id}`}
                           coordinates={traveledPath}
                           stroke={strokeColor}
-                          strokeWidth={1.5}
+                          strokeWidth={0.8}
+                          strokeLinecap="round"
                           style={{
                             opacity: passesFilter ? 0.15 : 0,
                             transition: "opacity 0.3s ease",
@@ -531,7 +545,8 @@ const WorldMap = ({
                         key={`path-${plane.id}`}
                         coordinates={remainingPath}
                         stroke={strokeColor}
-                        strokeWidth={1.5}
+                        strokeWidth={0.8}
+                        strokeLinecap="round"
                         strokeDasharray="4 3"
                         style={{
                           opacity: passesFilter ? getOpacity(plane.id, 0.45) : 0,
@@ -546,8 +561,8 @@ const WorldMap = ({
                 {/* ── Aviones con ícono limpio y sombra ── */}
                 {activeAircraft.map((plane) => {
                   const isEmpty = !plane.ocupacionReal || plane.ocupacionReal === 0;
-                  if (isDayToDay && isEmpty && !showEmptyFlights) return null;
-                  if (isDayToDay && !isEmpty && !showTestFlights) return null;
+                  if (isEmpty && !showEmptyFlights) return null;
+                  if (!isEmpty && !showTestFlights) return null;
                   const from = airportByIcao[plane.from];
                   const to   = airportByIcao[plane.to];
                   if (!from || !to) return null;
@@ -593,7 +608,6 @@ const WorldMap = ({
                         aria-label={`Vuelo ${plane.from} → ${plane.to}`}
                         onClick={(e) => {
                           e.stopPropagation();
-                          setSelectedPlaneId(plane.id);
                           onAircraftSelect(plane.id);
                           setFocusedEntity('flight', plane.id, 'map');
                         }}
@@ -608,7 +622,6 @@ const WorldMap = ({
                             : "drop-shadow(0 1px 2px rgba(0,0,0,0.8))"
                         }}
                       >
-                        {/* Se eliminó el círculo de fondo para una visualización más limpia */}
                         <text
                           textAnchor="middle"
                           dominantBaseline="central"
@@ -619,7 +632,6 @@ const WorldMap = ({
                             fontSize: planeSize, 
                             fill: "currentColor", 
                             fontWeight: "bold",
-                            transition: "font-size 0.3s ease" 
                           }}
                         >
                           {planeIcon}
@@ -646,7 +658,7 @@ const WorldMap = ({
             const maxCap     = metrics?.warehouseCapacity ?? metrics?.capacity ?? "—";
             const level      = stockBags === 0 && metrics ? "empty" : (metrics?.level ?? "green");
             const isSaturated= isCollapseScenario && metrics?.isSaturated;
-            const isSelected = selectedAirportCode === airport.icao;
+            const isSelected = focusedEntity?.type === 'airport' && focusedEntity?.id === airport.icao;
             const isHighlighted = highlightedId === airport.icao;
             const passesFilter = airportPassesFilter(airport.icao);
 
@@ -673,23 +685,49 @@ const WorldMap = ({
                     pointerEvents: passesFilter ? "auto" : "none",
                   }}
                 >
-                  <circle
-                    r={isSaturated ? 11 : isHighlighted ? 12 : 8}
-                    className="ct-airport-marker__ring"
+                  {isSelected && (
+                    <circle r={16} fill="none" stroke="currentColor" strokeWidth={2.5}
+                            opacity={0.7} className="ct-airport-marker__selection-ring" />
+                  )}
+                  {/* Control tower SVG icon */}
+                  <g
+                    className="ct-airport-marker__tower"
+                    transform={`scale(${isSaturated ? 1.0 : isHighlighted ? 1.1 : isSelected ? 0.9 : 0.7})`}
                     style={{
-                      animation: isHighlighted ? "ct-exception-pulse 1s 3 ease-in-out" : undefined,
-                      stroke: isHighlighted ? "#facc15" : undefined,
+                      transformOrigin: 'center',
+                      transition: 'transform 0.3s ease',
+                      ...(isHighlighted ? { filter: 'drop-shadow(0 0 2px #facc15)', animation: 'ct-exception-pulse 1s 3 ease-in-out' } : {}),
                     }}
-                  />
-                  <circle r={isSaturated ? 6 : 4.5} className="ct-airport-marker__dot" />
-                  <rect x={-5} y={5} width={10} height={1.5} rx={0.5} fill="currentColor" opacity={0.5} />
-                  <text y={-13} textAnchor="middle" className="ct-airport-marker__label">
+                  >
+                    {/* Antenna */}
+                    <line x1="0" y1="-11" x2="0" y2="-6.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                    <circle cx="0" cy="-11.5" r="1.5" fill="currentColor"/>
+                    {/* Cabin */}
+                    <rect x="-5" y="-6.5" width="10" height="5" rx="1" fill="currentColor" opacity="0.9"/>
+                    {/* Windows */}
+                    <rect x="-3" y="-5" width="1.5" height="2" rx="0.3" fill="#061828"/>
+                    <rect x="1.5" y="-5" width="1.5" height="2" rx="0.3" fill="#061828"/>
+                    {/* Shaft */}
+                    <rect x="-2.5" y="-1.5" width="5" height="8.5" rx="0.5" fill="currentColor" opacity="0.85"/>
+                    {/* Door */}
+                    <rect x="-0.75" y="4" width="1.5" height="3" rx="0.3" fill="#061828" opacity="0.5"/>
+                  </g>
+                  <rect x={-5} y={9} width={10} height={1.5} rx={0.5} fill="currentColor" opacity={0.5} />
+                  <text y={-13}
+                        textAnchor={nearbyOffsets[airport.icao] === 'left' ? 'end' : nearbyOffsets[airport.icao] === 'right' ? 'start' : 'middle'}
+                        x={nearbyOffsets[airport.icao] === 'left' ? -10 : nearbyOffsets[airport.icao] === 'right' ? 10 : 0}
+                        className="ct-airport-marker__label">
                     {airport.icao}
                   </text>
-                  <text y={22} textAnchor="middle" className="ct-airport-marker__city">
+                  <text y={22}
+                        textAnchor={nearbyOffsets[airport.icao] === 'left' ? 'end' : nearbyOffsets[airport.icao] === 'right' ? 'start' : 'middle'}
+                        x={nearbyOffsets[airport.icao] === 'left' ? -10 : nearbyOffsets[airport.icao] === 'right' ? 10 : 0}
+                        className="ct-airport-marker__city">
                     {airport.city}
                   </text>
-                  <text y={32} textAnchor="middle"
+                  <text y={32}
+                        textAnchor={nearbyOffsets[airport.icao] === 'left' ? 'end' : nearbyOffsets[airport.icao] === 'right' ? 'start' : 'middle'}
+                        x={nearbyOffsets[airport.icao] === 'left' ? -10 : nearbyOffsets[airport.icao] === 'right' ? 10 : 0}
                         className={`ct-airport-marker__inventory ct-airport-marker__inventory--${level}`}>
                     {stockBags}/{maxCap}
                   </text>
@@ -697,67 +735,6 @@ const WorldMap = ({
               </Marker>
             );
           })}
-
-
-          {/* ── Tooltip Interactivo Flotante sobre Avión Seleccionado (foreignObject) ── */}
-          {selectedPlane && (() => {
-            const from = airportByIcao[selectedPlane.from];
-            const to   = airportByIcao[selectedPlane.to];
-            if (!from || !to) return null;
-            const progress = selectedPlane.progress ?? 0;
-            const position = interpolateCoordinates(from, to, progress);
-
-            return (
-              <Marker coordinates={position}>
-                <foreignObject
-                  x={20}
-                  y={-40}
-                  width={170}
-                  height={170}
-                  style={{ pointerEvents: "auto", overflow: "visible" }}
-                >
-                  <div style={{
-                    background: "rgba(15, 23, 42, 0.96)",
-                    border: `1.5px solid ${getStrokeColor(selectedPlane.status, selectedPlane.ocupacionReal, selectedPlane.capacidadMax)}`,
-                    borderRadius: "6px",
-                    padding: "8px",
-                    color: "white",
-                    fontSize: "12px",
-                    boxShadow: "0 4px 15px rgba(0,0,0,0.6)",
-                    fontFamily: "sans-serif",
-                    textAlign: "center",
-                    backdropFilter: "blur(4px)"
-                  }}>
-                    <div style={{ fontWeight: "bold", color: "#60a5fa", marginBottom: "2px" }}>
-                      ✈️ Vuelo {selectedPlane.id.toString().replace("vuelo-", "").split("-")[0]}
-                    </div>
-                    <div style={{ fontSize: "11px", color: "#e2e8f0", marginBottom: "4px" }}>
-                      {selectedPlane.from} ➔ {selectedPlane.to}
-                    </div>
-                    <div style={{ fontSize: "10px", color: "#9ca3af", marginTop: "2px" }}>
-                      {(() => {
-                        const fmtOffset = (ep) => {
-                          if (!ep) return "--:--";
-                          const d = new Date(ep);
-                          return `${String(d.getUTCHours()).padStart(2,'0')}:${String(d.getUTCMinutes()).padStart(2,'0')}`;
-                        };
-                        const dep = fmtOffset(selectedPlane.departureTime);
-                        const arr = fmtOffset(selectedPlane.arrivalTime);
-                        const pct = Math.round((selectedPlane.progress ?? 0) * 100);
-                        return `${dep} — ${arr} (${pct}%)`;
-                      })()}
-                    </div>
-                    {selectedPlane.ocupacionReal != null && selectedPlane.capacidadMax != null && (
-                      <div style={{ fontSize: "10px", color: "#9ca3af", marginTop: "2px" }}>
-                        Stock: {selectedPlane.ocupacionReal} / {selectedPlane.capacidadMax} maletas
-                      </div>
-                    )}
-                  </div>
-                </foreignObject>
-              </Marker>
-            );
-          })()}
-
         </ZoomableGroup>
       </ComposableMap>
 
