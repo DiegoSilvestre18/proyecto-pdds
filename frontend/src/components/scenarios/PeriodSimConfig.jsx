@@ -276,15 +276,15 @@ function PeriodSimConfig({
             <div className="ct-config-section">
               <p className="ct-config-section__title">⏳ PROGRESO</p>
               <div style={{ margin: "10px 0" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 6, color: "#1a3a5a" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 6, color: "#cbd5e1" }}>
                   <span>Día {liveStatus?.currentDay ?? 0} / {liveStatus?.totalDays ?? DIAS_SIMULACION}</span>
-                  <span style={{ color: "#1a70c0", fontWeight: 700 }}>{liveStatus?.percent ?? 0}%</span>
+                  <span style={{ color: "#38bdf8", fontWeight: 700 }}>{liveStatus?.percent ?? 0}%</span>
                 </div>
-                <div style={{ height: 8, background: "rgba(10,60,110,0.1)", borderRadius: 4 }}>
+                <div style={{ height: 8, background: "rgba(255,255,255,0.08)", borderRadius: 4 }}>
                   <div style={{
                     height: "100%", borderRadius: 4,
                     width: `${liveStatus?.percent ?? 0}%`,
-                    background: "linear-gradient(90deg, #1a70c0, #0ca36e)",
+                    background: "linear-gradient(90deg, #38bdf8, #34d399)",
                     transition: "width 0.5s ease",
                   }} />
                 </div>
@@ -316,15 +316,15 @@ function PeriodSimConfig({
           <>
             {/* Encabezado */}
             <div style={{
-              background: "linear-gradient(135deg, rgba(5,150,105,0.08), rgba(4,120,87,0.05))",
-              border: "1px solid rgba(5,150,105,0.35)", borderRadius: 10,
+              background: "linear-gradient(135deg, rgba(5,150,105,0.15), rgba(4,120,87,0.1))",
+              border: "1px solid rgba(52,211,153,0.35)", borderRadius: 10,
               padding: "12px 14px", marginBottom: 12,
             }}>
-              <p style={{ color: "#065f46", fontWeight: 700, fontSize: 13, margin: 0 }}>
+              <p style={{ color: "#34d399", fontWeight: 700, fontSize: 13, margin: 0 }}>
                 ✅ SIMULACIÓN COMPLETADA
               </p>
-              <p style={{ fontSize: 11, color: "#374151", margin: "4px 0 0" }}>
-                Algoritmo: <strong style={{ color: "#1a3a6a" }}>{selectedAlgorithm?.toUpperCase()}</strong>
+              <p style={{ fontSize: 11, color: "#94a3b8", margin: "4px 0 0" }}>
+                Algoritmo: <strong style={{ color: "#60a5fa" }}>{selectedAlgorithm?.toUpperCase()}</strong>
                 {" · "}{reportMetrics.diasCount} días · {startDate}
               </p>
             </div>
@@ -332,8 +332,8 @@ function PeriodSimConfig({
             {/* Acumulados (simulacion) */}
             <RSection title="⚖️ ACUMULADOS BRUTOS (simulación)">
               <MRow label="Demanda total"       value={fmt(reportMetrics.totalDemanda)} />
-              <MRow label="Atendidas (cap)"     value={fmt(reportMetrics.atendidas)}    color="#065f46" />
-              <MRow label="No atendidas (Ecap)" value={fmt(reportMetrics.ecap)}         color="#b91c1c" />
+              <MRow label="Atendidas (cap)"     value={fmt(reportMetrics.atendidas)}    color="#34d399" />
+              <MRow label="No atendidas (Ecap)" value={fmt(reportMetrics.ecap)}         color="#f87171" />
             </RSection>
 
             {/* Demanda real de los archivos .txt */}
@@ -347,7 +347,7 @@ function PeriodSimConfig({
                   <MRow
                     label="Total real 5 días"
                     value={fmt(Object.values(liveStatus.dailyRealDemand).reduce((a,b) => a+b, 0))}
-                    color="#1a3a6a"
+                    color="#60a5fa"
                   />
                 </div>
               </RSection>
@@ -356,30 +356,30 @@ function PeriodSimConfig({
             {/* Promedios */}
             <RSection title="÷ PROMEDIOS DIARIOS">
               <MRow label="Demanda / día"   value={fmt(Math.round(reportMetrics.avgDemanda))} />
-              <MRow label="Atendidas / día" value={fmt(Math.round(reportMetrics.avgAtendidas))} color="#065f46" />
-              <MRow label="Ecap / día"      value={fmt(Math.round(reportMetrics.avgEcap))} color="#b91c1c" />
+              <MRow label="Atendidas / día" value={fmt(Math.round(reportMetrics.avgAtendidas))} color="#34d399" />
+              <MRow label="Ecap / día"      value={fmt(Math.round(reportMetrics.avgEcap))} color="#f87171" />
             </RSection>
 
             {/* KPIs */}
             <RSection title="📊 KPIs">
               <MRow label="Ocupación eff."     value={fmtPct(reportMetrics.ocupacion)} />
               <MRow label="Cumplimiento"        value={fmtPct(reportMetrics.cumplimiento)}
-                color={reportMetrics.cumplimiento >= 90 ? "#065f46" : "#b91c1c"} />
+                color={reportMetrics.cumplimiento >= 90 ? "#34d399" : "#f87171"} />
               <MRow label="Sat. aeroportuaria"  value={fmtPct(reportMetrics.saturacion)}
-                color={reportMetrics.saturacion > 100 ? "#b91c1c" : "#92400e"} />
+                color={reportMetrics.saturacion > 100 ? "#f87171" : "#fbbf24"} />
             </RSection>
 
             {/* Fitness Score */}
             <div style={{
-              background: "linear-gradient(135deg, rgba(79,70,229,0.07), rgba(99,102,241,0.04))",
-              border: "1px solid rgba(79,70,229,0.25)", borderRadius: 10,
+              background: "linear-gradient(135deg, rgba(129,140,248,0.1), rgba(99,102,241,0.05))",
+              border: "1px solid rgba(129,140,248,0.25)", borderRadius: 10,
               padding: "12px 14px", marginBottom: 12,
             }}>
-              <p style={{ fontSize: 10, color: "#4338ca", margin: "0 0 3px", fontWeight: 700 }}>🧠 FITNESS SCORE</p>
-              <p style={{ fontSize: 9, color: "#6b7280", margin: "0 0 8px" }}>10A − 0.005Ecap − 2Dh − 12Saero</p>
+              <p style={{ fontSize: 10, color: "#a78bfa", margin: "0 0 3px", fontWeight: 700 }}>🧠 FITNESS SCORE</p>
+              <p style={{ fontSize: 9, color: "#94a3b8", margin: "0 0 8px" }}>10A − 0.005Ecap − 2Dh − 12Saero</p>
               <p style={{
                 fontSize: 24, fontWeight: 800, margin: 0,
-                color: reportMetrics.score >= 0 ? "#065f46" : "#b91c1c",
+                color: reportMetrics.score >= 0 ? "#34d399" : "#f87171",
               }}>
                 {Number(reportMetrics.score).toLocaleString("es-PE", { maximumFractionDigits: 1 })}
               </p>
@@ -390,20 +390,20 @@ function PeriodSimConfig({
               <RSection title="📅 DESGLOSE POR DÍA">
                 <table style={{ width: "100%", fontSize: 10, borderCollapse: "collapse" }}>
                   <thead>
-                    <tr style={{ color: "#3a5a78" }}>
+                    <tr style={{ color: "#94a3b8" }}>
                       {["Día","Demanda","Atend.","Ecap","SLA"].map(h => (
-                        <th key={h} style={{ textAlign: "right", padding: "4px 4px", borderBottom: "1px solid rgba(10,60,110,0.12)" }}>{h}</th>
+                        <th key={h} style={{ textAlign: "right", padding: "4px 4px", borderBottom: "1px solid rgba(255,255,255,0.1)" }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {reportMetrics.byDay.map(d => (
-                      <tr key={d.dia} style={{ background: d.colapsed ? "rgba(220,38,38,0.06)" : "transparent" }}>
-                        <td style={{ textAlign: "right", padding: "3px 4px", color: d.colapsed ? "#b91c1c" : "#0a2a4a", fontWeight: 600 }}>{d.dia}{d.colapsed ? " ⚠" : ""}</td>
-                        <td style={{ textAlign: "right", padding: "3px 4px", color: "#374151" }}>{(d.demanda/1000).toFixed(0)}k</td>
-                        <td style={{ textAlign: "right", padding: "3px 4px", color: "#065f46", fontWeight: 600 }}>{(d.atendidas/1000).toFixed(0)}k</td>
-                        <td style={{ textAlign: "right", padding: "3px 4px", color: "#b91c1c" }}>{(d.ecap/1000).toFixed(0)}k</td>
-                        <td style={{ textAlign: "right", padding: "3px 4px", color: "#92400e", fontWeight: 600 }}>{d.sla.toFixed(1)}%</td>
+                      <tr key={d.dia} style={{ background: d.colapsed ? "rgba(248,113,113,0.15)" : "transparent" }}>
+                        <td style={{ textAlign: "right", padding: "3px 4px", color: d.colapsed ? "#fca5a5" : "#cbd5e1", fontWeight: 600 }}>{d.dia}{d.colapsed ? " ⚠" : ""}</td>
+                        <td style={{ textAlign: "right", padding: "3px 4px", color: "#e2e8f0" }}>{(d.demanda/1000).toFixed(0)}k</td>
+                        <td style={{ textAlign: "right", padding: "3px 4px", color: "#34d399", fontWeight: 600 }}>{(d.atendidas/1000).toFixed(0)}k</td>
+                        <td style={{ textAlign: "right", padding: "3px 4px", color: "#f87171" }}>{(d.ecap/1000).toFixed(0)}k</td>
+                        <td style={{ textAlign: "right", padding: "3px 4px", color: "#fbbf24", fontWeight: 600 }}>{d.sla.toFixed(1)}%</td>
                       </tr>
                     ))}
                   </tbody>
@@ -477,9 +477,9 @@ function PeriodSimConfig({
 // ── Sub-componentes ───────────────────────────────────────────────────────────
 function RSection({ title, children }) {
   return (
-    <div style={{ background: "rgba(10,60,110,0.05)", borderRadius: 8, padding: "10px 12px", marginBottom: 10,
-                  border: "1px solid rgba(10,60,110,0.1)" }}>
-      <p style={{ fontSize: 10, fontWeight: 700, color: "#3a5a78", margin: "0 0 8px", letterSpacing: 1 }}>{title}</p>
+    <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 8, padding: "10px 12px", marginBottom: 10,
+                  border: "1px solid rgba(255,255,255,0.08)" }}>
+      <p style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", margin: "0 0 8px", letterSpacing: 1 }}>{title}</p>
       {children}
     </div>
   );
@@ -488,8 +488,8 @@ function RSection({ title, children }) {
 function MRow({ label, value, color }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
-      <span style={{ fontSize: 11, color: "#4a6a85" }}>{label}</span>
-      <span style={{ fontSize: 12, fontWeight: 700, color: color ?? "#0a2a4a" }}>{value}</span>
+      <span style={{ fontSize: 11, color: "#cbd5e1" }}>{label}</span>
+      <span style={{ fontSize: 12, fontWeight: 700, color: color ?? "#f8fafc" }}>{value}</span>
     </div>
   );
 }

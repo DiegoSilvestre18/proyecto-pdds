@@ -139,6 +139,8 @@
 .ct-kpi-region {
   display: flex;
   flex-direction: column;
+  position: relative;
+  z-index: 10;
 }
 
 .ct-kpi-strip {
@@ -166,35 +168,30 @@
   text-transform: uppercase;
 }
 
-.ct-kpi-controls {
-  display: flex;
-  justify-content: flex-end;
-  padding: 6px 12px 8px;
-  background: linear-gradient(180deg, rgba(9, 29, 49, 0.98), rgba(6, 22, 38, 0.98));
-  border-bottom: 1px solid #1e3f5f;
-  z-index: 8;
-  transition: padding 0.2s ease;
-}
-
-.ct-kpi-controls--expanded {
-  padding-top: 6px;
-}
-
-.ct-kpi-controls--collapsed {
-  padding-top: 4px;
-}
-
-.ct-kpi-controls-btn {
-  border: 1px solid #678aab;
-  border-radius: 999px;
-  background: rgba(230, 241, 251, 0.96);
-  color: #173b5b;
-  font-size: 0.67rem;
+.ct-kpi-pull-tab {
+  position: absolute;
+  bottom: -20px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(180deg, rgba(6, 22, 38, 0.98), rgba(4, 15, 26, 0.95));
+  border: 1px solid #1e3f5f;
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  color: #a9c1d6;
+  font-size: 10px;
   font-weight: 700;
-  letter-spacing: 0.03em;
-  padding: 5px 10px;
+  padding: 4px 16px;
   cursor: pointer;
-  box-shadow: 0 4px 10px rgba(5, 17, 30, 0.3);
+  z-index: 10;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  transition: color 0.2s, background 0.2s;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ct-kpi-pull-tab:hover {
+  color: #38bdf8;
+  background: linear-gradient(180deg, rgba(9, 29, 49, 0.98), rgba(6, 22, 38, 0.98));
 }
 
 .ct-kpi-card {

@@ -157,6 +157,7 @@ const App = () => {
         isCollapseScenario={isCollapseScenario}
         onTabChange={handleTabChange}
         systemClock={summary.systemClock}
+        realClock={summary.realClock}
       />
 
       <div className="ct-kpi-region">
@@ -176,17 +177,10 @@ const App = () => {
               ...(isSimScenario || (activeTab === "vivo" && simState !== "idle") ? [
 
                   {
-                      key: "sim_real_time",
-                      title: "Tiempo Real",
-                      value: elapsedOperationTime,
-                      subtitle: "Transcurrido",
-                      status: "default"
-                  },
-                  {
-                      key: "sim_clock",
-                      title: "Hora Operativa",
-                      value: summary.systemClock,
-                      subtitle: "Reloj del sistema",
+                      key: "sim_elapsed_times",
+                      title: "T. Ejecución (Real)",
+                      value: summary.realTimeElapsed || "00:00:00",
+                      subtitle: isSimScenario ? `Restante est: ~${summary.realTimeRemaining || "00:00:00"}` : "Transcurrido",
                       status: "default"
                   }
               ] : [])

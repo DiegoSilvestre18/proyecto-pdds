@@ -14,7 +14,7 @@ const KpiStrip = React.memo(({ isCollapsed, kpiCards }) => {
             <p className="ct-kpi-title">{card.title}</p>
             <strong className="ct-kpi-value">{card.value}</strong>
             <p className="ct-kpi-subtitle">{card.subtitle}</p>
-            {card.progress && (
+            {typeof card.progress === 'number' && (
               <div className="ct-kpi-progress" role="presentation" aria-hidden="true">
                 <span style={{ width: `${card.progress}%` }} />
               </div>

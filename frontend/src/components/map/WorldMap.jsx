@@ -355,6 +355,7 @@ const WorldMap = ({
         projectionConfig={PROJECTION_CONFIG}
         className="ct-world-map__svg"
         onClick={(e) => { if (e.target === e.currentTarget && onBackgroundClick) onBackgroundClick(); }}
+        style={{ width: "100%", height: "100%" }}
       >
         <ZoomableGroup zoom={zoom} center={center} onMoveEnd={onMoveEnd} maxZoom={8}>
           

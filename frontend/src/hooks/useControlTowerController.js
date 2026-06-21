@@ -92,6 +92,15 @@ export const useControlTowerController = () => {
   const [realElapsedSecs, setRealElapsedSecs] = useState(0);
   const realStartRef = useRef(null);
   const [logs, setLogs] = useState([]);
+  const [realTimeTicker, setRealTimeTicker] = useState(Date.now());
+
+  // Ticker para actualizar el reloj de la vida real (incluso en idle)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setRealTimeTicker(Date.now());
+    }, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   // ── BUFFER DE SNAPSHOTS PARA SIMULACIÓN FLUIDA ────────────────────────────
   const snapshotBufferRef = useRef([]);
@@ -952,16 +961,34 @@ if (selected && !finalSelection.some((p) => p.id === selected.id)) {
   const summary = useMemo(() => {
     const pad = (n) => String(n).padStart(2, "0");
     const fmtSim = (epoch, start) => {
-      if (!epoch || !start) return "--:--:--";
+      if (!epoch || !start) return "--:--";
       const date = new Date(epoch);
-      const months = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-      const day = date.getUTCDate();
-      const month = months[date.getUTCMonth()];
+      const day = pad(date.getUTCDate());
+      const month = pad(date.getUTCMonth() + 1);
       const year = date.getUTCFullYear();
       const h = pad(date.getUTCHours());
       const m = pad(date.getUTCMinutes());
       const s = pad(date.getUTCSeconds());
-      return `${day} ${month} ${year} - ${h}:${m}:${s}`;
+      return `${day}/${month}/${year} ${h}:${m}:${s}`;
+    };
+    const fmtSimElapsed = (epoch, start) => {
+      if (!epoch || !start || epoch < start) return "00:00:00";
+      const diffSecs = Math.floor((epoch - start) / 1000);
+      const d = Math.floor(diffSecs / 86400);
+      const h = pad(Math.floor((diffSecs % 86400) / 3600));
+      const m = pad(Math.floor((diffSecs % 3600) / 60));
+      const s = pad(diffSecs % 60);
+      return d > 0 ? `${d}d ${h}:${m}:${s}` : `${h}:${m}:${s}`;
+    };
+    const fmtRealClock = () => {
+      const date = new Date();
+      const day = pad(date.getDate());
+      const month = pad(date.getMonth() + 1);
+      const year = date.getFullYear();
+      const h = pad(date.getHours());
+      const m = pad(date.getMinutes());
+      const s = pad(date.getSeconds());
+      return `${day}/${month}/${year} ${h}:${m}:${s}`;
     };
     const fmtReal = (s) => {
       const h = Math.floor(s / 3600);
@@ -975,6 +1002,9 @@ if (selected && !finalSelection.some((p) => p.id === selected.id)) {
         scenarioLabel: "Simulación en vivo",
         systemClock: fmtSim(smoothSimTime || currentEpochTime, meta.startEpoch),
         realTimeElapsed: fmtReal(realElapsedSecs),
+        realTimeRemaining: fmtReal(Math.max(0, (targetPlaybackMinutes * 60) - realElapsedSecs)),
+        simulatedElapsed: fmtSimElapsed(smoothSimTime || currentEpochTime, meta.startEpoch),
+        realClock: fmtRealClock(),
         globalCapacity: `${globalOccupancyCalculated.toFixed(1)}%`,
         networkLatency: "OK",
         flightsInCourse: { value: aircraft.length ?? 0, delta: "datos reales", status: "green" },
@@ -991,6 +1021,9 @@ if (selected && !finalSelection.some((p) => p.id === selected.id)) {
       operationStart: "--:--",
       systemClock: "--:--",
       realTimeElapsed: "00:00:00",
+      realTimeRemaining: fmtReal(targetPlaybackMinutes * 60),
+      simulatedElapsed: "00:00:00",
+      realClock: fmtRealClock(),
       globalCapacity: "0%",
       networkLatency: "--",
       flightsInCourse: { value: 0, delta: "--", status: "green" },
@@ -1000,7 +1033,7 @@ if (selected && !finalSelection.some((p) => p.id === selected.id)) {
       progress: { label: "Listo", percent: 0, simulatedTime: "00:00:00", status: "amber" },
       transitByContinent: { america: 0, europe: 0, asia: 0 },
     };
-  }, [meta, kpis, clock, aircraft, sessionId, smoothSimTime, currentEpochTime, realElapsedSecs, globalOccupancyCalculated, transitByContinent]);
+  }, [meta, kpis, clock, aircraft, sessionId, smoothSimTime, currentEpochTime, realElapsedSecs, globalOccupancyCalculated, transitByContinent, realTimeTicker, targetPlaybackMinutes]);
 
   const elapsedOperationTime = summary.realTimeElapsed;
 
@@ -1068,7 +1101,7 @@ if (selected && !finalSelection.some((p) => p.id === selected.id)) {
           key: "progress",
           title: "Progreso simulación",
           value: `${dayLabel} · ${progressPercent}%`,
-          subtitle: meta.status === "DONE" ? "✓ Completado" : "En ejecución...",
+          subtitle: meta.status === "DONE" ? "✓ Completado" : `Hora simulada actual: ${summary.simulatedElapsed || "00:00:00"}`,
           status: meta.status === "FAILED" ? "red"
             : meta.status === "DONE" ? "green" : "amber",
           progress: progressPercent,
@@ -1080,7 +1113,7 @@ if (selected && !finalSelection.some((p) => p.id === selected.id)) {
       { key: "occupancy", title: "Ocupación global", value: "0%", subtitle: "Esperando...", status: "green" },
       { key: "sla", title: "SLA", value: "0%", subtitle: "Esperando...", status: "green" },
       { key: "critical", title: "Nodos críticos", value: 0, subtitle: "Esperando...", status: "green" },
-      { key: "progress", title: isCollapseScenario ? "Estado colapso" : "Progreso", value: "Listo · 0%", subtitle: "Presione Ejecutar", status: "amber", progress: 0 },
+      { key: "progress", title: isCollapseScenario ? "Estado colapso" : "Progreso", value: "0%", subtitle: "Listo para iniciar", status: "amber", progress: 0 },
     ];
   }, [isCollapseScenario, meta, kpis, aircraft, sessionId, globalOccupancyCalculated]);
 

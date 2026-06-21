@@ -6,7 +6,8 @@ const ScenarioHeader = ({
   isCollapseScenario = false,
   onTabChange = () => {},
   tabs = [],
-  systemClock = "--:--:--",
+  systemClock = "--:--",
+  realClock = "--:--",
 }) => {
   const navigate = useNavigate();
 
@@ -41,11 +42,40 @@ const ScenarioHeader = ({
         <div className={`ct-session ${isCollapseScenario ? "ct-session--danger" : ""}`}>
           {isCollapseScenario ? "⚠ Modo Colapso" : "Sesión Activa"}
         </div>
-        {systemClock && systemClock !== "--:--:--" && (
-          <div style={{ color: "#60a5fa", fontSize: "12px", fontWeight: "bold", fontFamily: "monospace", marginLeft: "10px" }}>
-            🕒 {systemClock}
-          </div>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: "24px" }}>
+          {realClock && realClock !== "--:--" && (
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px" }}>
+              <span style={{ color: "#64748b", fontWeight: 600, whiteSpace: "nowrap" }}>Hora actual:</span>
+              <span style={{ 
+                color: "#0f172a", 
+                fontWeight: 700, 
+                fontVariantNumeric: "tabular-nums", 
+                fontFamily: "monospace, monospace", 
+                letterSpacing: "0.5px",
+                whiteSpace: "nowrap",
+                display: "inline-block"
+              }}>
+                {realClock}
+              </span>
+            </div>
+          )}
+          {systemClock && systemClock !== "--:--" && systemClock !== "--:--:--" && (
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px" }}>
+              <span style={{ color: "#0284c7", fontWeight: 600, whiteSpace: "nowrap" }}>Hora actual simulada:</span>
+              <span style={{ 
+                color: "#0c4a6e", 
+                fontWeight: 700, 
+                fontVariantNumeric: "tabular-nums", 
+                fontFamily: "monospace, monospace", 
+                letterSpacing: "0.5px",
+                whiteSpace: "nowrap",
+                display: "inline-block"
+              }}>
+                {systemClock}
+              </span>
+            </div>
+          )}
+        </div>
       </div>
     </header>
   );
