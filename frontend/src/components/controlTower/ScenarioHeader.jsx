@@ -17,12 +17,23 @@ const ScenarioHeader = ({
         <p className="ct-title">Control Tower</p>
         <nav className="ct-tabs" aria-label="Escenarios de operación">
           <button
-            className="ct-tab"
             type="button"
-            onClick={() => navigate('/registrar-envio')}
-            style={{ color: '#38bdf8', fontWeight: 'bold', marginRight: '10px', borderRight: '1px solid rgba(255,255,255,0.1)', paddingRight: '15px' }}
+            onClick={() => navigate('/')}
+            style={{ 
+                background: '#f8fbff', 
+                color: '#1a3556', 
+                border: '1px solid #a8b8cb', 
+                borderRadius: '6px', 
+                padding: '6px 14px', 
+                marginRight: '16px', 
+                fontSize: '12px', 
+                fontWeight: 'bold',
+                cursor: 'pointer',
+                boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
+            }}
+            title="Volver al panel para inyectar más vuelos o envíos mientras corre la simulación"
           >
-            📥 Registrar envío
+            Añadir Data Adicional
           </button>
           {tabs.map((tab) => (
             <button

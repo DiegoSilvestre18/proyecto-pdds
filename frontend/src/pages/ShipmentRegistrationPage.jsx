@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { AIRPORTS } from '../data/airportsData';
 import { apiFetch } from '../hooks/api';
 
-const ShipmentRegistrationPage = () => {
+const ShipmentRegistrationPage = ({ hideBackButton = false }) => {
     const navigate = useNavigate();
     const [globalOrigenIcao, setGlobalOrigenIcao] = useState('');
     const [trayShipments, setTrayShipments] = useState([]);
@@ -167,27 +167,29 @@ const ShipmentRegistrationPage = () => {
 
     return (
         <div className="registration-page" style={{
-            padding: '2rem',
+            padding: hideBackButton ? '0' : '2rem',
             color: 'white',
-            background: '#080e1e',
-            minHeight: '100vh',
+            background: hideBackButton ? 'transparent' : '#080e1e',
+            minHeight: hideBackButton ? 'auto' : '100vh',
             fontFamily: 'sans-serif'
         }}>
-            <button
-                onClick={() => navigate('/')}
-                style={{
-                    marginBottom: '2rem', background: 'rgba(56, 189, 248, 0.1)',
-                    color: '#38bdf8',
-                    border: '1px solid rgba(56, 189, 248, 0.3)',
-                    padding: '0.6rem 1.2rem',
-                    borderRadius: '8px',
-                    cursor: 'pointer',
-                    fontWeight: 'bold',
-                    transition: 'all 0.2s'
-                }}
-            >
-                ← Volver al Mapa de Control
-            </button>
+            {!hideBackButton && (
+                <button
+                    onClick={() => navigate('/')}
+                    style={{
+                        marginBottom: '2rem', background: 'rgba(56, 189, 248, 0.1)',
+                        color: '#38bdf8',
+                        border: '1px solid rgba(56, 189, 248, 0.3)',
+                        padding: '0.6rem 1.2rem',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontWeight: 'bold',
+                        transition: 'all 0.2s'
+                    }}
+                >
+                    ← Volver al Mapa de Control
+                </button>
+            )}
 
             <div style={{ maxWidth: '1000px', margin: '0 auto', display: 'flex', gap: '2rem', flexWrap: 'wrap' }}>
 
