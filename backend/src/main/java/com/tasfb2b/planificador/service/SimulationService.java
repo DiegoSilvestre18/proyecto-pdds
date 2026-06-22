@@ -238,11 +238,12 @@ public class SimulationService {
                         List<Route> masterPlan = new ArrayList<>();
 
                         while (currentSimMinuteOfDay < 1440) {
-                                int currentSa = isRealTime ? 1 : saMinutes;
+                                long currentSimTime = dayStartEpochMs + ((long) currentSimMinuteOfDay * 60_000L);
+                                boolean isCatchingUp = isRealTime && currentSimTime < targetEpoch;
+                                
+                                int currentSa = isRealTime ? (isCatchingUp ? Math.min(30, planningHorizon) : 1) : saMinutes;
                                 if (currentSimMinuteOfDay + currentSa > 1440) currentSa = 1440 - currentSimMinuteOfDay;
                                 session.setCurrentSaMinutes(currentSa);
-
-                                long currentSimTime = dayStartEpochMs + ((long) currentSimMinuteOfDay * 60_000L);
 
                                 java.time.ZonedDateTime zdt = java.time.Instant.ofEpochMilli(currentSimTime).atZone(java.time.ZoneId.systemDefault());
                                 String simulatedTimeStr = String.format("Día %d - %02d:%02d", day + 1, zdt.getHour(), zdt.getMinute());
@@ -303,7 +304,7 @@ public class SimulationService {
                                         while (!globalEventQueue.isEmpty() && globalEventQueue.peek().getTime() <= microEnd) globalState.apply(globalEventQueue.poll(), airportMap);
 
                                         int mPercent = (int) ((((day * 1440.0) + currentSimMinuteOfDay + step) / (dias * 1440.0)) * 100);
-                                        if (microEnd >= targetEpoch) {
+                                        if (microEnd >= targetEpoch || (isCatchingUp && step == microSteps - 1)) {
                                                 updateProgress(session, day + 1, dias, mPercent, simulatedTimeStr, slaPercent, globalState, airportMap, inTransitRoutes, microEnd, startTime, algorithm, session.getCurrentPlanId(), masterPlan, todosLosVuelos, planifiablePool, isRealTime);
                                         }
 

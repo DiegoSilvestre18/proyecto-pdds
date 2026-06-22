@@ -9,210 +9,99 @@ const STATUS_LABELS = {
   cancelled: "Cancelado",
 };
 
-function ShipmentDetailPanel({ 
-  isVisible, 
-  searchedShipment, 
-  selectedAircraft = null, 
-  onSearch = () => {},
-  isSearching = false,
-  onCancelFlight = () => {},
-}) {      
-  const [searchValue, setSearchValue] = React.useState("");
+function formatFlightId(id) {
+  if (!id) return "--";
+  const parts = id.split('-');
+  if (parts.length >= 2) {
+    return `${parts[0].toUpperCase()}-${parts[1]}`;
+  }
+  return id;
+}
 
-  if (!isVisible) {
-    return null
+function formatTimeWithDate(epoch) {
+  if (!epoch) return '--';
+  return new Date(epoch).toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+function ShipmentDetailPanel({ isVisible, selectedAircraft = null }) {      
+  if (!isVisible || !selectedAircraft) {
+    return null;
   }
 
-  const handleSearch = (e) => {
-    e.preventDefault();
-    onSearch(searchValue);
-  };
-
-  const s = searchedShipment;
-
-  const routeLabel = selectedAircraft ? `${selectedAircraft.from} → ${selectedAircraft.to}` : "--";
-  const statusLabel = selectedAircraft
-    ? (STATUS_LABELS[selectedAircraft.status] ?? selectedAircraft.status ?? "En tránsito")
-    : "--";
-  const progressPct = selectedAircraft
-    ? Math.round((selectedAircraft.progress ?? 0) * 100)
-    : 0;
-
-  const bagsLabel = s?.totalBags
-    ?? (selectedAircraft ? `${selectedAircraft.ocupacionReal} / ${selectedAircraft.capacidadMax}` : '—');
-
-  const fmtEpoch = (ep) => ep ? new Date(ep).toLocaleString() : '—';
-
-  const arrivalLabel = s?.arrival
-    ? new Date(s.arrival).toLocaleString()
-    : fmtEpoch(selectedAircraft?.arrivalTime);
-
-  const travelPlan = selectedAircraft ? [
-    {
-      airport: selectedAircraft.from,
-      label: 'Salida',
-      time: fmtEpoch(selectedAircraft.departureTime),
-      status: progressPct > 10 ? "completado" : "en escala",
-    },
-    {
-      airport: selectedAircraft.to,
-      label: 'Llegada',
-      time: fmtEpoch(selectedAircraft.arrivalTime),
-      status: progressPct > 85 ? "en escala" : "pendiente",
-    },
-  ] : [];
+  const statusLabel = STATUS_LABELS[selectedAircraft.status] ?? selectedAircraft.status ?? "En vuelo";
+  const bagsLabel = `${selectedAircraft.ocupacionReal} / ${selectedAircraft.capacidadMax}`;
+  const depTime = formatTimeWithDate(selectedAircraft.departureTime);
+  const arrTime = formatTimeWithDate(selectedAircraft.arrivalTime);
+  
+  const progressPct = Math.min(100, Math.max(0, Math.round((selectedAircraft.progress ?? 0) * 100)));
 
   return (
     <aside 
       className="ct-panel--shipment" 
-      aria-label="Detalle de envío"
+      aria-label="Detalle de Vuelo"
       style={{
         position: 'fixed',
         bottom: '24px',
         right: '24px',
-        width: '320px',
+        width: '360px',
         background: 'rgba(15, 23, 42, 0.95)',
         backdropFilter: 'blur(12px)',
         border: '1px solid rgba(96, 165, 250, 0.4)',
         borderRadius: '8px',
         padding: '16px',
         zIndex: 1000,
-        boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
+        boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+        color: 'white',
+        fontFamily: 'system-ui, sans-serif'
       }}
     >
-      <div style={{ padding: '0 0 4px', fontSize: '9px', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        DETALLE DE ENVÍO {s?.isLocal ? '⚡ ACTIVO' : '🏛️ HISTÓRICO'}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+        <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 700, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+          ✈️ Detalle del Vuelo
+        </span>
+        <strong style={{ color: '#60a5fa', fontSize: '13px', backgroundColor: 'rgba(96, 165, 250, 0.1)', padding: '2px 8px', borderRadius: '4px' }}>
+          {formatFlightId(selectedAircraft.id)}
+        </strong>
       </div>
 
-      <div style={{ padding: '6px 0', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-        <form onSubmit={handleSearch} style={{ position: "relative", width: "100%" }}>
-          <input 
-            type="text" 
-            placeholder="Buscar ID..." 
-            value={searchValue}
-            onChange={(e) => setSearchValue(e.target.value)}
-            style={{
-              background: "rgba(15, 23, 42, 0.6)",
-              border: "1px solid rgba(255,255,255,0.1)",
-              borderRadius: "4px",
-              padding: "5px 10px",
-              paddingRight: "30px",
-              color: "white",
-              fontSize: "11px",
-              width: "100%",
-              outline: "none",
-              boxSizing: "border-box"
-            }}
-          />
-          <button 
-            type="submit"
-            disabled={isSearching}
-            style={{
-              position: "absolute",
-              right: "6px",
-              top: "50%",
-              transform: "translateY(-50%)",
-              background: "transparent",
-              border: "none",
-              color: "#94a3b8",
-              cursor: "pointer",
-              fontSize: "12px",
-              padding: "2px"
-            }}
-          >
-            {isSearching ? "⏳" : "🔍"}
-          </button>
-        </form>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', position: 'relative', marginBottom: '16px' }}>
+        <div style={{ textAlign: 'left', flex: 1 }}>
+          <div style={{ color: '#94a3b8', fontSize: '10px', textTransform: 'uppercase' }}>Salida</div>
+          <strong style={{ fontSize: '18px', display: 'block', margin: '2px 0' }}>{selectedAircraft.from}</strong>
+          <div style={{ color: '#cbd5e1', fontSize: '11px' }}>{depTime}</div>
+        </div>
+
+        <div style={{ flex: 1.5, padding: '0 10px', display: 'flex', flexDirection: 'column', justifyContent: 'center', marginTop: '16px' }}>
+           <div style={{ position: 'relative', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', width: '100%' }}>
+              <div style={{ position: 'absolute', top: 0, left: 0, height: '100%', background: '#60a5fa', borderRadius: '2px', width: `${progressPct}%`, transition: 'width 0.5s ease-out' }} />
+              <div style={{ position: 'absolute', top: '-7px', left: `${progressPct}%`, fontSize: '14px', transform: 'translateX(-50%) rotate(45deg)', transition: 'left 0.5s ease-out' }}>✈️</div>
+           </div>
+           <div style={{ textAlign: 'center', fontSize: '10px', color: '#94a3b8', marginTop: '10px', fontWeight: 600 }}>
+             {progressPct}% Completado
+           </div>
+        </div>
+
+        <div style={{ textAlign: 'right', flex: 1 }}>
+          <div style={{ color: '#94a3b8', fontSize: '10px', textTransform: 'uppercase' }}>Llegada</div>
+          <strong style={{ fontSize: '18px', display: 'block', margin: '2px 0' }}>{selectedAircraft.to}</strong>
+          <div style={{ color: '#cbd5e1', fontSize: '11px' }}>{arrTime}</div>
+        </div>
       </div>
 
-      {!s && !selectedAircraft ? (
-        <div style={{ padding: '12px', textAlign: 'center', color: '#94a3b8', fontSize: '11px' }}>
-          Ingrese un ID en el buscador o seleccione un vuelo del mapa.
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.03)', padding: '10px 12px', borderRadius: '6px' }}>
+        <div>
+          <div style={{ color: '#94a3b8', fontSize: '9px', textTransform: 'uppercase', marginBottom: '2px' }}>Estado actual</div>
+          <strong style={{ color: '#fbbf24', fontSize: '12px' }}>{statusLabel}</strong>
         </div>
-      ) : (
-        <div className="ct-shipment-detail">
-          <div className="ct-shipment-detail__summary">
-            <div className="ct-shipment-detail__field">
-              <span>ID Envío / Vuelo</span>
-              <strong style={{ color: '#60a5fa' }}>{s?.id || selectedAircraft?.id}</strong>
-            </div>
-            <div className="ct-shipment-detail__field">
-              <span>Ruta</span>
-              <strong>{s ? `${s.origin} → ${s.destination}` : routeLabel}</strong>
-            </div>
-            <div className="ct-shipment-detail__field">
-              <span>Maletas / Capacidad</span>
-              <strong>{bagsLabel}</strong>
-            </div>
-            <div className="ct-shipment-detail__field">
-              <span>Estado</span>
-              <strong className={s?.status === 'cancelled' || selectedAircraft?.status === 'cancelled' ? 'ct-text-red' : 'ct-text-amber'}>
-                {s ? s.status?.toUpperCase() : statusLabel}
-              </strong>
-            </div>
-            <div className="ct-shipment-detail__field">
-              <span>Llegada</span>
-              <strong>{arrivalLabel}</strong>
-            </div>
-          </div>
-
-          {selectedAircraft && !s && (
-            <button onClick={onCancelFlight} style={{
-              width: '100%', marginTop: 6, padding: '5px', borderRadius: 4,
-              background: 'rgba(239,68,68,0.12)', border: '1px solid rgba(239,68,68,0.25)',
-              color: '#fca5a5', fontSize: 11, fontWeight: 700, cursor: 'pointer',
-            }}>
-              🚫 Cancelar / Reprogramar Vuelo
-            </button>
-          )}
-
-          {s?.route && s.route.length > 0 && (
-            <div className="ct-config-section">
-              <p className="ct-config-section__title">🗺️ PLAN DE VIAJE</p>
-              <div className="ct-travel-plan">
-                {s.route.map((hop, i) => (
-                  <div key={i} className="ct-travel-stop">
-                    <div className="ct-travel-stop__dot" />
-                    <div className="ct-travel-stop__info">
-                      <strong>Vuelo: {hop.id}</strong>
-                      <span>Tramo: {hop.from} → {hop.to}</span>
-                      <span>Dep: {hop.dep} | Arr: {hop.arr}</span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {selectedAircraft && !s && (
-            <div className="ct-config-section">
-              <p className="ct-config-section__title">🗺️ PLAN DE VIAJE</p>
-              <div className="ct-travel-plan">
-                {travelPlan.map((stop, i) => (
-                  <div key={i} className={`ct-travel-stop ct-travel-stop--${stop.status === 'completado' ? 'done' : stop.status === 'en escala' ? 'current' : 'pending'}`}>
-                    <div className="ct-travel-stop__dot" />
-                    <div className="ct-travel-stop__info">
-                      <strong>{stop.airport}</strong>
-                      <span>{stop.label}: {stop.time}</span>
-                    </div>
-                    <span className={`ct-travel-stop__status ct-travel-stop__status--${stop.status === 'completado' ? 'done' : stop.status === 'en escala' ? 'current' : 'pending'}`}>
-                      {stop.status}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          
-          {s && !s.isLocal && (
-            <div style={{ marginTop: '8px', fontSize: '9px', color: '#94a3b8', fontStyle: 'italic', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '6px' }}>
-              * Envío histórico (no está en telemetría activa).
-            </div>
-          )}
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ color: '#94a3b8', fontSize: '9px', textTransform: 'uppercase', marginBottom: '2px' }}>Carga confirmada</div>
+          <strong style={{ fontSize: '12px', color: selectedAircraft.ocupacionReal >= selectedAircraft.capacidadMax ? '#ef4444' : '#a7f3d0' }}>
+            {bagsLabel} maletas
+          </strong>
         </div>
-      )}
+      </div>
     </aside>
-  )
+  );
 }
 
 export default ShipmentDetailPanel;

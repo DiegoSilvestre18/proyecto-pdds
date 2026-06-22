@@ -11,6 +11,7 @@ import TopAirportsPanel from "./components/floating/TopAirportsPanel";
 import TransitInventoryPanel from "./components/floating/TransitInventoryPanel";
 import AlgorithmComparisonPanel from "./components/floating/AlgorithmComparisonPanel";
 import ShipmentDetailPanel from "./components/floating/ShipmentDetailPanel";
+import AirportDetailPanel from "./components/floating/AirportDetailPanel";
 import FlightCancellationPanel from "./components/scenarios/FlightCancellationPanel";
 import ReportsPanel from "./components/floating/ReportsPanel";
 import EntitiesListPanel from "./components/floating/EntitiesListPanel";
@@ -50,6 +51,7 @@ const App = () => {
     liveStatus,
     selectedAircraftId,
     selectedAirportCode,
+    setSelectedAirportCode,
     selectedFromAirport,
     selectedToAirport,
     selectedAlgorithm,
@@ -78,7 +80,7 @@ const App = () => {
   } = useControlTowerController();
 
   // ── Paso 4: Sincronizar Track & Trace con el SelectionBridge ──
-  const { setTrackedRoute } = useSelectionBridge();
+  const { setTrackedRoute, clearFocusedEntity } = useSelectionBridge();
   React.useEffect(() => {
     if (trackedRouteData) {
       setTrackedRoute(trackedRouteData);
@@ -230,15 +232,12 @@ const App = () => {
       <ShipmentDetailPanel 
         isVisible={!!currentFlight || !!searchedShipment} 
         selectedAircraft={currentFlight}
-        searchedShipment={searchedShipment} 
-        onSearch={searchShipment}
-        isSearching={isSearching}
-        onCancelFlight={() => {
-          if (selectedAircraftId) {
-            if (!isWindowOpen("cancellation")) handleToggleWindow("cancellation");
-            handleFocusWindow("cancellation");
-          }
-        }}
+      />
+      <AirportDetailPanel
+        isVisible={!!selectedAirportCode}
+        selectedAirport={airportNodes.find(a => a.icao === selectedAirportCode)}
+        metrics={activeMetrics[selectedAirportCode]}
+        currentEpochTime={liveStatus?.interpolatedTime || currentEpochTime}
       />
       {isWindowOpen("reports") && (
         <DraggableWindow title="Reportes y Exportación" onClose={() => handleToggleWindow("reports")} initialPosition={{x: window.innerWidth / 2 - 200, y: window.innerHeight / 2 - 150}} isActive={openWindowsQueue[openWindowsQueue.length-1] === "reports"} onFocus={() => handleFocusWindow("reports")}>
@@ -286,6 +285,7 @@ const App = () => {
             </div>
           )}
 
+          {console.log("App render, selectedAirportCode:", selectedAirportCode)}
           <WorldMap
             isDayToDay={activeTab === 'vivo'}
             airports={airportNodes}
@@ -297,13 +297,14 @@ const App = () => {
             selectedAirportCode={selectedAirportCode}
             selectedFromAirport={selectedFromAirport}
             selectedToAirport={selectedToAirport}
-            onAirportSelect={() => {
-                // Ya no abrimos ventanas automáticamente para ahorrar memoria y ruido visual
+            onAirportSelect={(code) => {
+                setSelectedAirportCode(code);
+                setSelectedAircraftId(null);
             }}
             selectedAircraftId={selectedAircraftId}
             onAircraftSelect={(id) => {
                 setSelectedAircraftId(id);
-                // La tarjeta inferior de ShipmentDetailPanel reacciona automáticamente a selectedAircraftId
+                setSelectedAirportCode(null);
             }}
             showCityLabels={activeAircraft.length < 80}
             zoom={mapZoom}
@@ -316,7 +317,11 @@ const App = () => {
             systemClock={summary.systemClock}
             simState={simState}
             isDayToDay={activeTab === "vivo"}
-            onBackgroundClick={() => setSelectedAircraftId(null)}
+            onBackgroundClick={() => {
+              setSelectedAircraftId(null);
+              setSelectedAirportCode(null);
+              clearFocusedEntity();
+            }}
             />
 
           <DayToDayConfig
