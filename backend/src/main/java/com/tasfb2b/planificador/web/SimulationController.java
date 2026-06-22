@@ -92,7 +92,13 @@ public class SimulationController {
                 effectiveStartTime = "00:00";
             }
         }
-
+        if (isRealTime) {
+            effectiveStartTime = java.time.LocalTime
+                    .now(ZoneOffset.UTC)
+                    .withSecond(0)
+                    .withNano(0)
+                    .toString();
+        }
         log.info("isRealTime={}", isRealTime);
         log.info("effectiveStartTime={}", effectiveStartTime);
         log.info("fechaInicio={}", fechaInicio);
