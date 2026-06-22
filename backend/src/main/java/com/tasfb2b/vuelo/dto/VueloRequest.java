@@ -4,11 +4,11 @@ import jakarta.validation.constraints.*;
 
 public record VueloRequest(
 
-        @NotNull
-        Long origenId,
+        @NotBlank
+        String origenIcao,
 
-        @NotNull
-        Long destinoId,
+        @NotBlank
+        String destinoIcao,
 
         @NotNull @Min(1)
         Integer capacity,
