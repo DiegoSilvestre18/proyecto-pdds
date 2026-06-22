@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { AIRPORTS } from '../../data/airportsData';
 import { apiFetch } from '../../hooks/api';
 
-const FlightManagement = () => {
+const FlightManagement = ({ flights, setFlights }) => {
     const [status, setStatus] = useState({ type: '', message: '' });
 
     const [entryMode, setEntryMode] = useState('manual');
@@ -14,7 +14,28 @@ const FlightManagement = () => {
         departureTime: '',
         arrivalTime: ''
     });
+    const fetchFlights = async () => {
+        try {
+            const res = await apiFetch('/api/v1/vuelos/search');
 
+            if (!res.ok) {
+                setStatus({
+                    type: 'error',
+                    message: 'Error cargando vuelos'
+                });
+                return;
+            }
+
+            const data = await res.json();
+            setFlights(data);
+
+        } catch (err) {
+            setStatus({
+                type: 'error',
+                message: 'Error de conexión al obtener vuelos'
+            });
+        }
+    };
     const handleUpload = (e) => {
         e.preventDefault();
         setStatus({ type: 'success', message: 'Archivo de vuelos cargado temporalmente.' });
@@ -71,7 +92,6 @@ const FlightManagement = () => {
             );
 
             if (response.ok) {
-
                 setStatus({
                     type: 'success',
                     message: 'Vuelo creado correctamente.'
@@ -84,6 +104,7 @@ const FlightManagement = () => {
                     departureTime: '',
                     arrivalTime: ''
                 });
+                await fetchFlights();
 
             } else {
 
