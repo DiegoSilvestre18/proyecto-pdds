@@ -63,7 +63,23 @@ function ShipmentDetailPanel({
   ] : [];
 
   return (
-    <aside className="ct-panel--shipment" aria-label="Detalle de envío">
+    <aside 
+      className="ct-panel--shipment" 
+      aria-label="Detalle de envío"
+      style={{
+        position: 'fixed',
+        bottom: '24px',
+        right: '24px',
+        width: '320px',
+        background: 'rgba(15, 23, 42, 0.95)',
+        backdropFilter: 'blur(12px)',
+        border: '1px solid rgba(96, 165, 250, 0.4)',
+        borderRadius: '8px',
+        padding: '16px',
+        zIndex: 1000,
+        boxShadow: '0 10px 30px rgba(0,0,0,0.5)'
+      }}
+    >
       <div style={{ padding: '0 0 4px', fontSize: '9px', color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
         DETALLE DE ENVÍO {s?.isLocal ? '⚡ ACTIVO' : '🏛️ HISTÓRICO'}
       </div>
