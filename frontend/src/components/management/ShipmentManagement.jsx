@@ -6,6 +6,7 @@ const ShipmentManagement = () => {
     const [globalOrigenIcao, setGlobalOrigenIcao] = useState('');
     const [trayShipments, setTrayShipments] = useState([]);
     const [selectedFile, setSelectedFile] = useState(null);
+    const [entryMode, setEntryMode] = useState('manual');
 
     // Manual form state according to LEYENDA.md
     const [formData, setFormData] = useState({
@@ -162,10 +163,17 @@ const ShipmentManagement = () => {
                 <div style={{ display: 'flex', gap: '1.5rem', flexWrap: 'wrap' }}>
                     
                     {/* LEFT PANEL: MANUAL & TXT ENTRY */}
-                    <div style={{ flex: '1 1 400px', display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+                    <div style={{ flex: '1 1 400px', display: 'flex', flexDirection: 'column' }}>
+                        
+                        {/* TOGGLE MANUAL / TXT */}
+                        <div style={toggleContainerStyle}>
+                            <button type="button" onClick={() => setEntryMode('manual')} style={toggleBtnStyle(entryMode === 'manual')}>Ingreso Manual</button>
+                            <button type="button" onClick={() => setEntryMode('txt')} style={toggleBtnStyle(entryMode === 'txt')}>Masivo por TXT</button>
+                        </div>
                         
                         {/* MANUAL ENTRY */}
-                        <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255,255,255,0.1)', padding: '1.2rem', borderRadius: '8px' }}>
+                        {entryMode === 'manual' && (
+                            <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255,255,255,0.1)', padding: '1.2rem', borderRadius: '8px', marginBottom: '1.5rem' }}>
                             <h3 style={{ margin: '0 0 1rem 0', color: '#e2e8f0', fontSize: '14px' }}>Ingreso Manual</h3>
                             <form onSubmit={handleAddToTray} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                                 
@@ -209,10 +217,12 @@ const ShipmentManagement = () => {
                                     </button>
                                 </div>
                             </form>
-                        </div>
+                            </div>
+                        )}
 
                         {/* TXT UPLOAD */}
-                        <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px dashed rgba(148, 163, 184, 0.3)', padding: '1.2rem', borderRadius: '8px' }}>
+                        {entryMode === 'txt' && (
+                            <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px dashed rgba(148, 163, 184, 0.3)', padding: '1.2rem', borderRadius: '8px', marginBottom: '1.5rem' }}>
                             <h3 style={{ margin: '0 0 0.5rem 0', color: '#e2e8f0', fontSize: '14px' }}>Carga Masiva (.TXT)</h3>
                             <p style={{ margin: '0 0 1rem 0', fontSize: '11px', color: '#94a3b8' }}>
                                 Formato: <code>id_pedido-aaaammdd-hh-mm-dest-###-IdCliente</code>
@@ -223,7 +233,8 @@ const ShipmentManagement = () => {
                                     {loading ? 'PROCESANDO...' : `SUBIR ARCHIVO`}
                                 </button>
                             )}
-                        </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* RIGHT PANEL: TRAY */}
@@ -309,6 +320,13 @@ const getStatusStyle = (type) => ({
     background: type === 'success' ? 'rgba(16,185,129,0.1)' : type === 'error' ? 'rgba(239,68,68,0.1)' : 'rgba(56,189,248,0.1)',
     border: `1px solid ${type === 'success' ? '#10b981' : type === 'error' ? '#ef4444' : '#38bdf8'}`,
     color: type === 'success' ? '#34d399' : type === 'error' ? '#f87171' : '#7dd3fc'
+});
+
+const toggleContainerStyle = { display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', background: 'rgba(15, 23, 42, 0.5)', padding: '6px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' };
+const toggleBtnStyle = (active) => ({
+    flex: 1, padding: '10px 16px', borderRadius: '6px', border: 'none', cursor: 'pointer', fontSize: '13px', fontWeight: 'bold', transition: 'all 0.2s',
+    background: active ? '#38bdf8' : 'transparent',
+    color: active ? '#0f172a' : '#94a3b8'
 });
 
 export default ShipmentManagement;

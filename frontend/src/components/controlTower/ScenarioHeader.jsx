@@ -16,25 +16,7 @@ const ScenarioHeader = ({
       <div className="ct-brand">
         <p className="ct-title">Control Tower</p>
         <nav className="ct-tabs" aria-label="Escenarios de operación">
-          <button
-            type="button"
-            onClick={() => navigate('/')}
-            style={{ 
-                background: '#f8fbff', 
-                color: '#1a3556', 
-                border: '1px solid #a8b8cb', 
-                borderRadius: '6px', 
-                padding: '6px 14px', 
-                marginRight: '16px', 
-                fontSize: '12px', 
-                fontWeight: 'bold',
-                cursor: 'pointer',
-                boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
-            }}
-            title="Volver al panel para inyectar más vuelos o envíos mientras corre la simulación"
-          >
-            Añadir Data Adicional
-          </button>
+
           {tabs.map((tab) => (
             <button
               key={tab.key}
@@ -50,6 +32,7 @@ const ScenarioHeader = ({
       </div>
 
       <div className="ct-header-actions">
+
         <div className={`ct-session ${isCollapseScenario ? "ct-session--danger" : ""}`}>
           {isCollapseScenario ? "⚠ Modo Colapso" : "Sesión Activa"}
         </div>
@@ -87,6 +70,37 @@ const ScenarioHeader = ({
             </div>
           )}
         </div>
+
+        <button
+          onClick={() => {
+            sessionStorage.removeItem('userRole');
+            navigate('/');
+          }}
+          style={{
+            background: 'transparent',
+            color: '#ef4444',
+            border: '1px solid rgba(239, 68, 68, 0.5)',
+            borderRadius: '6px',
+            padding: '6px 14px',
+            cursor: 'pointer',
+            fontWeight: 'bold',
+            fontSize: '12px',
+            transition: 'all 0.2s',
+            marginLeft: '12px'
+          }}
+          onMouseEnter={(e) => {
+            e.target.style.color = '#ffffff';
+            e.target.style.background = '#ef4444';
+            e.target.style.borderColor = '#ef4444';
+          }}
+          onMouseLeave={(e) => {
+            e.target.style.color = '#ef4444';
+            e.target.style.background = 'transparent';
+            e.target.style.borderColor = 'rgba(239, 68, 68, 0.5)';
+          }}
+        >
+          Cerrar Sesión
+        </button>
       </div>
     </header>
   );
