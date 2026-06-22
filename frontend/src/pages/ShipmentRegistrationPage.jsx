@@ -175,7 +175,7 @@ const ShipmentRegistrationPage = ({ hideBackButton = false }) => {
         }}>
             {!hideBackButton && (
                 <button
-                    onClick={() => navigate('/')}
+                    onClick={() => navigate('/registro-datos')}
                     style={{
                         marginBottom: '2rem', background: 'rgba(56, 189, 248, 0.1)',
                         color: '#38bdf8',
@@ -187,7 +187,7 @@ const ShipmentRegistrationPage = ({ hideBackButton = false }) => {
                         transition: 'all 0.2s'
                     }}
                 >
-                    ← Volver al Mapa de Control
+                    ← Volver al Panel Principal
                 </button>
             )}
 

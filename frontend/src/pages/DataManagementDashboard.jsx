@@ -8,15 +8,15 @@ const DataManagementDashboard = () => {
     const [activeTab, setActiveTab] = useState('envios');
     const navigate = useNavigate();
 
-    const handleSkipToMap = () => {
-        // Redirige al mapa sin registrar nada adicional
-        navigate('/map');
+    const handleLogout = () => {
+        sessionStorage.removeItem('userRole');
+        navigate('/');
     };
 
-    const handleIntegrationAndMap = () => {
-        // Aquí se dispara la petición al Backend H2 para consolidar los adiciones
-        console.log("Iniciando integración con ALNS y pasando al mapa...");
-        navigate('/map');
+    const handleIntegration = () => {
+        // Aquí se dispara la petición al Backend H2 para consolidar las adiciones
+        console.log("Iniciando integración de datos extra (sin navegar al mapa)...");
+        alert("Datos integrados exitosamente.");
     };
 
     return (
@@ -33,12 +33,12 @@ const DataManagementDashboard = () => {
                 {/* BOTONES DE ACCIÓN GLOBALES (Arriba para no perderse) */}
                 <div style={{ display: 'flex', gap: '12px' }}>
                     <button 
-                        onClick={handleSkipToMap}
+                        onClick={handleLogout}
                         style={{
                             padding: '8px 16px',
                             background: 'transparent',
-                            color: '#1c2b3a',
-                            border: '1px solid #1c2b3a',
+                            color: '#94a3b8',
+                            border: '1px solid #94a3b8',
                             borderRadius: '6px',
                             cursor: 'pointer',
                             fontWeight: 'bold',
@@ -46,25 +46,25 @@ const DataManagementDashboard = () => {
                             transition: 'all 0.2s'
                         }}
                     >
-                        Omitir y Ver Mapa
+                        Salir / Volver al Inicio
                     </button>
                     
                     <button 
-                        onClick={handleIntegrationAndMap}
+                        onClick={handleIntegration}
                         style={{
                             padding: '8px 16px',
-                            background: '#1c2b3a',
-                            color: '#e8edf2',
+                            background: '#38bdf8',
+                            color: '#0f172a',
                             border: 'none',
                             borderRadius: '6px',
                             cursor: 'pointer',
                             fontWeight: 'bold',
                             fontSize: '14px',
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                            boxShadow: '0 2px 10px rgba(56, 189, 248, 0.3)',
                             transition: 'all 0.2s'
                         }}
                     >
-                        + Integrar Datos y Ver Mapa
+                        + Integrar Datos Extra
                     </button>
                 </div>
             </header>
