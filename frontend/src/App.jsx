@@ -298,18 +298,12 @@ const App = () => {
             selectedFromAirport={selectedFromAirport}
             selectedToAirport={selectedToAirport}
             onAirportSelect={() => {
-                if (!isWindowOpen("entities")) handleToggleWindow("entities");
-                handleFocusWindow("entities");
+                // Ya no abrimos ventanas automáticamente para ahorrar memoria y ruido visual
             }}
             selectedAircraftId={selectedAircraftId}
             onAircraftSelect={(id) => {
                 setSelectedAircraftId(id);
-                if (!isWindowOpen("shipmentDetail")) handleToggleWindow("shipmentDetail");
-                handleFocusWindow("shipmentDetail");
-                if (id) {
-                    if (!isWindowOpen("entities")) handleToggleWindow("entities");
-                    handleFocusWindow("entities");
-                }
+                // La tarjeta inferior de ShipmentDetailPanel reacciona automáticamente a selectedAircraftId
             }}
             showCityLabels={activeAircraft.length < 80}
             zoom={mapZoom}
