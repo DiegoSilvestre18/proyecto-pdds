@@ -20,7 +20,7 @@ function formatFlightId(id) {
 
 function formatTimeWithDate(epoch) {
   if (!epoch) return '--';
-  return new Date(epoch).toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+  return new Date(epoch).toISOString().toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'UTC', timeZoneName: 'short'});
 }
 
 function ShipmentDetailPanel({ isVisible, selectedAircraft = null }) {      
