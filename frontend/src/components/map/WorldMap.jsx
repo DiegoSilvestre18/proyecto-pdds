@@ -193,22 +193,26 @@ const WorldMap = ({
   }, []);
 
   const nearbyOffsets = useMemo(() => {
-    const offsets = {};
-    for (let i = 0; i < airports.length; i++) {
-      for (let j = i + 1; j < airports.length; j++) {
-        const a = airports[i];
-        const b = airports[j];
-        const dLng = a.coordinates[0] - b.coordinates[0];
-        const dLat = a.coordinates[1] - b.coordinates[1];
-        const dist = Math.sqrt(dLng * dLng + dLat * dLat);
-        if (dist < 2.5) {
-          offsets[a.icao] = a.icao < b.icao ? 'left' : 'right';
-          offsets[b.icao] = a.icao < b.icao ? 'right' : 'left';
-        }
-      }
-    }
-    return offsets;
-  }, [airports]);
+    // Diccionario estático para evitar superposiciones en clusters densos.
+    // 'top': texto arriba del icono
+    // 'bottom': texto abajo (por defecto, pero se puede forzar)
+    // 'left' / 'right': a los costados
+    return {
+      "EKCH": "top",    // Copenhague (norte del cluster)
+      "EDDI": "left",   // Berlín (en el medio, lo tiramos a un lado)
+      "LOWW": "topRight", // Viena (arriba a la derecha)
+      "LDZA": "right",  // Zagreb (este)
+      
+      "OJAI": "left",
+      "OSDI": "right",
+      
+      "SABE": "left",
+      "SUAA": "right",
+      
+      "EHAM": "top",
+      "EBCI": "bottomLeft",
+    };
+  }, []);
 
   const getStrokeColor = (status, ocupacion = 0, capacidadMax = 0) => {
     switch (status) {
@@ -496,9 +500,9 @@ const WorldMap = ({
 
           {/* ── Lógica de atenuación (Focus) + Filtros + Estela ── */}
           {(() => {
-            const hasSelection = selectedAircraftId != null;
+            const hasAnySelection = selectedAircraftId != null || (selectedAirportCode != null && selectedAirportCode !== "");
             const isPlaneSelected = (planeId) => selectedAircraftId === planeId;
-            const getOpacity = (planeId, baseOpacity) => hasSelection ? (isPlaneSelected(planeId) ? baseOpacity : 0.15) : baseOpacity;
+            const getOpacity = (planeId, baseOpacity) => hasAnySelection ? (isPlaneSelected(planeId) ? baseOpacity : 0.1) : baseOpacity;
 
             return (
               <>
@@ -636,13 +640,7 @@ const WorldMap = ({
                         >
                           {planeIcon}
                         </text>
-                        {plane.ocupacionReal != null && plane.capacidadMax != null && (
-                          <text y={12} textAnchor="middle"
-                                style={{ fontSize: "7px", fill: "#cbd5e1", fontWeight: "bold",
-                                         paintOrder: "stroke fill", stroke: "#061828", strokeWidth: "1.5px" }}>
-                            {plane.ocupacionReal}/{plane.capacidadMax}
-                          </text>
-                        )}
+
                       </g>
                     </Marker>
                   );
@@ -658,9 +656,12 @@ const WorldMap = ({
             const maxCap     = metrics?.warehouseCapacity ?? metrics?.capacity ?? "—";
             const level      = stockBags === 0 && metrics ? "empty" : (metrics?.level ?? "green");
             const isSaturated= isCollapseScenario && metrics?.isSaturated;
-            const isSelected = focusedEntity?.type === 'airport' && focusedEntity?.id === airport.icao;
+            const hasAnySelection = selectedAircraftId != null || (selectedAirportCode != null && selectedAirportCode !== "");
+            const isAirportSelected = selectedAirportCode === airport.icao;
+            const isSelected = isAirportSelected || (focusedEntity?.type === 'airport' && focusedEntity?.id === airport.icao);
             const isHighlighted = highlightedId === airport.icao;
             const passesFilter = airportPassesFilter(airport.icao);
+            const isDimmed = hasAnySelection && !isSelected;
 
             return (
               <Marker key={airport.icao} coordinates={airport.coordinates}>
@@ -672,7 +673,9 @@ const WorldMap = ({
                   tabIndex={0}
                   aria-label={`Aeropuerto ${airport.icao}`}
                   title={`Aeropuerto ${airport.icao}\nStock: ${stockBags} maletas / Capacidad: ${maxCap}`}
-                  onClick={() => {
+                  onClick={(e) => {
+                    console.log("Airport clicked!", airport.icao);
+                    e.stopPropagation();
                     onAirportSelect(airport.icao);
                     // Paso 3: Notificar al bridge (Mapa→Panel)
                     setFocusedEntity('airport', airport.icao, 'map');
@@ -680,7 +683,7 @@ const WorldMap = ({
                   onKeyDown={(e) => e.key === "Enter" && onAirportSelect(airport.icao)}
                   style={{
                     cursor: "pointer",
-                    opacity: passesFilter ? 1 : 0.1,
+                    opacity: passesFilter ? (isDimmed ? 0.15 : 1) : 0.05,
                     transition: "opacity 0.3s ease",
                     pointerEvents: passesFilter ? "auto" : "none",
                   }}
@@ -713,24 +716,39 @@ const WorldMap = ({
                     <rect x="-0.75" y="4" width="1.5" height="3" rx="0.3" fill="#061828" opacity="0.5"/>
                   </g>
                   <rect x={-5} y={9} width={10} height={1.5} rx={0.5} fill="currentColor" opacity={0.5} />
-                  <text y={-13}
-                        textAnchor={nearbyOffsets[airport.icao] === 'left' ? 'end' : nearbyOffsets[airport.icao] === 'right' ? 'start' : 'middle'}
-                        x={nearbyOffsets[airport.icao] === 'left' ? -10 : nearbyOffsets[airport.icao] === 'right' ? 10 : 0}
-                        className="ct-airport-marker__label">
-                    {airport.icao}
-                  </text>
-                  <text y={22}
-                        textAnchor={nearbyOffsets[airport.icao] === 'left' ? 'end' : nearbyOffsets[airport.icao] === 'right' ? 'start' : 'middle'}
-                        x={nearbyOffsets[airport.icao] === 'left' ? -10 : nearbyOffsets[airport.icao] === 'right' ? 10 : 0}
-                        className="ct-airport-marker__city">
-                    {airport.city}
-                  </text>
-                  <text y={32}
-                        textAnchor={nearbyOffsets[airport.icao] === 'left' ? 'end' : nearbyOffsets[airport.icao] === 'right' ? 'start' : 'middle'}
-                        x={nearbyOffsets[airport.icao] === 'left' ? -10 : nearbyOffsets[airport.icao] === 'right' ? 10 : 0}
-                        className={`ct-airport-marker__inventory ct-airport-marker__inventory--${level}`}>
-                    {stockBags}/{maxCap}
-                  </text>
+                  {(() => {
+                    const offset = nearbyOffsets[airport.icao];
+                    let tAnchor = 'middle';
+                    let tX = 0;
+                    let tLabelY = -13, tCityY = 14, tInvY = 22;
+
+                    if (offset === 'left') { tAnchor = 'end'; tX = -10; tLabelY = -4; tCityY = 2; tInvY = 10; }
+                    else if (offset === 'right') { tAnchor = 'start'; tX = 10; tLabelY = -4; tCityY = 2; tInvY = 10; }
+                    else if (offset === 'top') { tLabelY = -28; tCityY = -22; tInvY = -14; }
+                    else if (offset === 'bottom') { tLabelY = 14; tCityY = 20; tInvY = 28; }
+                    else if (offset === 'topRight') { tAnchor = 'start'; tX = 8; tLabelY = -18; tCityY = -12; tInvY = -4; }
+                    else if (offset === 'topLeft') { tAnchor = 'end'; tX = -8; tLabelY = -18; tCityY = -12; tInvY = -4; }
+                    else if (offset === 'bottomRight') { tAnchor = 'start'; tX = 8; tLabelY = 8; tCityY = 14; tInvY = 22; }
+                    else if (offset === 'bottomLeft') { tAnchor = 'end'; tX = -8; tLabelY = 8; tCityY = 14; tInvY = 22; }
+
+                    return (
+                      <>
+                        <text y={tLabelY} textAnchor={tAnchor} x={tX} className="ct-airport-marker__label">
+                          {airport.icao}
+                        </text>
+                        <text y={tCityY} textAnchor={tAnchor} x={tX} className="ct-airport-marker__city">
+                          {airport.city}
+                        </text>
+                        <text y={tInvY} textAnchor={tAnchor} x={tX} className="ct-airport-marker__inventory"
+                              style={{ 
+                                fontSize: "7px", fill: "#cbd5e1", fontWeight: "bold",
+                                paintOrder: "stroke fill", stroke: "#061828", strokeWidth: "1.5px" 
+                              }}>
+                          {stockBags}/{maxCap}
+                        </text>
+                      </>
+                    );
+                  })()}
                 </g>
               </Marker>
             );
