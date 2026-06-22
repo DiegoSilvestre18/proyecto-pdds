@@ -1,13 +1,107 @@
 import React, { useState } from 'react';
+import { AIRPORTS } from '../../data/airportsData';
+import { apiFetch } from '../../hooks/api';
 
 const FlightManagement = () => {
     const [status, setStatus] = useState({ type: '', message: '' });
 
     const [entryMode, setEntryMode] = useState('manual');
 
+    const [flightData, setFlightData] = useState({
+        origenIcao: '',
+        destinoIcao: '',
+        capacity: '',
+        departureTime: '',
+        arrivalTime: ''
+    });
+
     const handleUpload = (e) => {
         e.preventDefault();
         setStatus({ type: 'success', message: 'Archivo de vuelos cargado temporalmente.' });
+    };
+    const timeToMinutes = (time) => {
+        const [h, m] = time.split(':').map(Number);
+        return h * 60 + m;
+    };
+
+    const handleInputChange = (e) => {
+        const { name, value } = e.target;
+
+        setFlightData(prev => ({
+            ...prev,
+            [name]: value
+        }));
+    };
+
+    const handleCreateFlight = async () => {
+
+        try {
+
+            if (
+                !flightData.origenIcao ||
+                !flightData.destinoIcao ||
+                !flightData.capacity ||
+                !flightData.departureTime ||
+                !flightData.arrivalTime
+            ) {
+                setStatus({
+                    type: 'error',
+                    message: 'Complete todos los campos.'
+                });
+                return;
+            }
+
+            const payload = {
+                origenIcao: flightData.origenIcao,
+                destinoIcao: flightData.destinoIcao,
+                capacity: Number(flightData.capacity),
+                departureMinute: timeToMinutes(flightData.departureTime),
+                arrivalMinute: timeToMinutes(flightData.arrivalTime)
+            };
+
+            const response = await apiFetch(
+                '/api/v1/vuelos/create',
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                }
+            );
+
+            if (response.ok) {
+
+                setStatus({
+                    type: 'success',
+                    message: 'Vuelo creado correctamente.'
+                });
+
+                setFlightData({
+                    origenIcao: '',
+                    destinoIcao: '',
+                    capacity: '',
+                    departureTime: '',
+                    arrivalTime: ''
+                });
+
+            } else {
+
+                const errorText = await response.text();
+
+                setStatus({
+                    type: 'error',
+                    message: errorText || 'No se pudo crear el vuelo.'
+                });
+            }
+
+        } catch (error) {
+
+            setStatus({
+                type: 'error',
+                message: 'Error de conexión con el servidor.'
+            });
+        }
     };
 
     return (
@@ -25,27 +119,87 @@ const FlightManagement = () => {
                     <form style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                         <div>
                             <label style={labelStyle}>ORIGEN (ICAO)</label>
-                            <input type="text" placeholder="Ej: SPJC" style={inputStyle} />
+                            <select
+                                name="origenIcao"
+                                value={flightData.origenIcao}
+                                onChange={handleInputChange}
+                                style={inputStyle}
+                            >
+                                <option value="">Seleccione origen...</option>
+
+                                {[...AIRPORTS]
+                                    .sort((a, b) => a.city.localeCompare(b.city))
+                                    .map(a => (
+                                        <option key={a.icao} value={a.icao}>
+                                            {a.city} ({a.icao})
+                                        </option>
+                                    ))
+                                }
+                            </select>
                         </div>
                         <div>
                             <label style={labelStyle}>DESTINO (ICAO)</label>
-                            <input type="text" placeholder="Ej: SBGR" style={inputStyle} />
+                            <select
+                                name="destinoIcao"
+                                value={flightData.destinoIcao}
+                                onChange={handleInputChange}
+                                style={inputStyle}
+                            >
+                                <option value="">Seleccione destino...</option>
+
+                                {[...AIRPORTS]
+                                    .sort((a, b) => a.city.localeCompare(b.city))
+                                    .map(a => (
+                                        <option key={a.icao} value={a.icao}>
+                                            {a.city} ({a.icao})
+                                        </option>
+                                    ))
+                                }
+                            </select>
                         </div>
                         <div>
                             <label style={labelStyle}>HORA SALIDA (HO:MO)</label>
-                            <input type="time" style={inputStyle} />
+                            <input
+                                type="time"
+                                name="departureTime"
+                                value={flightData.departureTime}
+                                onChange={handleInputChange}
+                                style={inputStyle}
+                            />
                         </div>
                         <div>
                             <label style={labelStyle}>HORA LLEGADA (HD:MD)</label>
-                            <input type="time" style={inputStyle} />
+                            <input
+                                type="time"
+                                name="arrivalTime"
+                                value={flightData.arrivalTime}
+                                onChange={handleInputChange}
+                                style={inputStyle}
+                            />
                         </div>
                         <div style={{ gridColumn: 'span 2' }}>
                             <label style={labelStyle}>CAPACIDAD (####)</label>
-                            <input type="number" placeholder="Ej: 250" style={inputStyle} />
+                            <input
+                                type="number"
+                                name="capacity"
+                                value={flightData.capacity}
+                                onChange={handleInputChange}
+                                placeholder="Ej: 250"
+                                style={inputStyle}
+                            />
                         </div>
                         <div style={{ gridColumn: 'span 2' }}>
-                            <button type="button" style={{...btnStylePrimary, background: 'rgba(255,255,255,0.05)', color: '#dbe6f2', border: '1px solid rgba(255,255,255,0.2)'}}>
-                                + Agregar Vuelo a la Bandeja
+                            <button
+                                type="button"
+                                onClick={handleCreateFlight}
+                                style={{
+                                    ...btnStylePrimary,
+                                    background: 'rgba(255,255,255,0.05)',
+                                    color: '#dbe6f2',
+                                    border: '1px solid rgba(255,255,255,0.2)'
+                                }}
+                            >
+                                Registrar Vuelo
                             </button>
                         </div>
                     </form>
