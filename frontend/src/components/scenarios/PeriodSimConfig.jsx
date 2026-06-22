@@ -23,20 +23,32 @@ function PeriodSimConfig({
   onAlgorithmChange,
   onStart,           // (dias: number, startDate: string) => void
   liveStatus,
-  sessionId,
   simState,
+  sessionId,
+  targetPlaybackMinutes,
+  setTargetPlaybackMinutes,
   onExportExcel,
   onExportMd,
+  onExportDetails,
   onReset,           // () => void — reinicia simState a idle
 }) {
   // ── Todos los hooks PRIMERO ───────────────────────────────────────────────
   const [day,        setDay]        = useState(1);
   const [month,      setMonth]      = useState(1);
   const [year,       setYear]       = useState(2026);
+  const [startTime,  setStartTime]  = useState("00:00");
+  const [destroyFraction, setDestroyFraction] = useState(20);
+  const [mutationRate, setMutationRate] = useState(15);
   const [isStarting, setIsStarting] = useState(false);
   const [preCancelledFlights, setPreCancelledFlights] = useState([]);
   const [tempFlightId, setTempFlightId] = useState("");
   const [tempDay, setTempDay] = useState("all");
+
+  const PLAYBACK_OPTIONS = [
+    { label: "Balanceado", value: 15, sub: "15 min" },
+    { label: "Análisis", value: 30, sub: "30 min" },
+    { label: "Detallado", value: 60, sub: "60 min" },
+  ];
 
   const daysInSel = month === 2 && year % 4 === 0 ? 29 : DAYS_IN_MONTH[month - 1];
   const startDate = `${year}-${pad(month)}-${pad(day)}`;
@@ -101,7 +113,7 @@ function PeriodSimConfig({
   const handleStart = async () => {
     if (!onStart) return;
     setIsStarting(true);
-    await onStart(DIAS_SIMULACION, startDate, preCancelledFlights);
+    await onStart(DIAS_SIMULACION, startDate, preCancelledFlights, startTime);
     setIsStarting(false);
   };
 
@@ -115,7 +127,7 @@ function PeriodSimConfig({
           <p className="ct-scenario-config__label">ESCENARIO ACTIVO</p>
           <h3 className="ct-scenario-config__title">Simulación de Periodo</h3>
         </div>
-        <button type="button" className="ct-scenario-config__close" onClick={onClose}>✕</button>
+          <button type="button" className="ct-scenario-config__close" onClick={onClose}>✕</button>
       </div>
 
       <div className="ct-scenario-config__body">
@@ -171,29 +183,34 @@ function PeriodSimConfig({
               </p>
             </div>
 
-            {/* Número de días — fijo en 5 */}
+{/* Hora de inicio */}
             <div className="ct-config-section">
-              <p className="ct-config-section__title">🗓 PERÍODO DE SIMULACIÓN</p>
-              <div style={{
-                display: "flex", alignItems: "center", justifyContent: "center",
-                gap: 12, marginTop: 8,
-                background: "rgba(99,102,241,0.08)", borderRadius: 8, padding: "12px",
-              }}>
-                <span style={{ fontSize: 32, fontWeight: 800, color: "#818cf8" }}>5</span>
-                <div>
-                  <p style={{ margin: 0, fontSize: 13, fontWeight: 600, color: "#e2e8f0" }}>días</p>
-                  <p style={{ margin: 0, fontSize: 10, color: "#475569" }}>valor académico fijo</p>
-                </div>
+              <p className="ct-config-section__title">🕒 HORA DE INICIO</p>
+              <div style={{ marginTop: 8 }}>
+                <input
+                  type="time"
+                  value={startTime}
+                  onChange={e => setStartTime(e.target.value)}
+                  style={{
+                    width: '100%', boxSizing: 'border-box',
+                    padding: '8px 10px', borderRadius: 7,
+                    background: '#f8fafc', border: '1px solid rgba(79,70,229,0.45)',
+                    color: '#1e293b', fontSize: 14, fontWeight: 600,
+                    colorScheme: 'light',
+                  }}
+                />
               </div>
             </div>
 
+            {/* Playback fijo en 30 min — sin controles visibles para el usuario */}
+
             {/* Selector de algoritmo */}
+            {/* EXPERIMENTAL MODE - DISABLED FOR BUSINESS UI
             <div className="ct-config-section">
               <p className="ct-config-section__title">⚡ ALGORITMO</p>
               <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                 {[
-                  { val: "alns", icon: "⚡", name: "ALNS", sub: "Adaptive Large Neighborhood" },
-                  { val: "hga",  icon: "🧬", name: "HGA",  sub: "Hybrid Genetic Algorithm" },
+                  { val: "alns", icon: "⚡", name: "ALNS", sub: "Adaptive Large Neighborhood Search" },
                 ].map(opt => (
                   <button key={opt.val} id={`period-algo-${opt.val}`} type="button"
                     onClick={() => onAlgorithmChange(opt.val)}
@@ -216,171 +233,9 @@ function PeriodSimConfig({
                 ))}
               </div>
             </div>
+            */}
 
-            {/* Configurar pre-cancelaciones */}
-            <div className="ct-config-section" style={{
-              background: 'rgba(15, 23, 42, 0.85)',
-              borderRadius: '12px',
-              border: '1px solid rgba(99, 102, 241, 0.3)',
-              padding: '14px 16px',
-            }}>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '6px',
-                marginBottom: '10px',
-                fontSize: '13px',
-                fontWeight: 600,
-                color: '#818cf8',
-                letterSpacing: '0.5px',
-              }}>
-                ⚙️ CANCELACIONES PROGRAMADAS (PREVIAS)
-              </div>
-              <p style={{ fontSize: '11px', color: '#64748b', margin: '0 0 12px 0', lineHeight: '1.4' }}>
-                Programa la cancelación de vuelos para un día específico o para todo el periodo.
-              </p>
-
-              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginBottom: '12px' }}>
-                <input
-                  type="number"
-                  placeholder="ID de vuelo"
-                  value={tempFlightId}
-                  onChange={(e) => setTempFlightId(e.target.value)}
-                  style={{
-                    flex: '1.5',
-                    background: 'rgba(30, 41, 59, 0.8)',
-                    border: '1px solid rgba(100, 116, 139, 0.4)',
-                    borderRadius: '8px',
-                    padding: '8px 10px',
-                    color: '#e2e8f0',
-                    fontSize: '12px',
-                    outline: 'none',
-                    minWidth: '70px',
-                  }}
-                />
-                <select
-                  value={tempDay}
-                  onChange={(e) => setTempDay(e.target.value)}
-                  style={{
-                    flex: '2',
-                    background: 'rgba(30, 41, 59, 0.8)',
-                    border: '1px solid rgba(100, 116, 139, 0.4)',
-                    borderRadius: '8px',
-                    padding: '8px 10px',
-                    color: '#e2e8f0',
-                    fontSize: '12px',
-                    outline: 'none',
-                  }}
-                >
-                  <option value="all">Todos los días</option>
-                  <option value="1">Día 1</option>
-                  <option value="2">Día 2</option>
-                  <option value="3">Día 3</option>
-                  <option value="4">Día 4</option>
-                  <option value="5">Día 5</option>
-                </select>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const fId = tempFlightId.trim();
-                    if (!fId) return;
-                    const entry = tempDay === "all" ? fId : `${fId}:${tempDay}`;
-                    if (!preCancelledFlights.includes(entry)) {
-                      setPreCancelledFlights([...preCancelledFlights, entry]);
-                    }
-                    setTempFlightId("");
-                  }}
-                  disabled={!tempFlightId}
-                  style={{
-                    flex: '1',
-                    background: !tempFlightId
-                      ? 'rgba(100, 116, 139, 0.4)'
-                      : 'linear-gradient(135deg, #6366f1 0%, #4f46e5 100%)',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: '8px',
-                    padding: '8px 12px',
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    cursor: !tempFlightId ? 'not-allowed' : 'pointer',
-                    transition: 'all 0.2s ease',
-                  }}
-                >
-                  ➕
-                </button>
-              </div>
-
-              {preCancelledFlights.length > 0 ? (
-                <div>
-                  <div style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', marginBottom: '6px' }}>
-                    Vuelos programados para cancelar:
-                  </div>
-                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                    {preCancelledFlights.map(entry => {
-                      const hasDay = entry.includes(":");
-                      const parts = entry.split(":");
-                      const fid = parts[0];
-                      const dayLabel = hasDay ? `Día ${parts[1]}` : "Todos";
-                      return (
-                        <div
-                          key={`pre-p-${entry}`}
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            background: 'rgba(239, 68, 68, 0.15)',
-                            border: '1px solid rgba(239, 68, 68, 0.3)',
-                            borderRadius: '20px',
-                            padding: '4px 10px',
-                            fontSize: '11px',
-                            color: '#ef4444',
-                            fontWeight: 700,
-                          }}
-                        >
-                          <span>Vuelo {fid} ({dayLabel})</span>
-                          <button
-                            type="button"
-                            onClick={() => setPreCancelledFlights(preCancelledFlights.filter(e => e !== entry))}
-                            style={{
-                              background: 'transparent',
-                              border: 'none',
-                              color: '#ef4444',
-                              cursor: 'pointer',
-                              fontWeight: 'bold',
-                              padding: 0,
-                              fontSize: '12px',
-                              lineHeight: 1,
-                            }}
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setPreCancelledFlights([])}
-                    style={{
-                      background: 'transparent',
-                      border: 'none',
-                      color: '#64748b',
-                      fontSize: '10px',
-                      cursor: 'pointer',
-                      marginTop: '10px',
-                      padding: 0,
-                      textDecoration: 'underline',
-                    }}
-                  >
-                    Limpiar lista
-                  </button>
-                </div>
-              ) : (
-                <div style={{ fontSize: '11px', color: '#64748b', fontStyle: 'italic', textAlign: 'center', padding: '8px 0' }}>
-                  Ningún vuelo programado.
-                </div>
-              )}
-            </div>
+            {/* Parámetros del algoritmo y cancelaciones — ocultos para usuario final */}
 
             {/* Botón iniciar */}
             <div style={{ paddingBottom: 8 }}>
@@ -390,18 +245,19 @@ function PeriodSimConfig({
                 onClick={handleStart}
                 disabled={isStarting}
                 style={{
-                  width: "100%", padding: "14px 0", borderRadius: 10, border: "none",
+                  width: "100%", padding: "11px 0", borderRadius: 8, border: "none",
                   background: isStarting
-                    ? "rgba(16,185,129,0.4)"
-                    : "linear-gradient(135deg, #10b981, #059669)",
-                  color: "white", fontWeight: 700, fontSize: 15, cursor: isStarting ? "default" : "pointer",
-                  letterSpacing: 1, boxShadow: "0 4px 20px rgba(16,185,129,0.35)",
-                  transition: "transform 0.15s",
+                    ? "rgba(5,150,105,0.4)"
+                    : "linear-gradient(135deg, #059669, #047857)",
+                  color: "white", fontWeight: 700, fontSize: 12, cursor: isStarting ? "default" : "pointer",
+                  letterSpacing: 0.8, boxShadow: "0 4px 16px rgba(5,150,105,0.32)",
+                  transition: "transform 0.15s, box-shadow 0.15s",
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                 }}
-                onMouseEnter={e => !isStarting && (e.currentTarget.style.transform = "translateY(-2px)")}
+                onMouseEnter={e => !isStarting && (e.currentTarget.style.transform = "translateY(-1px)")}
                 onMouseLeave={e => (e.currentTarget.style.transform = "translateY(0)")}
               >
-                {isStarting ? "⏳ Iniciando..." : `▶ EJECUTAR SIMULACIÓN — 5 DÍAS`}
+                {isStarting ? "⏳ Iniciando..." : "▶ EJECUTAR SIMULACIÓN — 5 DÍAS"}
               </button>
               {!onStart && (
                 <p style={{ fontSize: 11, color: "#f59e0b", marginTop: 6, textAlign: "center" }}>
@@ -420,15 +276,15 @@ function PeriodSimConfig({
             <div className="ct-config-section">
               <p className="ct-config-section__title">⏳ PROGRESO</p>
               <div style={{ margin: "10px 0" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 6, color: "#1a3a5a" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 6, color: "#cbd5e1" }}>
                   <span>Día {liveStatus?.currentDay ?? 0} / {liveStatus?.totalDays ?? DIAS_SIMULACION}</span>
-                  <span style={{ color: "#1a70c0", fontWeight: 700 }}>{liveStatus?.percent ?? 0}%</span>
+                  <span style={{ color: "#38bdf8", fontWeight: 700 }}>{liveStatus?.percent ?? 0}%</span>
                 </div>
-                <div style={{ height: 8, background: "rgba(10,60,110,0.1)", borderRadius: 4 }}>
+                <div style={{ height: 8, background: "rgba(255,255,255,0.08)", borderRadius: 4 }}>
                   <div style={{
                     height: "100%", borderRadius: 4,
                     width: `${liveStatus?.percent ?? 0}%`,
-                    background: "linear-gradient(90deg, #1a70c0, #0ca36e)",
+                    background: "linear-gradient(90deg, #38bdf8, #34d399)",
                     transition: "width 0.5s ease",
                   }} />
                 </div>
@@ -443,6 +299,8 @@ function PeriodSimConfig({
                   ["Ocupación global", `${liveStatus?.globalOccupancy?.toFixed(1) ?? 0}%`],
                   ["Nodos críticos",   liveStatus?.criticalNodes ?? 0],
                   ["Vuelos activos",   liveStatus?.activeRoutes?.length ?? 0],
+                  ["Salto Algoritmo (Sa)", `${liveStatus?.saMinutes ?? 10} min`],
+                  ["Latencia ALNS (Ta)", `${liveStatus?.taMs ?? 0} ms`],
                 ].map(([label, val]) => (
                   <div key={label} className="ct-progress-detail__item">
                     <span>{label}</span><strong>{val}</strong>
@@ -458,15 +316,15 @@ function PeriodSimConfig({
           <>
             {/* Encabezado */}
             <div style={{
-              background: "linear-gradient(135deg, rgba(5,150,105,0.08), rgba(4,120,87,0.05))",
-              border: "1px solid rgba(5,150,105,0.35)", borderRadius: 10,
+              background: "linear-gradient(135deg, rgba(5,150,105,0.15), rgba(4,120,87,0.1))",
+              border: "1px solid rgba(52,211,153,0.35)", borderRadius: 10,
               padding: "12px 14px", marginBottom: 12,
             }}>
-              <p style={{ color: "#065f46", fontWeight: 700, fontSize: 13, margin: 0 }}>
+              <p style={{ color: "#34d399", fontWeight: 700, fontSize: 13, margin: 0 }}>
                 ✅ SIMULACIÓN COMPLETADA
               </p>
-              <p style={{ fontSize: 11, color: "#374151", margin: "4px 0 0" }}>
-                Algoritmo: <strong style={{ color: "#1a3a6a" }}>{selectedAlgorithm?.toUpperCase()}</strong>
+              <p style={{ fontSize: 11, color: "#94a3b8", margin: "4px 0 0" }}>
+                Algoritmo: <strong style={{ color: "#60a5fa" }}>{selectedAlgorithm?.toUpperCase()}</strong>
                 {" · "}{reportMetrics.diasCount} días · {startDate}
               </p>
             </div>
@@ -474,8 +332,8 @@ function PeriodSimConfig({
             {/* Acumulados (simulacion) */}
             <RSection title="⚖️ ACUMULADOS BRUTOS (simulación)">
               <MRow label="Demanda total"       value={fmt(reportMetrics.totalDemanda)} />
-              <MRow label="Atendidas (cap)"     value={fmt(reportMetrics.atendidas)}    color="#065f46" />
-              <MRow label="No atendidas (Ecap)" value={fmt(reportMetrics.ecap)}         color="#b91c1c" />
+              <MRow label="Atendidas (cap)"     value={fmt(reportMetrics.atendidas)}    color="#34d399" />
+              <MRow label="No atendidas (Ecap)" value={fmt(reportMetrics.ecap)}         color="#f87171" />
             </RSection>
 
             {/* Demanda real de los archivos .txt */}
@@ -489,7 +347,7 @@ function PeriodSimConfig({
                   <MRow
                     label="Total real 5 días"
                     value={fmt(Object.values(liveStatus.dailyRealDemand).reduce((a,b) => a+b, 0))}
-                    color="#1a3a6a"
+                    color="#60a5fa"
                   />
                 </div>
               </RSection>
@@ -498,30 +356,30 @@ function PeriodSimConfig({
             {/* Promedios */}
             <RSection title="÷ PROMEDIOS DIARIOS">
               <MRow label="Demanda / día"   value={fmt(Math.round(reportMetrics.avgDemanda))} />
-              <MRow label="Atendidas / día" value={fmt(Math.round(reportMetrics.avgAtendidas))} color="#065f46" />
-              <MRow label="Ecap / día"      value={fmt(Math.round(reportMetrics.avgEcap))} color="#b91c1c" />
+              <MRow label="Atendidas / día" value={fmt(Math.round(reportMetrics.avgAtendidas))} color="#34d399" />
+              <MRow label="Ecap / día"      value={fmt(Math.round(reportMetrics.avgEcap))} color="#f87171" />
             </RSection>
 
             {/* KPIs */}
             <RSection title="📊 KPIs">
               <MRow label="Ocupación eff."     value={fmtPct(reportMetrics.ocupacion)} />
               <MRow label="Cumplimiento"        value={fmtPct(reportMetrics.cumplimiento)}
-                color={reportMetrics.cumplimiento >= 90 ? "#065f46" : "#b91c1c"} />
+                color={reportMetrics.cumplimiento >= 90 ? "#34d399" : "#f87171"} />
               <MRow label="Sat. aeroportuaria"  value={fmtPct(reportMetrics.saturacion)}
-                color={reportMetrics.saturacion > 100 ? "#b91c1c" : "#92400e"} />
+                color={reportMetrics.saturacion > 100 ? "#f87171" : "#fbbf24"} />
             </RSection>
 
             {/* Fitness Score */}
             <div style={{
-              background: "linear-gradient(135deg, rgba(79,70,229,0.07), rgba(99,102,241,0.04))",
-              border: "1px solid rgba(79,70,229,0.25)", borderRadius: 10,
+              background: "linear-gradient(135deg, rgba(129,140,248,0.1), rgba(99,102,241,0.05))",
+              border: "1px solid rgba(129,140,248,0.25)", borderRadius: 10,
               padding: "12px 14px", marginBottom: 12,
             }}>
-              <p style={{ fontSize: 10, color: "#4338ca", margin: "0 0 3px", fontWeight: 700 }}>🧠 FITNESS SCORE</p>
-              <p style={{ fontSize: 9, color: "#6b7280", margin: "0 0 8px" }}>10A − 0.005Ecap − 2Dh − 12Saero</p>
+              <p style={{ fontSize: 10, color: "#a78bfa", margin: "0 0 3px", fontWeight: 700 }}>🧠 FITNESS SCORE</p>
+              <p style={{ fontSize: 9, color: "#94a3b8", margin: "0 0 8px" }}>10A − 0.005Ecap − 2Dh − 12Saero</p>
               <p style={{
                 fontSize: 24, fontWeight: 800, margin: 0,
-                color: reportMetrics.score >= 0 ? "#065f46" : "#b91c1c",
+                color: reportMetrics.score >= 0 ? "#34d399" : "#f87171",
               }}>
                 {Number(reportMetrics.score).toLocaleString("es-PE", { maximumFractionDigits: 1 })}
               </p>
@@ -532,20 +390,20 @@ function PeriodSimConfig({
               <RSection title="📅 DESGLOSE POR DÍA">
                 <table style={{ width: "100%", fontSize: 10, borderCollapse: "collapse" }}>
                   <thead>
-                    <tr style={{ color: "#3a5a78" }}>
+                    <tr style={{ color: "#94a3b8" }}>
                       {["Día","Demanda","Atend.","Ecap","SLA"].map(h => (
-                        <th key={h} style={{ textAlign: "right", padding: "4px 4px", borderBottom: "1px solid rgba(10,60,110,0.12)" }}>{h}</th>
+                        <th key={h} style={{ textAlign: "right", padding: "4px 4px", borderBottom: "1px solid rgba(255,255,255,0.1)" }}>{h}</th>
                       ))}
                     </tr>
                   </thead>
                   <tbody>
                     {reportMetrics.byDay.map(d => (
-                      <tr key={d.dia} style={{ background: d.colapsed ? "rgba(220,38,38,0.06)" : "transparent" }}>
-                        <td style={{ textAlign: "right", padding: "3px 4px", color: d.colapsed ? "#b91c1c" : "#0a2a4a", fontWeight: 600 }}>{d.dia}{d.colapsed ? " ⚠" : ""}</td>
-                        <td style={{ textAlign: "right", padding: "3px 4px", color: "#374151" }}>{(d.demanda/1000).toFixed(0)}k</td>
-                        <td style={{ textAlign: "right", padding: "3px 4px", color: "#065f46", fontWeight: 600 }}>{(d.atendidas/1000).toFixed(0)}k</td>
-                        <td style={{ textAlign: "right", padding: "3px 4px", color: "#b91c1c" }}>{(d.ecap/1000).toFixed(0)}k</td>
-                        <td style={{ textAlign: "right", padding: "3px 4px", color: "#92400e", fontWeight: 600 }}>{d.sla.toFixed(1)}%</td>
+                      <tr key={d.dia} style={{ background: d.colapsed ? "rgba(248,113,113,0.15)" : "transparent" }}>
+                        <td style={{ textAlign: "right", padding: "3px 4px", color: d.colapsed ? "#fca5a5" : "#cbd5e1", fontWeight: 600 }}>{d.dia}{d.colapsed ? " ⚠" : ""}</td>
+                        <td style={{ textAlign: "right", padding: "3px 4px", color: "#e2e8f0" }}>{(d.demanda/1000).toFixed(0)}k</td>
+                        <td style={{ textAlign: "right", padding: "3px 4px", color: "#34d399", fontWeight: 600 }}>{(d.atendidas/1000).toFixed(0)}k</td>
+                        <td style={{ textAlign: "right", padding: "3px 4px", color: "#f87171" }}>{(d.ecap/1000).toFixed(0)}k</td>
+                        <td style={{ textAlign: "right", padding: "3px 4px", color: "#fbbf24", fontWeight: 600 }}>{d.sla.toFixed(1)}%</td>
                       </tr>
                     ))}
                   </tbody>
@@ -581,9 +439,21 @@ function PeriodSimConfig({
                   📝 Exportar Reporte (.md)
                 </button>
               )}
+              {onExportDetails && (
+                <button id="period-btn-export-details" type="button"
+                  onClick={() => onExportDetails(sessionId)}
+                  style={{
+                    padding: "11px 0", borderRadius: 8, border: "none",
+                    background: "linear-gradient(135deg, #0f172a, #1e293b)",
+                    color: "white", fontWeight: 700, fontSize: 13, cursor: "pointer",
+                    boxShadow: "0 4px 15px rgba(15, 23, 42, 0.35)",
+                  }}
+                >
+                  ✈️ Reporte Detallado de Vuelos
+                </button>
+              )}
               <button id="period-btn-new" type="button"
                 onClick={() => {
-                  setPreCancelledFlights([]);
                   if (onReset) onReset();
                 }}
                 style={{
@@ -607,9 +477,9 @@ function PeriodSimConfig({
 // ── Sub-componentes ───────────────────────────────────────────────────────────
 function RSection({ title, children }) {
   return (
-    <div style={{ background: "rgba(10,60,110,0.05)", borderRadius: 8, padding: "10px 12px", marginBottom: 10,
-                  border: "1px solid rgba(10,60,110,0.1)" }}>
-      <p style={{ fontSize: 10, fontWeight: 700, color: "#3a5a78", margin: "0 0 8px", letterSpacing: 1 }}>{title}</p>
+    <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 8, padding: "10px 12px", marginBottom: 10,
+                  border: "1px solid rgba(255,255,255,0.08)" }}>
+      <p style={{ fontSize: 10, fontWeight: 700, color: "#94a3b8", margin: "0 0 8px", letterSpacing: 1 }}>{title}</p>
       {children}
     </div>
   );
@@ -618,17 +488,10 @@ function RSection({ title, children }) {
 function MRow({ label, value, color }) {
   return (
     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 5 }}>
-      <span style={{ fontSize: 11, color: "#4a6a85" }}>{label}</span>
-      <span style={{ fontSize: 12, fontWeight: 700, color: color ?? "#0a2a4a" }}>{value}</span>
+      <span style={{ fontSize: 11, color: "#cbd5e1" }}>{label}</span>
+      <span style={{ fontSize: 12, fontWeight: 700, color: color ?? "#f8fafc" }}>{value}</span>
     </div>
   );
 }
-
-const btnSm = {
-  width: 32, height: 32, borderRadius: 6, border: "1px solid rgba(255,255,255,0.1)",
-  background: "rgba(255,255,255,0.07)", color: "#e2e8f0",
-  fontSize: 18, fontWeight: 700, cursor: "pointer",
-  display: "flex", alignItems: "center", justifyContent: "center",
-};
 
 export default PeriodSimConfig;

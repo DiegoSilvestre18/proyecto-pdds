@@ -1,94 +1,107 @@
-const MOCK_PLAN = [
-  { airport: 'LIM', arrived: '2026-04-09 08:00', departed: '2026-04-09 08:25', status: 'completado' },
-  { airport: 'BOG', arrived: '2026-04-09 14:30', departed: '2026-04-09 14:55', status: 'completado' },
-  { airport: 'IAD', arrived: '2026-04-10 02:10', departed: '2026-04-10 02:35', status: 'completado' },
-  { airport: 'LHR', arrived: '2026-04-10 14:00', departed: '—', status: 'en escala' },
-  { airport: 'MAD', arrived: '—', departed: '—', status: 'pendiente' },
-]
+import React from 'react';
 
-const REPLAN_HISTORY = [
-  { date: '2026-04-09 18:42', reason: 'Cancelación vuelo BOG→MEX', oldRoute: 'LIM→BOG→MEX→MAD', newRoute: 'LIM→BOG→IAD→LHR→MAD' },
-]
+const STATUS_LABELS = {
+  normal: "En tránsito",
+  high: "Carga alta",
+  critical: "Crítico",
+  blocked: "Bloqueado",
+  rescued: "Rescatado",
+  cancelled: "Cancelado",
+};
 
-function ShipmentDetailPanel({ isVisible, onHide }) {
-  if (!isVisible) {
-    return null
+function formatFlightId(id) {
+  if (!id) return "--";
+  const parts = id.split('-');
+  if (parts.length >= 2) {
+    return `${parts[0].toUpperCase()}-${parts[1]}`;
   }
-
-  return (
-    <aside className="ct-panel ct-panel--shipment" aria-label="Detalle de envío">
-      <div className="ct-panel-header">
-        <p>DETALLE DE ENVÍO</p>
-        <button type="button" className="ct-panel-close" onClick={onHide}>
-          Ocultar
-        </button>
-      </div>
-
-      <div className="ct-shipment-detail">
-        <div className="ct-shipment-detail__summary">
-          <div className="ct-shipment-detail__field">
-            <span>ID Envío</span>
-            <strong>ENV-10421</strong>
-          </div>
-          <div className="ct-shipment-detail__field">
-            <span>Aerolínea</span>
-            <strong>LATAM Airlines</strong>
-          </div>
-          <div className="ct-shipment-detail__field">
-            <span>Ruta</span>
-            <strong>LIM → MAD</strong>
-          </div>
-          <div className="ct-shipment-detail__field">
-            <span>Maletas</span>
-            <strong>12</strong>
-          </div>
-          <div className="ct-shipment-detail__field">
-            <span>Estado</span>
-            <strong className="ct-text-amber">En tránsito</strong>
-          </div>
-          <div className="ct-shipment-detail__field">
-            <span>ETA</span>
-            <strong>2026-04-10 18:00 UTC</strong>
-          </div>
-        </div>
-
-        <div className="ct-config-section">
-          <p className="ct-config-section__title">🗺️ PLAN DE VIAJE</p>
-          <div className="ct-travel-plan">
-            {MOCK_PLAN.map((stop, i) => (
-              <div key={i} className={`ct-travel-stop ct-travel-stop--${stop.status === 'completado' ? 'done' : stop.status === 'en escala' ? 'current' : 'pending'}`}>
-                <div className="ct-travel-stop__dot" />
-                <div className="ct-travel-stop__info">
-                  <strong>{stop.airport}</strong>
-                  <span>Llegada: {stop.arrived}</span>
-                  <span>Salida: {stop.departed}</span>
-                </div>
-                <span className={`ct-travel-stop__status ct-travel-stop__status--${stop.status === 'completado' ? 'done' : stop.status === 'en escala' ? 'current' : 'pending'}`}>
-                  {stop.status}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {REPLAN_HISTORY.length > 0 && (
-          <div className="ct-config-section">
-            <p className="ct-config-section__title">🔄 HISTORIAL REPLANIFICACIÓN</p>
-            {REPLAN_HISTORY.map((r, i) => (
-              <div key={i} className="ct-replan-entry">
-                <span className="ct-replan-entry__date">{r.date}</span>
-                <p className="ct-replan-entry__reason">{r.reason}</p>
-                <div className="ct-replan-entry__routes">
-                  <span className="ct-replan-entry__old">❌ {r.oldRoute}</span>
-                  <span className="ct-replan-entry__new">✅ {r.newRoute}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </aside>
-  )
+  return id;
 }
 
-export default ShipmentDetailPanel
+function formatTimeWithDate(epoch) {
+  if (!epoch) return '--';
+  return new Date(epoch).toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+}
+
+function ShipmentDetailPanel({ isVisible, selectedAircraft = null }) {      
+  if (!isVisible || !selectedAircraft) {
+    return null;
+  }
+
+  const statusLabel = STATUS_LABELS[selectedAircraft.status] ?? selectedAircraft.status ?? "En vuelo";
+  const bagsLabel = `${selectedAircraft.ocupacionReal} / ${selectedAircraft.capacidadMax}`;
+  const depTime = formatTimeWithDate(selectedAircraft.departureTime);
+  const arrTime = formatTimeWithDate(selectedAircraft.arrivalTime);
+  
+  const progressPct = Math.min(100, Math.max(0, Math.round((selectedAircraft.progress ?? 0) * 100)));
+
+  return (
+    <aside 
+      className="ct-panel--shipment" 
+      aria-label="Detalle de Vuelo"
+      style={{
+        position: 'fixed',
+        bottom: '24px',
+        right: '24px',
+        width: '360px',
+        background: 'rgba(15, 23, 42, 0.95)',
+        backdropFilter: 'blur(12px)',
+        border: '1px solid rgba(96, 165, 250, 0.4)',
+        borderRadius: '8px',
+        padding: '16px',
+        zIndex: 1000,
+        boxShadow: '0 10px 30px rgba(0,0,0,0.5)',
+        color: 'white',
+        fontFamily: 'system-ui, sans-serif'
+      }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
+        <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 700, letterSpacing: '0.5px', textTransform: 'uppercase' }}>
+          ✈️ Detalle del Vuelo
+        </span>
+        <strong style={{ color: '#60a5fa', fontSize: '13px', backgroundColor: 'rgba(96, 165, 250, 0.1)', padding: '2px 8px', borderRadius: '4px' }}>
+          {formatFlightId(selectedAircraft.id)}
+        </strong>
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', position: 'relative', marginBottom: '16px' }}>
+        <div style={{ textAlign: 'left', flex: 1 }}>
+          <div style={{ color: '#94a3b8', fontSize: '10px', textTransform: 'uppercase' }}>Salida</div>
+          <strong style={{ fontSize: '18px', display: 'block', margin: '2px 0' }}>{selectedAircraft.from}</strong>
+          <div style={{ color: '#cbd5e1', fontSize: '11px' }}>{depTime}</div>
+        </div>
+
+        <div style={{ flex: 1.5, padding: '0 10px', display: 'flex', flexDirection: 'column', justifyContent: 'center', marginTop: '16px' }}>
+           <div style={{ position: 'relative', height: '4px', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', width: '100%' }}>
+              <div style={{ position: 'absolute', top: 0, left: 0, height: '100%', background: '#60a5fa', borderRadius: '2px', width: `${progressPct}%`, transition: 'width 0.5s ease-out' }} />
+              <div style={{ position: 'absolute', top: '-7px', left: `${progressPct}%`, fontSize: '14px', transform: 'translateX(-50%) rotate(45deg)', transition: 'left 0.5s ease-out' }}>✈️</div>
+           </div>
+           <div style={{ textAlign: 'center', fontSize: '10px', color: '#94a3b8', marginTop: '10px', fontWeight: 600 }}>
+             {progressPct}% Completado
+           </div>
+        </div>
+
+        <div style={{ textAlign: 'right', flex: 1 }}>
+          <div style={{ color: '#94a3b8', fontSize: '10px', textTransform: 'uppercase' }}>Llegada</div>
+          <strong style={{ fontSize: '18px', display: 'block', margin: '2px 0' }}>{selectedAircraft.to}</strong>
+          <div style={{ color: '#cbd5e1', fontSize: '11px' }}>{arrTime}</div>
+        </div>
+      </div>
+
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: 'rgba(255,255,255,0.03)', padding: '10px 12px', borderRadius: '6px' }}>
+        <div>
+          <div style={{ color: '#94a3b8', fontSize: '9px', textTransform: 'uppercase', marginBottom: '2px' }}>Estado actual</div>
+          <strong style={{ color: '#fbbf24', fontSize: '12px' }}>{statusLabel}</strong>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ color: '#94a3b8', fontSize: '9px', textTransform: 'uppercase', marginBottom: '2px' }}>Carga confirmada</div>
+          <strong style={{ fontSize: '12px', color: selectedAircraft.ocupacionReal >= selectedAircraft.capacidadMax ? '#ef4444' : '#a7f3d0' }}>
+            {bagsLabel} maletas
+          </strong>
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+export default ShipmentDetailPanel;

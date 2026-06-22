@@ -8,34 +8,34 @@ package com.tasfb2b.planificador.web;
  */
 
 import com.tasfb2b.planificador.service.SimulationExcelService;
-import com.tasfb2b.planificador.service.FlightCancellationService;
+import com.tasfb2b.planificador.domain.CollapseEndCondition;
 import com.tasfb2b.planificador.domain.SimulationDayReport;
 import com.tasfb2b.planificador.service.SimulationProgressHolder;
 import com.tasfb2b.planificador.service.SimulationService;
-import com.tasfb2b.planificador.service.SimulationWsPublisher;
+import com.tasfb2b.planificador.service.FlightCancellationService;
 import com.tasfb2b.envio.service.EnvioService;
+import com.tasfb2b.planificador.service.SimulationWsPublisher;
+import com.tasfb2b.vuelo.domain.Vuelo;
+import com.tasfb2b.planificador.domain.Route;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import com.tasfb2b.envio.domain.Envio;
+import com.tasfb2b.envio.repository.EnvioRepository;
+
 
 import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
+import java.util.List;
+import java.util.stream.Collectors;
+import java.util.LinkedHashMap;
 
 /**
  * Controlador REST para la simulación multi-día de TASF.B2B.
- *
- * <p>Expone tres grupos de endpoints:
- * <ul>
- *   <li>POST /api/v1/simulation/run/{dias}          → simulación estándar</li>
- *   <li>POST /api/v1/simulation/run-collapse/{dias} → simulación con inyección de colapso</li>
- *   <li>GET  /api/v1/simulation/status/{id}         → estado y métricas en tiempo real</li>
- *   <li>POST /api/v1/simulation/export-excel/{id}   → exportación Excel</li>
- *   <li>GET  /api/v1/simulation/export/{id}         → exportación CSV (legado)</li>
- * </ul>
  */
 @RestController
 @RequestMapping("/api/v1/simulation")
@@ -49,14 +49,22 @@ public class SimulationController {
     private final EnvioService               envioService;
     private final FlightCancellationService  flightCancellationService;
     private final SimulationWsPublisher      wsPublisher;
+    private final EnvioRepository envioRepository;
 
     @PostMapping("/run/{dias}")
     public ResponseEntity<Map<String, String>> startSimulation(
             @PathVariable(required = false) Integer dias,
-            @RequestParam(required = false, defaultValue = "HGA") String algorithm,
+            @RequestParam(required = false, defaultValue = "ALNS") String algorithm,
             @RequestParam(required = false) String startDate,
             @RequestParam(required = false, defaultValue = "60") int playbackMinutes,
-            @RequestParam(required = false) String preCancelledFlightIds) {
+            @RequestParam(required = false) String preCancelledFlightIds,
+            @RequestParam(required = false) String startTime,
+            @RequestParam(required = false, defaultValue = "1440") int saMinutes,
+            @RequestParam(required = false, defaultValue = "240") int planningHorizon,
+            @RequestParam(required = false, defaultValue = "false") boolean isRealTime) {
+
+        //Limpiamos caché al inicio así limpiamos los envíos de la BD de otros escenarios
+        envioRepository.deleteAllEnvios();
 
         int totalDays = (dias != null && dias > 0) ? dias : 5;
         String sessionId = UUID.randomUUID().toString();
@@ -68,8 +76,24 @@ public class SimulationController {
 
         SimulationProgressHolder.SimulationSessionState session = progressHolder.create(sessionId, totalDays);
         session.setAlgorithm(algorithm);
-        
-        service.runAsync(sessionId, totalDays, algorithm, fechaInicio, playbackMinutes, preCancelledFlightIds);
+        session.setPlanningHorizon(planningHorizon);
+        session.setRealTime(isRealTime);
+
+        String effectiveStartTime = startTime;
+
+        if (effectiveStartTime == null || effectiveStartTime.isBlank()) {
+            if (isRealTime) {
+                effectiveStartTime = java.time.LocalTime
+                        .now()
+                        .withSecond(0)
+                        .withNano(0)
+                        .toString();
+            } else {
+                effectiveStartTime = "00:00";
+            }
+        }
+
+        service.runAsync(sessionId, totalDays, algorithm, fechaInicio, playbackMinutes, preCancelledFlightIds, effectiveStartTime, saMinutes, planningHorizon, isRealTime);
 
         Map<String, String> response = new HashMap<>();
         response.put("sessionId", sessionId);
@@ -83,14 +107,18 @@ public class SimulationController {
     @PostMapping("/run-collapse/{dias}")
     public ResponseEntity<Map<String, String>> startCollapseSimulation(
             @PathVariable(required = false) Integer dias,
-            @RequestParam(required = false, defaultValue = "HGA") String algorithm,
+            @RequestParam(required = false, defaultValue = "ALNS") String algorithm,
             @RequestParam(required = false) String startDate,
-            @RequestParam(required = false, defaultValue = "5") int stressFactor,
+            @RequestParam(required = false, defaultValue = "FAILED_DELIVERY") String endCondition,
             @RequestParam(required = false, defaultValue = "60") int playbackMinutes,
-            @RequestParam(required = false) String preCancelledFlightIds) {
+            @RequestParam(required = false) String preCancelledFlightIds,
+            @RequestParam(required = false, defaultValue = "00:00:00") String startTime,
+            @RequestParam(required = false, defaultValue = "1440") int saMinutes) {
+        //Limpiamos también
+        envioRepository.deleteAllEnvios();
+        // En modo colapso, buscamos el punto de quiebre, por lo que usamos un límite alto de días (1000)
+        int totalDays = 1000; //DEspués dse cambiará
 
-        int totalDays = (dias != null && dias > 0) ? dias : 5;
-        double clampedStress = Math.max(1.0, Math.min(10.0, stressFactor)); // clamp 1–10
         String sessionId = UUID.randomUUID().toString();
 
         java.time.LocalDate fechaInicio = null;
@@ -98,30 +126,104 @@ public class SimulationController {
             try { fechaInicio = java.time.LocalDate.parse(startDate); } catch (Exception ignored) {}
         }
 
+        CollapseEndCondition cond;
+        try {
+            cond = CollapseEndCondition.valueOf(endCondition.toUpperCase());
+        } catch (IllegalArgumentException e) {
+            log.warn("[run-collapse] endCondition '{}' inválida; usando FAILED_DELIVERY", endCondition);
+            cond = CollapseEndCondition.FAILED_DELIVERY;
+        }
+
         SimulationProgressHolder.SimulationSessionState session = progressHolder.create(sessionId, totalDays);
         session.setCollapseMode(true);
-        session.setStressFactor(clampedStress);
         session.setAlgorithm(algorithm);
+        session.setEndCondition(cond);
+        session.setPlanningHorizon(1440); // 24 Horas para colapso
 
-        service.runAsync(sessionId, totalDays, algorithm, fechaInicio, playbackMinutes, preCancelledFlightIds);
+        // En modo colapso playbackMinutes debe ser igual a totalDays para meta 1 min / día
+        service.runAsync(sessionId, totalDays, algorithm, fechaInicio, totalDays, preCancelledFlightIds, startTime, saMinutes, 1440, false);
+
 
         Map<String, String> response = new HashMap<>();
         response.put("sessionId", sessionId);
         response.put("totalDays", String.valueOf(totalDays));
-        response.put("stressFactor", String.valueOf(clampedStress));
+        response.put("endCondition", cond.name());
         response.put("message", "Simulación de colapso iniciada.");
 
         return ResponseEntity.accepted().body(response);
     }
 
-    // ── GET /status/{sessionId} ─────────────────────────────────────────────
+    @PostMapping("/speed/{sessionId}")
+    public ResponseEntity<Void> updateSpeed(@PathVariable String sessionId, @RequestParam int speed) {
+        SimulationProgressHolder.SimulationSessionState session = progressHolder.get(sessionId);
+        if (session != null) {
+            session.setSpeedFactor(speed);
+        }
+        return ResponseEntity.ok().build();
+    }
 
-    /**
-     * Retorna el estado actual de la simulación.
-     * Diseñado para ser consultado por el frontend cada 2 segundos (polling).
-     *
-     * @return 200 con SimulationStatusDTO | 404 si la sesión no existe
-     */
+    // ── GET /status/{sessionId} ─────────────────────────────────────────────
+/*
+    @GetMapping("/active-shipments/{sessionId}")
+    public ResponseEntity<List<Map<String, Object>>> getActiveShipments(@PathVariable String sessionId) {
+        SimulationProgressHolder.SimulationSessionState session = progressHolder.get(sessionId);
+        if (session == null) return ResponseEntity.notFound().build();
+
+        List<Route> masterPlan = session.getMasterPlan();
+        if (masterPlan == null || masterPlan.isEmpty()) return ResponseEntity.ok(java.util.Collections.emptyList());
+
+        long minReadyTime = masterPlan.stream().mapToLong(r -> r.getLot().getReadyTime()).min().orElse(System.currentTimeMillis());
+        long maxReadyTime = masterPlan.stream().mapToLong(r -> r.getLot().getReadyTime()).max().orElse(System.currentTimeMillis());
+
+        java.time.LocalDate startDate = java.time.Instant.ofEpochMilli(minReadyTime).atOffset(java.time.ZoneOffset.UTC).toLocalDate().minusDays(1);
+        java.time.LocalDate endDate = java.time.Instant.ofEpochMilli(maxReadyTime).atOffset(java.time.ZoneOffset.UTC).toLocalDate().plusDays(1);
+
+        List<Object[]> envios = envioRepository.findActiveShipmentData(startDate, endDate);
+
+        java.util.Map<String, String> assignmentMap = new java.util.HashMap<>();
+        for (Route r : masterPlan) {
+            String flightIdStr = r.getFlights() != null && !r.getFlights().isEmpty()
+                    ? String.valueOf(r.getFlights().get(0).getId())
+                    : "En proceso";
+            String key = r.getLot().getOrigenIcao() + "-" + r.getLot().getDestinoIcao() + "-" + r.getLot().getReadyTime();
+            assignmentMap.put(key, flightIdStr);
+        }
+
+        List<Map<String, Object>> result = new java.util.ArrayList<>();
+        for (Object[] row : envios) {
+            String codigoPedido = (String) row[0];
+            String origen = (String) row[1];
+            String destino = (String) row[2];
+            int cantidad = (Integer) row[3];
+            java.time.LocalDate fecha = (java.time.LocalDate) row[4];
+            java.time.LocalTime hora = (java.time.LocalTime) row[5];
+
+            long readyTime = java.time.LocalDateTime.of(fecha, hora)
+                    .toInstant(java.time.ZoneOffset.UTC).toEpochMilli();
+
+            if (readyTime >= minReadyTime && readyTime <= maxReadyTime) {
+                String key = origen + "-" + destino + "-" + readyTime;
+                if (assignmentMap.containsKey(key)) {
+                    Map<String, Object> map = new java.util.HashMap<>();
+                    map.put("id", codigoPedido);
+                    map.put("origen", origen);
+                    map.put("destino", destino);
+                    map.put("cantidad", cantidad);
+                    map.put("vueloAsignado", assignmentMap.get(key));
+                    result.add(map);
+                }
+            }
+        }
+
+        result.sort((a, b) -> Integer.compare((Integer) b.get("cantidad"), (Integer) a.get("cantidad")));
+
+        if (result.size() > 200) {
+            result = result.subList(0, 200);
+        }
+
+        return ResponseEntity.ok(result);
+    }
+*/
     @GetMapping("/status/{sessionId}")
     public ResponseEntity<SimulationStatusDTO> getStatus(
             @PathVariable String sessionId) {
@@ -133,16 +235,14 @@ public class SimulationController {
             return ResponseEntity.notFound().build();
         }
 
-        // Calcular ocupación global promedio
         double globalOccupancy = 0;
         if (session.getAirportLoads() != null && !session.getAirportLoads().isEmpty()) {
             globalOccupancy = session.getAirportLoads().values().stream()
-                    .mapToInt(Integer::intValue)
+                    .mapToInt(data -> (Integer) data.getOrDefault("occupancy", 0))
                     .average()
                     .orElse(0);
         }
 
-        // Serializar los reports diarios como lista de Maps para el JSON
         java.util.List<java.util.Map<String, Object>> reportsList = session.getReports().stream()
                 .map(r -> {
                     java.util.Map<String, Object> m = new java.util.LinkedHashMap<>();
@@ -176,14 +276,17 @@ public class SimulationController {
                 .slaFinal(session.getSlaFinal())
                 .isCollapseMode(session.isCollapseMode())
                 .rescuedFlights(session.getRescuedFlights())
-                .stressFactor(session.getStressFactor())
                 .startEpoch(session.getStartEpoch())
                 .algorithm(session.getAlgorithm())
+                .endCondition(session.getEndCondition() != null ? session.getEndCondition().name() : "NONE")
+                .collapseDayIndex(session.getCollapseDayIndex())
+                .collapseReason(session.getCollapseReason())
                 .comparisonResults(progressHolder.getComparisonResults())
                 .errorMessage(session.getErrorMessage())
-                .reports(reportsList);
+                .reports(reportsList)
+                .taMs(session.getLastTaMs())
+                .saMinutes(session.getCurrentSaMinutes());
 
-        // Si la simulacion termino, incluir la demanda real por dia
         if ("DONE".equals(session.getStatus().name()) && session.getStartEpoch() != null) {
             try {
                 java.time.LocalDate inicio = java.time.Instant
@@ -200,13 +303,50 @@ public class SimulationController {
         return ResponseEntity.ok(builder.build());
     }
 
+    /**
+     * Búsqueda profunda de trazabilidad para un envío o maleta específica.
+     * Consulta el historial completo de rutas de la sesión.
+     */
+    @GetMapping("/shipment/{sessionId}/{shipmentId}")
+    public ResponseEntity<Map<String, Object>> getShipmentTraceability(
+            @PathVariable String sessionId,
+            @PathVariable String shipmentId) {
+
+        SimulationProgressHolder.SimulationSessionState session = progressHolder.get(sessionId);
+        if (session == null) return ResponseEntity.notFound().build();
+
+        // Historial de rutas no mantenido en memoria para evitar OOM.
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .body(Map.of("message", "Envío no encontrado en el historial de esta sesión (historial purgado por OOM)"));
+    }
+
+    private Map<String, Object> buildShipmentTraceMap(Route r) {
+        Map<String, Object> trace = new LinkedHashMap<>();
+        trace.put("id", r.getLot().getId());
+        trace.put("origin", r.getLot().getOrigenIcao());
+        trace.put("destination", r.getLot().getDestinoIcao());
+        trace.put("totalBags", r.getLot().getTotalMaletas());
+        trace.put("departure", r.getLot().getReadyTime());
+        trace.put("arrival", r.getArrivalTime());
+        trace.put("deadline", r.getLot().getDeadline());
+        trace.put("status", r.getStatus());
+        
+        List<Map<String, Object>> hops = r.getFlights().stream().map(v -> {
+            Map<String, Object> h = new HashMap<>();
+            h.put("id", v.getId());
+            h.put("from", v.getOrigen().getIcaoCode());
+            h.put("to", v.getDestino().getIcaoCode());
+            h.put("dep", v.getDepartureMinute());
+            h.put("arr", v.getArrivalMinute());
+            return h;
+        }).collect(Collectors.toList());
+        
+        trace.put("route", hops);
+        return trace;
+    }
+
     // ── POST /export-excel/{sessionId} ─────────────────────────────────────
 
-    /**
-     * Genera y descarga un archivo Excel (.xlsx) con los resultados completos
-     * de la simulación: métricas por día, totales, promedios y fitness score.
-     * Reemplaza al endpoint CSV legacy (que permanece por compatibilidad).
-     */
     @PostMapping("/export-excel/{sessionId}")
     public ResponseEntity<byte[]> exportExcel(
             @PathVariable String sessionId,
@@ -224,8 +364,6 @@ public class SimulationController {
         }
 
         try {
-            // El startEpoch es el currentEpochTime del primer día (si lo tenemos)
-            // Fallback: epoch 2026-01-01 si no hay datos
             long startEpoch = session.getStartEpoch() != null
                     ? session.getStartEpoch()
                     : java.time.LocalDate.of(2026, 1, 1).atStartOfDay()
@@ -249,12 +387,6 @@ public class SimulationController {
     }
 
 
-    /**
-     * Genera y descarga un archivo CSV con los resultados de la simulación.
-     * El CSV incluye una fila por día simulado con todas las métricas clave.
-     *
-     * @return 200 con CSV descargable | 404 si la sesión no existe | 409 si aún está en curso
-     */
     @GetMapping("/export/{sessionId}")
     public ResponseEntity<byte[]> exportCsv(@PathVariable String sessionId) {
 
@@ -282,23 +414,15 @@ public class SimulationController {
                 .body(csv.getBytes(java.nio.charset.StandardCharsets.UTF_8));
     }
 
-    // ── CSV Builder ─────────────────────────────────────────────────────────
-
-    /**
-     * Construye el contenido CSV a partir de los reportes de la sesión.
-     * Formato: una fila por día simulado.
-     */
     private String buildCsv(String sessionId,
                              SimulationProgressHolder.SimulationSessionState session) {
 
         StringBuilder sb = new StringBuilder();
 
-        // Cabecera
         sb.append("sessionId,dayIndex,startTime,endTime,")
           .append("totalMaletas,malatetasAtendidas,slaPercent,")
           .append("airportSaturation,colapsed,collapseTime,pendingLots\n");
 
-        // Filas
         for (SimulationDayReport report : session.getReports()) {
             sb.append(sessionId).append(",")
               .append(report.getDayIndex()).append(",")
@@ -314,7 +438,6 @@ public class SimulationController {
               .append("\n");
         }
 
-        // Fila de totales / resumen
         if (!session.getReports().isEmpty()) {
             double avgSla = session.getReports().stream()
                     .mapToDouble(SimulationDayReport::getSlaPercent)
@@ -333,8 +456,7 @@ public class SimulationController {
 
         return sb.toString();
     }
-
-    /**
+/**
      * Cancela manualmente un vuelo durante una simulación en curso.
      * Dispara replanificación ALNS automática si hay sesión activa.
      */
@@ -372,5 +494,92 @@ public class SimulationController {
             ));
         }
     }
-}
 
+    /**
+     * Genera un reporte detallado en Markdown de todas las operaciones,
+     * incluyendo desglose de rutas por día, cancelaciones y reacomodación,
+     * y ocupación acumulada de vuelos físicos.
+     */
+    @GetMapping("/export-details/{sessionId}")
+    public ResponseEntity<byte[]> exportDetailedReport(@PathVariable String sessionId) {
+        SimulationProgressHolder.SimulationSessionState session = progressHolder.get(sessionId);
+
+        if (session == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        if (session.getStatus() == SimulationProgressHolder.Status.RUNNING) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body("La simulación aún está en curso. Espere a que finalice.".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        }
+
+        String report = buildDetailedReport(sessionId, session);
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.parseMediaType("text/markdown; charset=UTF-8"));
+        headers.setContentDispositionFormData("attachment",
+                "reporte_detallado_vuelos_" + sessionId.substring(0, 8) + ".md");
+
+        return ResponseEntity.ok()
+                .headers(headers)
+                .body(report.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    private String buildDetailedReport(String sessionId, SimulationProgressHolder.SimulationSessionState session) {
+        StringBuilder sb = new StringBuilder();
+
+        sb.append("# 📋 Reporte Detallado de Operaciones y Flujo de Equipaje\n\n");
+        sb.append("> **Documento operativo de trazabilidad completa generado por TASF-B2B.**\n\n");
+
+        sb.append("## ⚙️ Metadatos de la Corrida\n");
+        sb.append("- **ID de Sesión**: `").append(sessionId).append("`\n");
+        sb.append("- **Algoritmo de Optimización**: **").append(session.getAlgorithm() != null ? session.getAlgorithm().toUpperCase() : "ALNS").append("**\n");
+        sb.append("- **SLA Final Alcanzado**: `").append(String.format("%.2f", session.getSlaFinal())).append("%`\n");
+        sb.append("- **Total de Días Simulados**: ").append(session.getTotalDays()).append(" días\n");
+        sb.append("- **Maletas Atendidas (A tiempo)**: ").append(String.format("%,d", session.getTotalAttended())).append("\n");
+        sb.append("- **Maletas No Atendidas (Ecap)**: ").append(String.format("%,d", session.getTotalMissed())).append("\n");
+        if (session.isCollapseMode()) {
+            sb.append("- **Modo de Simulación**: 🚨 Búsqueda de Punto de Quiebre (Colapso Logístico/Computacional)\n");  sb.append("- **Vuelos Replanificados/Rescatados**: ").append(session.getRescuedFlights()).append("\n");
+        } else {
+            sb.append("- **Modo de Simulación**: 🟢 Operación Día a Día (Normal)\n");
+        }
+        sb.append("\n---\n\n");
+
+        sb.append("## 🚨 Registro de Cancelaciones e Incidentes\n");
+        List<String> cancelLog = session.getEventLog().stream()
+                .filter(l -> l.contains("CANCELADO") || l.contains("Cancelado") || l.contains("cancelado"))
+                .collect(Collectors.toList());
+
+        if (cancelLog.isEmpty()) {
+            sb.append("*No se registraron cancelaciones ni incidentes de vuelos durante esta sesión de simulación.*\n\n");
+        } else {
+            sb.append("| Momento / Fase | Detalle de la Disrupción / Medida Logística |\n");
+            sb.append("| :--- | :--- |\n");
+            for (String logLine : cancelLog) {
+                sb.append("| Evento Log | ").append(logLine).append(" |\n");
+            }
+            sb.append("\n");
+        }
+
+        sb.append("## ✈️ Ocupación Acumulada de Vuelos Físicos\n");
+        sb.append("*El historial de rutas por vuelo ha sido deshabilitado para evitar OOM.*\n\n");
+
+        sb.append("## 📅 Desglose Diarios\n");
+        for (SimulationDayReport report : session.getReports()) {
+            sb.append("### 📆 Día ").append(report.getDayIndex() + 1).append("\n");
+            sb.append("- **SLA del Día**: `").append(String.format("%.2f", report.getSlaPercent())).append("%`\n");
+            sb.append("- **Maletas Totales (Demanda)**: ").append(String.format("%,d", report.getTotalMaletas())).append("\n");
+            sb.append("- **Maletas Atendidas**: ").append(String.format("%,d", report.getMalatetasAtendidas())).append("\n");
+            if (report.isColapsed()) {
+                sb.append("- **Estado**: 🚨 Colapsado (Saturación: ").append(report.getAirportSaturation()).append("%)\n");
+            } else {
+                sb.append("- **Estado**: 🟢 Estable\n");
+            }
+            sb.append("\n");
+        }
+
+        sb.append("\n---\n> Reporte detallado generado dinámicamente por **TASF-B2B Control Tower**.");
+        return sb.toString();
+    }
+
+}

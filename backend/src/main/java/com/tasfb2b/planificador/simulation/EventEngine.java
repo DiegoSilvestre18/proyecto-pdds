@@ -4,8 +4,10 @@ import com.tasfb2b.planificador.domain.Event;
 import com.tasfb2b.planificador.domain.EventType;
 import com.tasfb2b.planificador.domain.Route;
 import com.tasfb2b.vuelo.domain.Vuelo;
+import com.tasfb2b.bloqueo.service.BloqueoService;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.*;
 
 /**
@@ -18,10 +20,17 @@ import java.util.*;
  *   <li>{@code FLIGHT_DEPARTURE} — despegue con carga</li>
  *   <li>{@code FLIGHT_ARRIVAL} — aterrizaje en cada escala/destino</li>
  *   <li>{@code STORAGE_RELEASE} — liberación del almacén tras 24h de permanencia</li>
+ *   <li>{@code BAGGAGE_PICKUP} — el cliente recoge sus maletas</li>
  * </ul>
  */
 @Component
 public class EventEngine {
+
+    private final BloqueoService bloqueoService;
+
+    public EventEngine(BloqueoService bloqueoService) {
+        this.bloqueoService = bloqueoService;
+    }
 
     /**
      * Construye todos los eventos de simulación para las rutas dadas.
@@ -37,34 +46,65 @@ public class EventEngine {
         for (Route r : routes) {
 
             List<Vuelo> flights = r.getFlights();
+
+            // Rutas sin vuelos asignados no generan eventos de movimiento
             if (flights == null || flights.isEmpty()) continue;
 
             int load = r.getCapacidadAsignada();
 
-            // Llegada del lote al aeropuerto de origen
+            // ── LLEGADA DEL LOTE AL ORIGEN ──
             events.add(new Event(
                     r.getLot().getReadyTime(),
                     EventType.LOT_ARRIVAL,
                     r.getLot(),
-                    flights.get(0),
+                    flights.get(0), // vuelo de referencia para ICAO destino, origen
                     load
             ));
 
-            // Secuencia de vuelos: departure → arrival por cada tramo
+            // Aseguramos secuencialidad: el próximo vuelo no puede salir antes de que aterrice el anterior o de que el lote esté listo.
             long sequenceTime = r.getLot().getReadyTime();
 
             for (Vuelo v : flights) {
+
+                // departure anclado a partir del sequenceTime
                 long depTime = v.calcularSiguienteSalida(sequenceTime);
-                events.add(new Event(depTime, EventType.FLIGHT_DEPARTURE, r.getLot(), v, load));
+                events.add(new Event(
+                        depTime,
+                        EventType.FLIGHT_DEPARTURE,
+                        r.getLot(),
+                        v,
+                        load
+                ));
 
-                long arrTime = depTime + v.getDuracionMs();
-                events.add(new Event(arrTime, EventType.FLIGHT_ARRIVAL, r.getLot(), v, load));
+                // llegada del vuelo
+                long duration = v.getDuracionMs();
+                // B09: Avería Tipo 3 - Demora de tránsito (duplica el tiempo de tránsito)
+                if (bloqueoService != null && bloqueoService.tieneDemoraTransito(
+                        v.getOrigen().getIcaoCode(),
+                        v.getDestino().getIcaoCode(),
+                        Instant.ofEpochMilli(depTime))) {
+                    duration *= 2;
+                }
 
+                long arrTime = depTime + duration;
+                events.add(new Event(
+                        arrTime,
+                        EventType.FLIGHT_ARRIVAL,
+                        r.getLot(),
+                        v,
+                        load
+                ));
+                
+                // Actualizamos el sequenceTime para el siguiente tramo (si lo hay)
                 sequenceTime = arrTime;
             }
 
-            // Permanencia 24h: el paquete ocupa almacén de destino por 24h tras su llegada
+            // ── PERMANENCIA (24h) ──────────────────────────────────────────────
+            // Regla de Permanencia: El paquete se queda ocupando espacio
+            // en el almacén de destino por exactamente 24 horas tras su llegada,
+            // momento en el cual se libera y ya no figura en el almacén.
             if (load > 0 && r.getArrivalTime() > 0) {
+
                 long arrivalTime = r.getArrivalTime();
                 Vuelo lastFlight = flights.get(flights.size() - 1);
 
@@ -87,9 +127,6 @@ public class EventEngine {
         return events;
     }
 
-    /**
-     * Calcula el momento UTC en que se libera el almacén tras 24h de permanencia local.
-     */
     private long computeLocalReleaseTime(long arrivalEpochMs, int gmtOffsetHours) {
         long offsetMs = gmtOffsetHours * 60L * 60 * 1000;
         long localArrival = arrivalEpochMs + offsetMs;

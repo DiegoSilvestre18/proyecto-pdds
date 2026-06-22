@@ -32,7 +32,9 @@ public class CollapseHelper {
     @Qualifier("replanExecutor")
     private final Executor replanExecutor;
 
-    /** Ventana de ALNS para cada replan en modo colapso (ms). */
+    /**
+     * Ventana de ALNS para cada replan en modo colapso (ms).
+     */
     private static final long REPLAN_WINDOW_MS = 500L;
 
     @Value("${tasf.sim.collapse.slaThreshold:30.0}")
@@ -49,6 +51,7 @@ public class CollapseHelper {
      * @param algorithm algoritmo en uso ("HGA"/"ALNS")
      * @return número de rutas rescatadas
      */
+    /*
     public int applyCollapseInjections(
             SimulationProgressHolder.SimulationSessionState session,
             List<Route> routes,
@@ -123,12 +126,24 @@ public class CollapseHelper {
      * Reduce la capacidad de almacenamiento de aeropuertos hub para simular estrés.
      * Solo se aplica UNA VEZ al inicio del modo colapso.
      */
+    /*
     public void reduceHubCapacity(Map<String, Aeropuerto> airportMap) {
         for (String hub : Arrays.asList("SKBO", "LEMD", "VIDP")) {
             Aeropuerto a = airportMap.get(hub);
             if (a != null) a.setStorageCapacity(a.getStorageCapacity() / 2);
         }
     }
+    */
+    //Dummies temporales
+    @Deprecated
+    public int applyCollapseInjections(
+            SimulationProgressHolder.SimulationSessionState session,
+            List<Route> routes,
+            String algorithm) {
+        return 0;
+    }
+
+
 
     /**
      * Evalúa la condición de terminación del modo colapso al fin de un día simulado.
@@ -141,27 +156,50 @@ public class CollapseHelper {
             SimulationState endOfDayState,
             Map<String, Aeropuerto> airportMap) {
 
-        return switch (session.getEndCondition()) {
-            case SLA_BELOW_THRESHOLD -> {
-                int streak = report.getSlaPercent() < collapseSlaThreshold
-                        ? session.getSlaStreak() + 1 : 0;
-                session.setSlaStreak(streak);
-                yield new CollapseCheckResult(
-                        streak >= collapseConsecutiveDays,
-                        String.format("SLA < %.1f%% por %d días consecutivos (actual %.1f%%)",
-                                collapseSlaThreshold, collapseConsecutiveDays, report.getSlaPercent()));
+        // REGLA ESTRICTA 1: Capacidad de almacén excedida
+        if (endOfDayState.isColapsado()) {
+            return new CollapseCheckResult(true, "CAPACIDAD_EXCEDIDA: Se ha superado la capacidad física de almacenamiento en la red.");
+        }
+
+        // REGLA ESTRICTA 2: Incumplimiento de entrega (SLA < 100%)
+        if (session.getEndCondition() == CollapseEndCondition.FAILED_DELIVERY) {
+            if (report.getMalatetasAtendidas() < report.getTotalMaletas() || !report.getPendingLots().isEmpty()) {
+                return new CollapseCheckResult(true, "INCUMPLIMIENTO_ENTREGA: Se han detectado maletas que no pudieron ser entregadas a tiempo.");
             }
-            case ALL_AIRPORTS_CRITICAL -> {
-                final int total = airportMap.size();
-                long critical = airportMap.keySet().stream()
-                        .filter(icao -> endOfDayState.getOccupancyPercent(icao, airportMap) >= 90)
-                        .count();
-                yield new CollapseCheckResult(
-                        critical >= total,
-                        String.format("Todos los aeropuertos críticos (%d/%d)", critical, total));
+        }
+
+        // REGLA ESTRICTA 3: Lotes remanentes persistentemente grandes
+ //(sin capacidad de aviones)
+        // Como heurística: si los pendientes superan la capacidad total diaria de la flota,
+        // no hay forma de recuperarse.
+        long totalCapacity = 0;
+        for (Integer cap : endOfDayState.getCapacidadVuelo().values()) totalCapacity += cap;
+        long totalPendientes = report.getPendingLots().stream().mapToLong(com.tasfb2b.superlote.domain.SuperLot::getTotalMaletas).sum();
+        
+        if (totalPendientes > totalCapacity && totalCapacity > 0) {
+            return new CollapseCheckResult(true, "Demanda crónicamente rechazada (Pendientes > Capacidad Total de Flota).");
+        }
+
+        // REGLA ESTRICTA 3: SLA por debajo del umbral de negocio (por defecto 30%)
+        int streak = report.getSlaPercent() < collapseSlaThreshold ? session.getSlaStreak() + 1 : 0;
+        session.setSlaStreak(streak);
+        if (streak >= collapseConsecutiveDays) {
+            return new CollapseCheckResult(true, String.format("SLA < %.1f%% por %d días consecutivos (actual %.1f%%)",
+                            collapseSlaThreshold, collapseConsecutiveDays, report.getSlaPercent()));
+        }
+
+        // REGLA OPCIONAL: Usuario seleccionó terminación manual cuando todos los aeropuertos estén en 90%
+        if (session.getEndCondition() == CollapseEndCondition.ALL_AIRPORTS_CRITICAL) {
+            final int total = airportMap.size();
+            long critical = airportMap.keySet().stream()
+                    .filter(icao -> endOfDayState.getOccupancyPercent(icao, airportMap) >= 90)
+                    .count();
+            if (critical >= total) {
+                return new CollapseCheckResult(true, String.format("Todos los aeropuertos críticos (%d/%d)", critical, total));
             }
-            case NONE -> new CollapseCheckResult(false, "NONE");
-        };
+        }
+
+        return new CollapseCheckResult(false, "NONE");
     }
 
     private void markCancelled(List<Route> rutasModificables,

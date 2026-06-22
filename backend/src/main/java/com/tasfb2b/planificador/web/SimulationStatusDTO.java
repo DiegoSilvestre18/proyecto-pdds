@@ -58,10 +58,10 @@ public class SimulationStatusDTO {
 
     /**
      * Ocupación actual por aeropuerto ICAO.
-     * { "SKBO": 72, "EHAM": 45, ... }
+     * { "SKBO": { "occupancy": 72, "bags": 310 }, ... }
      * El frontend usa este mapa para colorear los marcadores del WorldMap.
      */
-    private Map<String, Integer> airportLoads;
+    private Map<String, Map<String, Object>> airportLoads;
 
     /** Reloj simulado (ej. "Día 1 - 14:00") */
     private String simulatedTime;
@@ -83,9 +83,17 @@ public class SimulationStatusDTO {
     /** Métricas de colapso */
     private Boolean isCollapseMode;
     private Integer rescuedFlights;
-    private Double stressFactor;
     private Long startEpoch;
     private String algorithm;
+
+    /** Condición de terminación del colapso (NONE | SLA_BELOW_THRESHOLD | ALL_AIRPORTS_CRITICAL). */
+    private String endCondition;
+
+    /** Día (1-based) en que se cumplió la condición de terminación, null si no terminó por condición. */
+    private Integer collapseDayIndex;
+
+    /** Razón humana de la terminación por condición. */
+    private String collapseReason;
 
     /** Diccionario de resultados comparativos por algoritmo */
     private Map<String, Map<String, Object>> comparisonResults;
@@ -106,4 +114,10 @@ public class SimulationStatusDTO {
      *                  slaPercent, airportSaturation, colapsed }
      */
     private List<Map<String, Object>> reports;
+
+    /** Tiempo de ejecución del último ALNS (ms) */
+    private Long taMs;
+
+    /** Salto de algoritmo actual (minutos) */
+    private Integer saMinutes;
 }

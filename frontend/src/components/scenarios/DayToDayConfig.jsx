@@ -1,5 +1,4 @@
 import { useState, useMemo } from "react";
-import FlightCancellationPanel from "./FlightCancellationPanel";
 
 // ── DayToDayConfig — Panel del escenario "Operación Día a Día" ──────────────
 // Muestra monitoreo en vivo y permite iniciar la simulación con la fecha real
@@ -12,7 +11,6 @@ function DayToDayConfig({
   onAlgorithmChange,
   activeShipments,
   totalBagsWaiting,
-  currentEpochTime,
   simState,
   liveStatus,
   onStartDayToDay,
@@ -48,12 +46,13 @@ function DayToDayConfig({
   }, []);
 
   const [selectedDate, setSelectedDate] = useState(todayStr);
+  const [startTime, setStartTime] = useState("00:00");
 
   // ── Early return DESPUÉS de todos los hooks ───────────────────────────────
   if (!isOpen) return null;
 
-  const isRunning   = simState === "running";
-  const isCompleted = simState === "completed";
+  const isRunning   = simState === "running" || liveStatus?.status === "RUNNING";
+  const isCompleted = simState === "completed" || liveStatus?.status === "DONE";
 
   const sections = [
     { key: "envios",  label: "Monitor" },
@@ -93,76 +92,37 @@ function DayToDayConfig({
         <div className="ct-config-section" style={{ marginBottom: 0 }}>
           {!isRunning && !isCompleted ? (
           <>
-            <p style={{ fontSize: 11, color: "#64748b", marginBottom: 8 }}>
-              Algoritmo: <strong style={{ color: "#818cf8" }}>{selectedAlgorithm?.toUpperCase()}</strong>
-            </p>
-
-            {/* Selector de fecha */}
+            {/* Card de estado */}
             <div style={{
-              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(79,70,229,0.3)',
-              borderRadius: 10, padding: '12px 14px', marginBottom: 10,
+              background: 'linear-gradient(135deg, rgba(16,185,129,0.08), rgba(5,150,105,0.05))',
+              border: '1px solid rgba(16,185,129,0.22)',
+              borderRadius: 8, padding: '10px 12px', marginBottom: 10,
+              display: 'flex', alignItems: 'center', gap: 10
             }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                <span style={{ fontSize: 20 }}>📅</span>
-                <div>
-                  <p style={{ margin: 0, fontSize: 17, fontWeight: 800, color: '#818cf8' }}>
-                    {selectedDate
-                      ? new Date(selectedDate + 'T12:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'long', year: 'numeric' })
-                      : '—'}
-                  </p>
-                  <p style={{ margin: 0, fontSize: 10, color: '#64748b' }}>Día a simular (1 día)</p>
-                </div>
-              </div>
-              <input
-                id="dtd-date-input"
-                type="date"
-                value={selectedDate}
-                onChange={e => setSelectedDate(e.target.value)}
-                style={{
-                  width: '100%', boxSizing: 'border-box',
-                  padding: '8px 10px', borderRadius: 7,
-                  background: '#f8fafc', border: '1px solid rgba(79,70,229,0.45)',
-                  color: '#1e293b', fontSize: 13, fontWeight: 600,
-                  colorScheme: 'light',
-                }}
-              />
-              <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
-                {[{ label: 'Ayer', date: yesterdayStr }, { label: 'Hoy', date: todayStr }].map(q => (
-                  <button
-                    key={q.date}
-                    type="button"
-                    onClick={() => setSelectedDate(q.date)}
-                    style={{
-                      flex: 1, padding: '4px 0', borderRadius: 6,
-                      border: '1px solid rgba(79,70,229,0.3)',
-                      background: selectedDate === q.date ? 'rgba(79,70,229,0.25)' : 'rgba(79,70,229,0.08)',
-                      color: selectedDate === q.date ? '#818cf8' : '#64748b',
-                      fontSize: 11, cursor: 'pointer', fontWeight: 700,
-                    }}
-                  >{q.label}</button>
-                ))}
+              <div style={{ fontSize: 20, flexShrink: 0 }}>📡</div>
+              <div>
+                <p style={{ margin: 0, fontSize: 11, fontWeight: 800, color: '#10b981', letterSpacing: 0.5 }}>
+                  Sincronización en Vivo
+                </p>
+                <p style={{ margin: '3px 0 0', fontSize: 10, color: '#64748b', lineHeight: 1.4 }}>
+                  Fecha: <strong style={{ color: '#94a3b8' }}>{todayStr}</strong> · Hora sincronizada con servidor
+                </p>
               </div>
             </div>
 
-            <button
-              id="dtd-btn-start"
-              type="button"
-              onClick={() => onStartDayToDay && onStartDayToDay(selectedDate, 1, preCancelledFlightIds)}
-              style={{
-                width: "100%", padding: "12px 0", borderRadius: 8, border: "none",
-                background: "linear-gradient(135deg, #10b981, #059669)",
-                color: "white", fontWeight: 700, fontSize: 14, cursor: "pointer",
-                boxShadow: "0 4px 15px rgba(16,185,129,0.35)",
-                letterSpacing: 0.5,
-              }}
-            >
-              ▶ INICIAR OPERACIÓN
-            </button>
+            <div style={{
+              width: "100%", padding: "12px 0", borderRadius: 8,
+              background: "rgba(16,185,129,0.1)",
+              color: "#10b981", fontWeight: 700, fontSize: 13, textAlign: "center",
+              letterSpacing: 0.5, border: "1px solid rgba(16,185,129,0.2)"
+            }}>
+              Estableciendo conexión en vivo...
+            </div>
           </>
         ) : isRunning ? (
           <div style={{ textAlign: "center", padding: "8px 0" }}>
             <span style={{ color: "#10b981", fontSize: 13, fontWeight: 700 }}>
-              ● EN OPERACIÓN — Día {liveStatus?.currentDay ?? 1}
+              📡 TRANSMITIENDO EN VIVO — {new Date(todayStr + 'T12:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'long' })}
             </span>
             <div style={{ height: 4, background: "rgba(255,255,255,0.08)", borderRadius: 4, marginTop: 8 }}>
               <div style={{
@@ -175,12 +135,11 @@ function DayToDayConfig({
           </div>
         ) : (
           <div style={{ textAlign: "center", padding: "6px 0" }}>
-            <span style={{ color: "#34d399", fontSize: 12, fontWeight: 700 }}>✓ Operación completada</span>
+            <span style={{ color: "#34d399", fontSize: 12, fontWeight: 700 }}>Monitoreo finalizado</span>
             <button
               id="dtd-btn-reset"
               type="button"
               onClick={() => {
-                setPreCancelledFlightIds([]);
                 if (onReset) onReset();
               }}
               style={{
@@ -191,7 +150,7 @@ function DayToDayConfig({
                 fontWeight: 600, fontSize: 12, cursor: "pointer",
               }}
             >
-              ↩ Nueva operación
+              ↩ Reiniciar conexión
             </button>
           </div>
         )}
@@ -202,12 +161,16 @@ function DayToDayConfig({
           <>
             <div className="ct-config-section">
               <p className="ct-config-section__title">📦 MALETAS EN ESPERA</p>
-              <div style={{ padding: "14px", background: "rgba(255,255,255,0.04)", borderRadius: 8, textAlign: "center" }}>
-                <span style={{ fontSize: 26, fontWeight: 800, color: "#10b981" }}>
+              <div style={{
+                padding: "10px 12px", background: "rgba(16,185,129,0.07)",
+                borderRadius: 7, textAlign: "center",
+                border: '1px solid rgba(16,185,129,0.18)',
+              }}>
+                <span style={{ fontSize: 22, fontWeight: 800, color: "#10b981" }}>
                   {(totalBagsWaiting ?? 0).toLocaleString("es-PE")}
                 </span>
-                <span style={{ display: "block", fontSize: 11, opacity: 0.6, marginTop: 4 }}>
-                  maletas esperando en almacenes
+                <span style={{ display: "block", fontSize: 10, color: '#64748b', marginTop: 2 }}>
+                  maletas en almacenes
                 </span>
               </div>
             </div>
@@ -221,15 +184,15 @@ function DayToDayConfig({
                   </div>
                 ) : activeShipments.slice(0, 6).map(s => {
                   const depDate = new Date(s.departureTime);
-                  const depFmt  = depDate.toLocaleTimeString("en-GB",
-                    { hour: "2-digit", minute: "2-digit", timeZone: "UTC" }) + " UTC";
+                  const depFmt  = depDate.toLocaleTimeString("es-PE",
+                    { hour: "2-digit", minute: "2-digit", timeZone: "UTC" });
                   const colors  = { cancelled: "#ef4444", rescued: "#3b82f6",
                                     blocked: "#f59e0b", critical: "#f97316" };
                   const dot     = colors[s.status] ?? "#10b981";
                   return (
                     <div key={`s-${s.id}`} className="ct-shipment-item">
                       <div className="ct-shipment-item__header">
-                        <strong>Vuelo {s.id}</strong>
+                        <strong>Vuelo {s.id.toString().replace("vuelo-", "").split("-")[0]}</strong>
                         <span className="ct-sla-dot" style={{ background: dot }} title={s.status} />
                       </div>
                       <p className="ct-shipment-item__route">{s.from} → {s.to} · {depFmt}</p>
@@ -280,13 +243,15 @@ function DayToDayConfig({
                     },
                   ].map(item => (
                     <div key={item.label} style={{
-                      background: 'rgba(255,255,255,0.04)', borderRadius: 8,
-                      padding: '8px 10px', textAlign: 'center',
+                      background: 'rgba(255,255,255,0.04)',
+                      border: `1px solid ${item.color}22`,
+                      borderRadius: 6,
+                      padding: '6px 8px', textAlign: 'center',
                     }}>
-                      <p style={{ margin: 0, fontSize: 18, fontWeight: 800, color: item.color }}>
+                      <p style={{ margin: 0, fontSize: 15, fontWeight: 800, color: item.color }}>
                         {item.value}
                       </p>
-                      <p style={{ margin: 0, fontSize: 9, color: '#64748b', marginTop: 2, textTransform: 'uppercase', letterSpacing: 0.4 }}>
+                      <p style={{ margin: 0, fontSize: 8, color: '#64748b', marginTop: 1, textTransform: 'uppercase', letterSpacing: 0.4 }}>
                         {item.label}
                       </p>
                     </div>
@@ -297,7 +262,11 @@ function DayToDayConfig({
                 {liveStatus.percent != null && (
                   <div style={{ marginTop: 10 }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 10, color: '#64748b', marginBottom: 4 }}>
-                      <span>{liveStatus.simulatedTime ?? `Día ${liveStatus.currentDay}`}</span>
+                      <span>
+                        {liveStatus.simulatedTime?.includes(" - ") 
+                          ? `Hoy - ${liveStatus.simulatedTime.split(" - ")[1]}` 
+                          : "Transmisión en Vivo"}
+                      </span>
                       <span style={{ color: liveStatus.status === 'DONE' ? '#10b981' : '#818cf8', fontWeight: 700 }}>
                         {liveStatus.status === 'DONE' ? '✓ Completado' : `${liveStatus.percent}%`}
                       </span>
@@ -340,13 +309,15 @@ function DayToDayConfig({
                   fontWeight: 600,
                   color: '#818cf8',
                   letterSpacing: '0.5px',
+                  opacity: 0.5
                 }}>
-                  ⚙️ CONFIGURAR CANCELACIONES PREVIAS
+                  ⚙️ CONFIGURAR CANCELACIONES PREVIAS (DESHABILITADO)
                 </div>
                 <p style={{ fontSize: '11px', color: '#64748b', margin: '0 0 12px 0', lineHeight: '1.4' }}>
-                  Define qué vuelos iniciarán cancelados desde el primer ciclo de la simulación.
+                  Esta función ha sido deshabilitada. Utiliza el panel de control durante la simulación para cancelaciones manuales.
                 </p>
 
+                {/* Se comenta el bloque de configuración previa por requerimiento
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center', marginBottom: '14px' }}>
                   <input
                     type="number"
@@ -385,7 +356,9 @@ function DayToDayConfig({
                     ➕ Agregar
                   </button>
                 </div>
+                */}
 
+                {/* 
                 {preCancelledFlightIds.length > 0 ? (
                   <div>
                     <div style={{ fontSize: '11px', fontWeight: 600, color: '#94a3b8', marginBottom: '6px' }}>
@@ -448,15 +421,10 @@ function DayToDayConfig({
                     Ningún vuelo configurado para pre-cancelar.
                   </div>
                 )}
+                */}
               </div>
             ) : (
               <div>
-                {/* Si la simulación está corriendo o completada, mostramos panel interactivo en curso */}
-                <FlightCancellationPanel
-                  sessionId={sessionId}
-                  isRunning={isRunning}
-                />
-                
                 {/* Si hubo pre-cancelados, mostrar el listado como referencia de lectura */}
                 {preCancelledFlightIds.length > 0 && (
                   <div style={{
@@ -497,27 +465,6 @@ function DayToDayConfig({
         {/* ── SECCIÓN CONFIG ───────────────────────────────────────────────── */}
         {activeSection === "config" && (
           <div className="ct-config-section">
-            <p className="ct-config-section__title">ALGORITMO PLANIFICADOR</p>
-            <div className="ct-algorithm-selector">
-              {[{ val: "hga", label: "Algoritmo A — HGA", sub: "Hybrid Genetic Algorithm" },
-                { val: "alns", label: "Algoritmo B — ALNS", sub: "Adaptive Large Neighborhood Search" }
-              ].map(opt => (
-                <label key={opt.val} className="ct-algorithm-option">
-                  <input
-                    type="radio"
-                    name="algorithm-dtd"
-                    value={opt.val}
-                    checked={selectedAlgorithm === opt.val}
-                    onChange={() => onAlgorithmChange(opt.val)}
-                  />
-                  <div>
-                    <strong>{opt.label}</strong>
-                    <span>{opt.sub}</span>
-                  </div>
-                </label>
-              ))}
-            </div>
-
             <p className="ct-config-section__title" style={{ marginTop: 16 }}>🚦 SEMÁFORO DE MALETAS</p>
             <div className="ct-sla-legend">
               {[

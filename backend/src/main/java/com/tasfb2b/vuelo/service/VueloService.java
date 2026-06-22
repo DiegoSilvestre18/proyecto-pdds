@@ -79,14 +79,19 @@ public class VueloService {
                         .orElseThrow(() ->
                                 new RuntimeException("Destino no encontrado: " + parsed.destinoIcao()));
 
+                // Normalización a UTC: Restar el GMT offset (local -> UTC)
+                // Usamos (minutos + 1440) % 1440 para manejar resultados negativos
+                int depUtc = (parsed.departureMinute() - (origen.getGmtOffset() * 60) + 1440) % 1440;
+                int arrUtc = (parsed.arrivalMinute() - (destino.getGmtOffset() * 60) + 1440) % 1440;
+
                 boolean intercontinental = origen.getContinent() != destino.getContinent();
 
                 Vuelo vuelo = Vuelo.builder()
                         .origen(origen)
                         .destino(destino)
                         .capacidadTotal(parsed.capacidad())
-                        .departureMinute(parsed.departureMinute())
-                        .arrivalMinute(parsed.arrivalMinute())
+                        .departureMinute(depUtc)
+                        .arrivalMinute(arrUtc)
                         .intercontinental(intercontinental)
                         .cancelled(false)
                         .build();
@@ -110,5 +115,26 @@ public class VueloService {
 
         // Invalidar el caché del grafo para que Dijkstra no vuelva a usarlo
         networkAdapter.invalidateGraph();
+    }
+
+    public List<VueloResponse> buscar(String query) {
+        List<Vuelo> todos = vueloRepo.findAllWithAirports();
+        String q = query != null ? query.toUpperCase() : "";
+        
+        return todos.stream()
+                .filter(v -> q.isEmpty() || 
+                        v.getOrigen().getIcaoCode().contains(q) || 
+                        v.getDestino().getIcaoCode().contains(q))
+                .map(v -> new VueloResponse(
+                        v.getId(),
+                        v.getOrigen().getIcaoCode(),
+                        v.getDestino().getIcaoCode(),
+                        v.getCapacidadTotal(),
+                        v.getCancelled(),
+                        v.getDepartureMinute(),
+                        v.getArrivalMinute()
+                ))
+                .limit(100)
+                .toList();
     }
 }

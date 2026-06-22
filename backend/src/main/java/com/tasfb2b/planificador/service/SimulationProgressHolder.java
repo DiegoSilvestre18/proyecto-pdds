@@ -16,34 +16,60 @@ import java.util.concurrent.ConcurrentHashMap;
  * <p>Indexado por UUID de sesión (String). Acceso thread-safe via
  * {@link ConcurrentHashMap}. El estado de cada sesión es mutable
  * y actualizado por {@link SimulationService} durante la ejecución.
- *
- * <p>Ciclo de vida de una sesión:
- * <ol>
- *   <li>POST /api/v1/simulation/run → se crea con status RUNNING</li>
- *   <li>SimulationService actualiza percent/currentDay en cada iteración</li>
- *   <li>Al finalizar → status = DONE; al fallar → status = FAILED</li>
- *   <li>GET /api/v1/simulation/status/{id} lee el estado en cualquier momento</li>
- * </ol>
  */
 @Component
 public class SimulationProgressHolder {
 
-    public enum Status { RUNNING, DONE, FAILED }
+    public enum Status { RECONSTRUCTING, RUNNING, DONE, FAILED }
 
     /** Snapshot inmutable de los datos del mapa para evitar condiciones de carrera con el WebSocket publisher. */
     public record MapSnapshot(Long epoch, String clock, List<Map<String, Object>> routes) {}
 
     /**
+     * Frame WS atómico para el visualizador: unifica reloj + rutas + KPIs/inventarios.
+     */
+    public record WsFrame(
+            String sessionId,
+            String status,
+            Long currentEpochTime,
+            String simulatedTime,
+            Integer percent,
+            Integer currentDay,
+            Integer totalDays,
+            Double slaPercent,
+            Integer criticalNodes,
+            Map<String, Map<String, Object>> airportLoads,
+            Integer totalBagsWaiting,
+            Boolean isCollapseMode,
+            Integer rescuedFlights,
+            String errorMessage,
+            Long startEpoch,
+            List<Map<String, Object>> activeRoutes,
+            String algorithm,
+            Long taMs,
+            Integer saMinutes,
+            String planId,
+            List<Map<String, Object>> plannedRoutes,
+            Double globalFleetOccupancy
+    ) {}
+
+    /**
      * Estado completo de una sesión de simulación.
-     * Los campos son actualizados directamente por SimulationService.
      */
     @Data
     public static class SimulationSessionState {
         private String sessionId;
         private Status status = Status.RUNNING;
+        private int speedFactor = 1;
+
+        /** ID del plan maestro actual para sincronización por versiones */
+        private String currentPlanId;
 
         /** Contenedor inmutable para sincronización con el WebSocket Publisher */
         private volatile MapSnapshot mapSnapshot;
+
+        /** Último frame atómico para WS (rutas + KPIs + reloj). */
+        private volatile WsFrame wsFrame;
 
         private int percent = 0;
         private int currentDay = 0;
@@ -52,8 +78,10 @@ public class SimulationProgressHolder {
         /** Reporte acumulado de todos los días completados. */
         private final List<SimulationDayReport> reports = new ArrayList<>();
 
-        /** Snapshot de ocupación por aeropuerto ICAO → porcentaje 0-100. */
-        private Map<String, Integer> airportLoads;
+        /** 
+         * Snapshot de ocupación por aeropuerto ICAO.
+         */
+        private Map<String, Map<String, Object>> airportLoads;
 
         /** SLA acumulado hasta el día actual. */
         private double slaPercent = 0.0;
@@ -63,7 +91,6 @@ public class SimulationProgressHolder {
 
         /**
          * Rutas activas del día en curso para visualización en el mapa.
-         * Cada elemento: { "id", "from", "to", "progress", "status" }
          */
         private List<Map<String, Object>> activeRoutes = new ArrayList<>();
 
@@ -87,7 +114,7 @@ public class SimulationProgressHolder {
         /** Métricas de colapso */
         private boolean isCollapseMode;
         private int rescuedFlights;
-        /** Factor de estrés operativo (1–10). Determina el % de rutas canceladas: stress × 3%. */
+        /** Factor de estrés operativo (1–10). Determina el % de rutas canceladas. */
         private double stressFactor = 5.0;
 
         /** Condición de terminación explícita del modo colapso. Default: NONE. */
@@ -96,36 +123,47 @@ public class SimulationProgressHolder {
         /** Contador de días consecutivos con SLA por debajo del umbral. */
         private int slaStreak = 0;
 
-        /** Día (1-based) en que se cumplió la condición de terminación, null si no terminó por condición. */
+        /** Día (1-based) en que se cumplió la condición de terminación. */
         private Integer collapseDayIndex;
 
         /** Razón humana de la terminación por condición. */
         private String collapseReason;
 
-        /** Diccionario general de resultados por algoritmo */
-        private Map<String, Map<String, Object>> comparisonResults;
-
         /** Mensaje de error si status = FAILED. */
         private String errorMessage;
 
-        /** Algoritmo utilizado (HGA, ALNS) */
-        private String algorithm = "HGA";
+        /** Algoritmo utilizado (ALNS) */
+        private String algorithm = "ALNS";
 
-        /** Longitud promedio de ruta (vuelos por ruta), calculada incrementalmente. */
+        /** Longitud promedio de ruta. */
         private double avgRouteLength = 0.0;
-
-        /** Epoch ms del primer día simulado — para el Excel export. */
+        
+        /** Epoch ms del primer día simulado. */
         private Long startEpoch;
+
+        /** Tiempo de ejecución del último ALNS (ms) */
+        private Long lastTaMs = 0L;
+
+        /** Salto de algoritmo actual (minutos) */
+        private Integer currentSaMinutes = 10;
+
+        /** Ventana de planificación del algoritmo (minutos) */
+        private Integer planningHorizon = 240;
+
+        /** Flag para ejecución en tiempo real (1:1) */
+        private boolean realTime = false;
+        
+        /** Futuro para el ALNS de la siguiente ventana concurrente */
+        private java.util.concurrent.CompletableFuture<?> nextPlanFuture;
     }
 
     private final ConcurrentHashMap<String, SimulationSessionState> sessions =
             new ConcurrentHashMap<>();
 
-    /** Diccionario global para persistir métricas por algoritmo (HGA, ALNS) */
+    /** Diccionario global para persistir métricas por algoritmo. */
     private final ConcurrentHashMap<String, Map<String, Object>> comparisonResults =
             new ConcurrentHashMap<>();
 
-    /** Registra una nueva sesión con el UUID dado y totalDays. */
     public SimulationSessionState create(String sessionId, int totalDays) {
         SimulationSessionState state = new SimulationSessionState();
         state.setSessionId(sessionId);
@@ -134,27 +172,22 @@ public class SimulationProgressHolder {
         return state;
     }
 
-    /** Retorna el estado de una sesión, o null si no existe. */
     public SimulationSessionState get(String sessionId) {
         return sessions.get(sessionId);
     }
 
-    /** Snapshot de ids activos (thread-safe) para broadcasting/monitoreo. */
     public List<String> getAllSessionIds() {
         return new ArrayList<>(sessions.keySet());
     }
 
-    /** Retorna el diccionario global de comparativa de algoritmos. */
     public Map<String, Map<String, Object>> getComparisonResults() {
         return comparisonResults;
     }
 
-    /** Guarda las métricas finales de un algoritmo. */
     public void saveAlgorithmResult(String algorithm, Map<String, Object> metrics) {
         comparisonResults.put(algorithm, metrics);
     }
 
-    /** Marca una sesión como completada. */
     public void markDone(String sessionId) {
         SimulationSessionState state = sessions.get(sessionId);
         if (state != null) {
@@ -163,7 +196,6 @@ public class SimulationProgressHolder {
         }
     }
 
-    /** Marca una sesión como fallida con el mensaje de error. */
     public void markFailed(String sessionId, String errorMessage) {
         SimulationSessionState state = sessions.get(sessionId);
         if (state != null) {
@@ -172,7 +204,6 @@ public class SimulationProgressHolder {
         }
     }
 
-    /** Limpia sesiones antiguas (opcional — para gestión de memoria). */
     public void remove(String sessionId) {
         sessions.remove(sessionId);
     }

@@ -11,6 +11,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
@@ -18,6 +19,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.Set;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -40,13 +43,12 @@ public class EnvioService {
         String origenIcao = NombreArchivoParser.extraerIcao(nombreArchivo);
         Aeropuerto origen = aeropuertoCache.get(origenIcao);
         if (origen == null) {
-            System.err.println("[EnvioService] Origen no registrado, se omite: " + nombreArchivo);
+            log.error("[EnvioService] Origen no registrado, se omite: {}", nombreArchivo);
             return;
         }
 
-        // Pre-cargar los códigos ya existentes para este origen — evita excepciones de Hibernate
         java.util.Set<String> existentes = envioRepo.findCodigosByOrigenIcao(origenIcao);
-
+        Set<String> seenInBatch = new HashSet<>();
         List<Envio> batch = new ArrayList<>(BATCH_SIZE);
 
         for (String linea : lineas) {
@@ -58,22 +60,29 @@ public class EnvioService {
             }
             if (parsed == null) continue;
 
-            // Saltar si ya existe en BD (pre-filtro preventivo)
-            if (existentes.contains(parsed.codigo())) {
-                log.debug("Envío ya registrado, omitido: {}", parsed.codigo());
+            String codigo = parsed.codigo();
+            if (existentes.contains(codigo) || !seenInBatch.add(codigo)) {
                 continue;
             }
 
             Aeropuerto destino = aeropuertoCache.get(parsed.destinoIcao());
             if (destino == null) {
-                System.err.println("Destino no encontrado: " + parsed.destinoIcao());
                 continue;
             }
 
+            // Normalización a UTC: Ajustar fecha/hora según GMT offset del origen
+            java.time.LocalDateTime localDT = java.time.LocalDateTime.of(
+                    LocalDate.parse(parsed.fecha(), DateTimeFormatter.BASIC_ISO_DATE),
+                    LocalTime.parse(parsed.hora())
+            );
+            // Restamos el offset para pasar de local a UTC (ej: -5h offset -> restamos -5 = sumamos 5h)
+            java.time.ZonedDateTime utcDT = localDT.atZone(java.time.ZoneId.ofOffset("GMT", 
+                    java.time.ZoneOffset.ofHours(origen.getGmtOffset()))).withZoneSameInstant(java.time.ZoneOffset.UTC);
+
             batch.add(Envio.builder()
-                    .codigoPedido(parsed.codigo())
-                    .fecha(LocalDate.parse(parsed.fecha(), DateTimeFormatter.BASIC_ISO_DATE))
-                    .hora(LocalTime.parse(parsed.hora()))
+                    .codigoPedido(codigo)
+                    .fecha(utcDT.toLocalDate())
+                    .hora(utcDT.toLocalTime())
                     .origen(origen)
                     .destino(destino)
                     .cantidadMaletas(parsed.cantidad())
@@ -90,40 +99,67 @@ public class EnvioService {
             envioRepo.saveAll(batch);
         }
     }
-    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
-    public void cargarPorFecha(LocalDate inicio, LocalDate fin, String dataPath) {
-        java.nio.file.Path folder = java.nio.file.Path.of(dataPath);
-        String startStr = inicio.format(DateTimeFormatter.BASIC_ISO_DATE);
-        String endStr = fin.format(DateTimeFormatter.BASIC_ISO_DATE);
 
-        try (java.nio.file.DirectoryStream<java.nio.file.Path> stream = java.nio.file.Files.newDirectoryStream(folder, "_envios_*.txt")) {
-            for (java.nio.file.Path archivo : stream) {
-                List<String> lineasFecha = new java.util.ArrayList<>();
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    public synchronized void cargarPorFecha(LocalDate inicio, LocalDate fin, String dataPath) {
+        for (LocalDate d = inicio; !d.isAfter(fin); d = d.plusDays(1)) {
+            cargarPorDia(d, dataPath);
+        }
+    }
+
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    public synchronized void cargarPorDia(LocalDate dia, String dataPath) {
+        if (envioRepo.existsByFecha(dia)) {
+            return;
+        }
+
+        String diaStr = dia.format(DateTimeFormatter.BASIC_ISO_DATE);
+        java.nio.file.Path folder = java.nio.file.Path.of(dataPath);
+
+        List<java.nio.file.Path> archivos = new ArrayList<>();
+        try (java.nio.file.DirectoryStream<java.nio.file.Path> stream =
+                     java.nio.file.Files.newDirectoryStream(folder, "_envios_*.txt")) {
+            stream.forEach(archivos::add);
+        } catch (Exception e) {
+            throw new RuntimeException("Error leyendo directorio: " + folder, e);
+        }
+
+        // Leer en paralelo, altamente IO/CPU bound
+        Map<String, List<String>> lineasPorArchivo = archivos.parallelStream()
+            .map(archivo -> {
+                List<String> lineasFecha = new ArrayList<>();
                 try (java.io.BufferedReader br = java.nio.file.Files.newBufferedReader(archivo)) {
                     String linea;
                     while ((linea = br.readLine()) != null) {
                         int guion = linea.indexOf('-');
                         if (guion < 0 || linea.length() <= guion + 8) continue;
-                        String f = linea.substring(guion + 1, guion + 9);
-                        if (f.compareTo(startStr) >= 0 && f.compareTo(endStr) <= 0) {
+                        // Usar regionMatches es más rápido que substring() y no crea nuevos objetos String
+                        if (linea.regionMatches(guion + 1, diaStr, 0, 8)) {
                             lineasFecha.add(linea);
                         }
                     }
+                } catch (Exception e) {
+                    log.error("Error leyendo archivo {}", archivo, e);
                 }
-                if (!lineasFecha.isEmpty()) {
-                    cargarDesdeLineasArchivo(archivo.getFileName().toString(), lineasFecha);
-                }
-            }
-        } catch (Exception e) {
-            throw new RuntimeException("Error en carga bajo demanda", e);
+                return Map.entry(archivo.getFileName().toString(), lineasFecha);
+            })
+            .filter(entry -> !entry.getValue().isEmpty())
+            .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+        // Insertar secuencialmente para evitar bloqueos concurrentes en la DB H2
+        for (Map.Entry<String, List<String>> entry : lineasPorArchivo.entrySet()) {
+            cargarDesdeLineasArchivo(entry.getKey(), entry.getValue());
         }
+
+        log.info("[Memoria] Cargados envíos del día {} a H2 (Multi-hilo)", dia);
     }
 
-    /**
-     * Devuelve la demanda REAL de maletas por día en el rango dado.
-     * Fuente: tabla Envio en BD (cargada previamente con cargarPorFecha).
-     * Clave del mapa: "YYYYMMDD", valor: suma de cantidadMaletas de todos los aeropuertos.
-     */
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
+    public void purgarAntesDe(LocalDate fecha) {
+        envioRepo.deleteByFechaBefore(fecha);
+        log.info("[Memoria] Purgados envíos anteriores a {}", fecha);
+    }
+
     @Transactional(readOnly = true)
     public java.util.Map<String, Long> getDemandaRealPorFecha(LocalDate inicio, LocalDate fin) {
         return envioRepo.findDailyTotalsByRange(inicio, fin).stream()
@@ -135,25 +171,94 @@ public class EnvioService {
                 ));
     }
 
-    /**
-     * Carga envíos de UN SOLO DÍA desde los archivos planos.
-     * Wrapper de {@link #cargarPorFecha} para sliding window.
-     */
-    public void cargarPorDia(LocalDate dia, String dataPath) {
-        cargarPorFecha(dia, dia, dataPath);
+    private LocalDateTime convertirLocalAUtc(
+            LocalDate fechaLocal,
+            LocalTime horaLocal,
+            Aeropuerto origen
+    ) {
+        LocalDateTime fechaHoraLocal =
+                LocalDateTime.of(fechaLocal, horaLocal);
+
+        return fechaHoraLocal.minusHours(origen.getGmtOffset());
     }
 
-    /**
-     * Purga envíos anteriores a la fecha dada de la BD H2 para liberar heap.
-     * Usado por la sliding window para evitar acumulación de datos en simulaciones largas.
-     *
-     * @param antes fecha (exclusiva); se eliminan envíos con fecha < antes
-     */
     @Transactional
-    public void purgarAntesDe(LocalDate antes) {
-        long deleted = envioRepo.deleteByFechaBefore(antes);
-        if (deleted > 0) {
-            log.info("[SlidingWindow] Purgados {} envíos anteriores a {}", deleted, antes);
+    public void registrarManual(com.tasfb2b.envio.web.UserEnvioRequest req) {
+        Aeropuerto origen = aeropuertoRepo.findByIcaoCode(req.getOrigenIcao())
+                .orElseThrow(() -> new RuntimeException("Origen no encontrado: " + req.getOrigenIcao()));
+        Aeropuerto destino = aeropuertoRepo.findByIcaoCode(req.getDestinoIcao())
+                .orElseThrow(() -> new RuntimeException("Destino no encontrado: " + req.getDestinoIcao()));
+
+        LocalDateTime fechaHoraUtc =
+                convertirLocalAUtc(
+                        req.getFecha(),
+                        req.getHora(),
+                        origen
+                );
+
+        String codigo9 = String.format("%09d", new java.util.Random().nextInt(1000000000));
+
+        envioRepo.save(Envio.builder()
+                .codigoPedido(codigo9)
+                .fecha(fechaHoraUtc.toLocalDate())
+                .hora(fechaHoraUtc.toLocalTime())
+                .origen(origen)
+                .destino(destino)
+                .cantidadMaletas(req.getCantidadMaletas())
+                .clienteId(req.getClienteId())
+                .build());
+    }
+
+    @Transactional
+    public void registrarLoteUsuario(List<String> lineas) {
+        Map<String, Aeropuerto> aeropuertoCache = aeropuertoRepo.findAll()
+                .stream()
+                .collect(Collectors.toMap(Aeropuerto::getIcaoCode, a -> a));
+
+        List<Envio> batch = new ArrayList<>();
+        java.util.Random random = new java.util.Random();
+
+        for (String linea : lineas) {
+            String[] parts = linea.split(",");
+            if (parts.length < 6) continue;
+
+            try {
+                LocalDate fecha = LocalDate.parse(parts[0].trim()); // ISO-8601 (yyyy-MM-dd)
+                LocalTime hora = LocalTime.parse(parts[1].trim());
+                String origenIcao = parts[2].trim();
+                String destinoIcao = parts[3].trim();
+                Integer cantidad = Integer.parseInt(parts[4].trim());
+                String clienteId = parts[5].trim();
+
+                Aeropuerto origen = aeropuertoCache.get(origenIcao);
+                Aeropuerto destino = aeropuertoCache.get(destinoIcao);
+
+                if (origen == null || destino == null) continue;
+                LocalDateTime fechaHoraUtc =
+                        convertirLocalAUtc(
+                                fecha,
+                                hora,
+                                origen
+                        );
+                String codigo9 = String.format("%09d", random.nextInt(1000000000));
+
+                batch.add(Envio.builder()
+                        .codigoPedido(codigo9)
+                        .fecha(fechaHoraUtc.toLocalDate())
+                        .hora(fechaHoraUtc.toLocalTime())
+                        .origen(origen)
+                        .destino(destino)
+                        .cantidadMaletas(cantidad)
+                        .clienteId(clienteId)
+                        .build());
+
+            } catch (Exception e) {
+                log.warn("[EnvioService] Error parseando linea de usuario: {}", linea);
+            }
+        }
+
+        if (!batch.isEmpty()) {
+            envioRepo.saveAll(batch);
         }
     }
 }

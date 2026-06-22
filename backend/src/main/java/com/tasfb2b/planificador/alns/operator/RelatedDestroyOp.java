@@ -4,9 +4,10 @@ import com.tasfb2b.planificador.domain.Route;
 import com.tasfb2b.superlote.domain.SuperLot;
 
 import java.util.ArrayList;
-import java.util.Iterator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
+import java.util.Set;
 
 /**
  * Operador de destrucción: elige un lote pivote y elimina los q lotes más
@@ -16,11 +17,18 @@ import java.util.Random;
 public class RelatedDestroyOp implements DestroyOperator {
 
     @Override
-    public List<SuperLot> destroy(List<Route> routes, int q, Random rng) {
+    public List<SuperLot> destroy(List<Route> routes, int q, Random rng, long currentSimTime) {
         if (routes.isEmpty()) return List.of();
 
-        // Elegir pivote aleatorio
-        Route pivot = routes.get(rng.nextInt(routes.size()));
+        // Filtrar rutas que pueden ser destruidas (no han empezado su primer tramo)
+        List<Route> candidates = routes.stream()
+                .filter(r -> r.getFlights().isEmpty() || r.getDepartureTime() > currentSimTime)
+                .collect(java.util.stream.Collectors.toList());
+
+        if (candidates.isEmpty()) return List.of();
+
+        // Elegir pivote aleatorio entre los candidatos
+        Route pivot = candidates.get(rng.nextInt(candidates.size()));
         String origenPivot  = pivot.getLot().getOrigenIcao();
         String destinoPivot = pivot.getLot().getDestinoIcao();
         long   slaPivot     = pivot.getLot().getSla();
@@ -34,13 +42,19 @@ public class RelatedDestroyOp implements DestroyOperator {
         });
 
         int toRemove = Math.min(q, sorted.size());
-        List<SuperLot> removed = new ArrayList<>();
+        List<SuperLot> removed = new ArrayList<>(toRemove);
 
+        // Recolectar IDs de lotes a remover en un HashSet para lookup O(1)
+        Set<Integer> lotIdsToRemove = new HashSet<>(toRemove * 2);
         for (int i = 0; i < toRemove; i++) {
             Route r = sorted.get(i);
             removed.add(r.getLot());
-            routes.remove(r);
+            lotIdsToRemove.add(r.getLot().getId());
         }
+
+        // Single-pass removal — O(N) en lugar de O(N²)
+        routes.removeIf(r -> lotIdsToRemove.contains(r.getLot().getId()));
+
         return removed;
     }
 

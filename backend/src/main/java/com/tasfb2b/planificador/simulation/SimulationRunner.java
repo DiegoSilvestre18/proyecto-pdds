@@ -4,6 +4,7 @@ import com.tasfb2b.aeropuerto.domain.Aeropuerto;
 import com.tasfb2b.planificador.domain.Event;
 import com.tasfb2b.planificador.domain.Route;
 import com.tasfb2b.vuelo.domain.Vuelo;
+import com.tasfb2b.bloqueo.service.BloqueoService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -25,6 +26,7 @@ import java.util.Map;
 public class SimulationRunner {
 
     private final EventEngine engine;
+    private final BloqueoService bloqueoService;
 
     /**
      * Simulación one-shot: crea un estado nuevo, genera todos los eventos
@@ -35,7 +37,8 @@ public class SimulationRunner {
      */
     public SimulationState run(List<Route> routes,
                                Map<String, Aeropuerto> airports,
-                               long startTime) {
+                               long startTime,
+                               long dayStartEpochMs) {
 
         List<Vuelo> vuelos = routes.stream()
                 .flatMap(r -> r.getFlights().stream())
@@ -46,11 +49,12 @@ public class SimulationRunner {
                 new SimulationState(
                         new ArrayList<>(airports.values()),
                         vuelos,
-                        startTime
+                        startTime,
+                        bloqueoService
                 );
 
         long t0 = System.nanoTime();
-        List<Event> events = engine.buildEvents(routes, startTime);
+        List<Event> events = engine.buildEvents(routes, dayStartEpochMs);
         long buildNanos = System.nanoTime() - t0;
         state.setBuildEventsTimeNanos(buildNanos);
 

@@ -4,10 +4,12 @@ import com.tasfb2b.aeropuerto.domain.Aeropuerto;
 import com.tasfb2b.superlote.domain.SuperLot;
 import com.tasfb2b.vuelo.domain.Vuelo;
 import com.tasfb2b.vuelo.repository.VueloRepository;
+import com.tasfb2b.bloqueo.service.BloqueoService;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.HashMap;
@@ -22,6 +24,7 @@ import java.util.Collections;
 public class NetworkAdapterImpl implements NetworkAdapter {
 
     private final VueloRepository repo;
+    private final BloqueoService bloqueoService;
 
     // EntityManager para hacer JOIN FETCH y evitar LazyInitializationException
     // en hilos @Async que no tienen sesión JPA por defecto.
@@ -38,9 +41,11 @@ public class NetworkAdapterImpl implements NetworkAdapter {
 
     // Volatile para asegurar visibilidad entre hilos sin bloquear findBestRoute
     private volatile Map<String, List<Vuelo>> graph;
+    private volatile Map<String, Map<String, List<Vuelo>>> shortestPathsCache;
 
-    public NetworkAdapterImpl(VueloRepository repo) {
+    public NetworkAdapterImpl(VueloRepository repo, BloqueoService bloqueoService) {
         this.repo = repo;
+        this.bloqueoService = bloqueoService;
     }
 
     private Map<String, List<Vuelo>> getGraph() {
@@ -65,23 +70,119 @@ public class NetworkAdapterImpl implements NetworkAdapter {
                         ).add(v);
                     }
                     graph = Map.copyOf(tempGraph); // Grafo inmutable
+                    
+                    // Precalcular rutas O(1)
+                    precomputeAllPairsShortestPaths(vuelos);
                 }
             }
         }
         return graph;
     }
 
+    private void precomputeAllPairsShortestPaths(List<Vuelo> todosLosVuelos) {
+        Map<String, Aeropuerto> aeropuertos = new HashMap<>();
+        for (Vuelo v : todosLosVuelos) {
+            aeropuertos.putIfAbsent(v.getOrigen().getIcaoCode(), v.getOrigen());
+            aeropuertos.putIfAbsent(v.getDestino().getIcaoCode(), v.getDestino());
+        }
+
+        Map<String, Map<String, List<Vuelo>>> cache = new HashMap<>();
+        for (Aeropuerto origen : aeropuertos.values()) {
+            Map<String, List<Vuelo>> destMap = dijkstraAllDestinations(origen, graph, aeropuertos);
+            cache.put(origen.getIcaoCode(), destMap);
+        }
+        this.shortestPathsCache = cache;
+    }
+
+    private Map<String, List<Vuelo>> dijkstraAllDestinations(Aeropuerto origen, Map<String, List<Vuelo>> localGraph, Map<String, Aeropuerto> aeropuertos) {
+        PriorityQueue<Node> pq = new PriorityQueue<>(Comparator.comparingLong(n -> n.time));
+        Map<String, Long> bestTime = new HashMap<>();
+        Map<String, Vuelo> prevFlight = new HashMap<>();
+
+        pq.add(new Node(origen.getIcaoCode(), 0L));
+        bestTime.put(origen.getIcaoCode(), 0L);
+
+        while (!pq.isEmpty()) {
+            Node current = pq.poll();
+
+            if (current.time > bestTime.getOrDefault(current.airport, Long.MAX_VALUE)) continue;
+
+            Instant momentCurrent = Instant.ofEpochMilli(current.time);
+            if (bloqueoService.nodoEstaBloqueado(current.airport, momentCurrent)) {
+                continue;
+            }
+
+            for (Vuelo v : localGraph.getOrDefault(current.airport, List.of())) {
+                String dest = v.getDestino().getIcaoCode();
+                if (bloqueoService.tramoEstaBloqueado(current.airport, dest, momentCurrent)) {
+                    continue;
+                }
+
+                long wait = calcularEsperaMatematica(current.time, v);
+                long duration = v.getDuracionMs();
+                
+                if (bloqueoService.tieneDemoraTransito(current.airport, dest, momentCurrent)) {
+                    duration *= 2;
+                }
+
+                long arrTime = current.time + wait + duration;
+                if (bloqueoService.nodoEstaBloqueado(dest, Instant.ofEpochMilli(arrTime))) {
+                    continue;
+                }
+
+                long costoEspera = wait;
+                if (Boolean.TRUE.equals(v.getCancelled())) {
+                    wait += PERIODO_DIARIO_MS;
+                    costoEspera = wait - (3600_000L);
+                }
+
+                long costoLlegada = current.time + costoEspera + duration;
+
+                if (costoLlegada < bestTime.getOrDefault(dest, Long.MAX_VALUE)) {
+                    bestTime.put(dest, costoLlegada);
+                    prevFlight.put(dest, v);
+                    pq.add(new Node(dest, costoLlegada));
+                }
+            }
+        }
+
+        Map<String, List<Vuelo>> destMap = new HashMap<>();
+        for (Aeropuerto destino : aeropuertos.values()) {
+            if (origen.getIcaoCode().equals(destino.getIcaoCode())) continue;
+            List<Vuelo> path = reconstruirRuta(prevFlight, origen.getIcaoCode(), destino.getIcaoCode());
+            if (!path.isEmpty()) {
+                destMap.put(destino.getIcaoCode(), path);
+            }
+        }
+        return destMap;
+    }
+
     @Override
     public List<Vuelo> findBestRoute(Aeropuerto origen, Aeropuerto destino, SuperLot lot) {
-        return calcularRuta(origen, destino, lot.getReadyTime(),
+        // Asegurar que el grafo y el caché estén inicializados
+        getGraph(); 
+        
+        // Uso de caché O(1) para rutas nominales
+        if (shortestPathsCache != null) {
+            Map<String, List<Vuelo>> rutasDesdeOrigen = shortestPathsCache.get(origen.getIcaoCode());
+            if (rutasDesdeOrigen != null) {
+                List<Vuelo> rutaCacheada = rutasDesdeOrigen.get(destino.getIcaoCode());
+                if (rutaCacheada != null && !rutaCacheada.isEmpty()) {
+                    return rutaCacheada;
+                }
+            }
+        }
+
+        // Fallback a Dijkstra en tiempo real
+        return calcularRuta(origen, destino, lot.getReadyTime(), lot.getDeadline(),
                 Collections.emptySet(), Collections.emptyMap());
     }
 
     @Override
     public List<Vuelo> findBestRoute(Aeropuerto origen, Aeropuerto destino,
                                      SuperLot lot, Map<Long, Integer> remainingCap) {
-        // Dijkstra consciente de capacidad: filtra vuelos sin espacio disponible.
-        return calcularRuta(origen, destino, lot.getReadyTime(),
+        // Dijkstra consciente de capacidad: filtra vuelos sin espacio disponible y respeta SLA.
+        return calcularRuta(origen, destino, lot.getReadyTime(), lot.getDeadline(),
                 Collections.emptySet(), remainingCap);
     }
 
@@ -90,7 +191,7 @@ public class NetworkAdapterImpl implements NetworkAdapter {
                                              Aeropuerto destino,
                                              SuperLot lot,
                                              Set<Long> excludedFlightIds) {
-        return calcularRuta(origen, destino, lot.getReadyTime(),
+        return calcularRuta(origen, destino, lot.getReadyTime(), lot.getDeadline(),
                 excludedFlightIds, Collections.emptyMap());
     }
 
@@ -98,16 +199,17 @@ public class NetworkAdapterImpl implements NetworkAdapter {
     public void invalidateGraph() {
         synchronized (this) {
             graph = null;
+            shortestPathsCache = null;
         }
     }
 
     // ─────────────────────────────────────────────────────────
-    // NÚCLEO: Dijkstra con exclusión de vuelos
-    // excludedFlightIds: vacío para ruta principal, lleno para backup
+    // NÚCLEO: Dijkstra con exclusión de vuelos y bloqueos
     // ─────────────────────────────────────────────────────────
     private List<Vuelo> calcularRuta(Aeropuerto origen,
                                      Aeropuerto destino,
                                      long startTime,
+                                     long deadline,
                                      Set<Long> excludedFlightIds,
                                      Map<Long, Integer> remainingCap) {
 
@@ -127,27 +229,63 @@ public class NetworkAdapterImpl implements NetworkAdapter {
             if (current.time > bestTime.getOrDefault(current.airport, Long.MAX_VALUE)) continue;
             if (current.airport.equals(destIcao)) break;
 
-            for (Vuelo v : localGraph.getOrDefault(current.airport, List.of())) {
-                if (Boolean.TRUE.equals(v.getCancelled())) continue;
-                if (excludedFlightIds.contains(v.getId())) continue; // exclusión para backup
+            // B06: Si el nodo origen actual está bloqueado, no se puede salir de él
+            Instant momentCurrent = Instant.ofEpochMilli(current.time);
+            if (bloqueoService.nodoEstaBloqueado(current.airport, momentCurrent)) {
+                continue;
+            }
 
-                // Fix Dijkstra-ciego: saltar vuelos sin capacidad disponible.
-                // Un vuelo con cap=0 no puede absorber ningún lote; excluirlo fuerza
-                // a Dijkstra a encontrar una ruta alternativa con espacio real.
-                // Si remainingCap está vacío (modo legacy), este filtro no aplica.
+            for (Vuelo v : localGraph.getOrDefault(current.airport, List.of())) {
+                if (excludedFlightIds.contains(v.getId())) continue;
+
+                // B05: Si el tramo origen->destino está bloqueado en el momento de salida
+                String orig = v.getOrigen().getIcaoCode();
+                String dest = v.getDestino().getIcaoCode();
+                if (bloqueoService.tramoEstaBloqueado(orig, dest, momentCurrent)) {
+                    continue;
+                }
+
+                long wait = calcularEsperaMatematica(current.time, v);
+                long duration = v.getDuracionMs();
+                
+                // B09: Avería Tipo 3 - Demora de tránsito (duplica el tiempo de tránsito)
+                if (bloqueoService.tieneDemoraTransito(orig, dest, momentCurrent)) {
+                    duration *= 2;
+                }
+
+                long arrTime = current.time + wait + duration;
+                // B06: Si el nodo de destino está bloqueado, no se puede aterrizar en él
+                if (bloqueoService.nodoEstaBloqueado(dest, Instant.ofEpochMilli(arrTime))) {
+                    continue;
+                }
+
                 if (!remainingCap.isEmpty()) {
                     int capRestante = remainingCap.getOrDefault(v.getId(), v.getCapacidadTotal());
                     if (capRestante <= 0) continue;
                 }
 
-                long wait = calcularEsperaMatematica(current.time, v);
-                long newTime = current.time + wait + v.getDuracionMs();
-                String next = v.getDestino().getIcaoCode();
+                // Si el vuelo fue cancelado hoy, estará disponible al día siguiente (+24h).
+                // Bonificamos ligeramente su costo (-1h virtual) para que el algoritmo lo 
+                // prefiera frente a una ruta con muchas escalas (afinidad al mismo vuelo).
+                long costoEspera = wait;
+                if (Boolean.TRUE.equals(v.getCancelled())) {
+                    wait += PERIODO_DIARIO_MS;
+                    costoEspera = wait - (3600_000L); // -1h de penalidad virtual (bonificación)
+                }
 
-                if (newTime < bestTime.getOrDefault(next, Long.MAX_VALUE)) {
-                    bestTime.put(next, newTime);
+                long llegadaReal = current.time + wait + duration;
+                long costoLlegada = current.time + costoEspera + duration;
+
+                // Filtro Duro (Viabilidad SLA):
+                // Si la hora de llegada real supera el deadline de la maleta, descartamos este camino.
+                if (llegadaReal > deadline) continue;
+
+                String next = dest;
+
+                if (costoLlegada < bestTime.getOrDefault(next, Long.MAX_VALUE)) {
+                    bestTime.put(next, costoLlegada);
                     prevFlight.put(next, v);
-                    pq.add(new Node(next, newTime));
+                    pq.add(new Node(next, costoLlegada));
                 }
             }
         }
@@ -156,7 +294,7 @@ public class NetworkAdapterImpl implements NetworkAdapter {
     }
 
     private long calcularEsperaMatematica(long currentTime, Vuelo v) {
-        long dep = v.getDepartureEpoch(0L);
+        long dep = v.getDepartureEpoch(0L); // epoch relativo (minutos del día en ms): base 0L es correcto para Dijkstra
         if (currentTime <= dep) return dep - currentTime;
 
         // Aritmética modular: calcula cuánto falta para el próximo ciclo del vuelo.

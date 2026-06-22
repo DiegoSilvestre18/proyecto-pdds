@@ -49,12 +49,25 @@ public class AeropuertoService {
         repository.deleteById(id);
     }
 
+    public AeropuertoResponse actualizar(Long id, AeropuertoRequest request) {
+        Aeropuerto aeropuerto = repository.findById(id)
+                .orElseThrow(() -> new AeropuertoNotFoundException(id));
+        aeropuerto.setCity(request.city());
+        aeropuerto.setCountry(request.country());
+        aeropuerto.setContinent(request.continent());
+        aeropuerto.setStorageCapacity(request.storageCapacity());
+        aeropuerto.setGmtOffset(request.gmtOffset());
+        aeropuerto.setLatitude(request.latitude());
+        aeropuerto.setLongitude(request.longitude());
+        return AeropuertoMapper.toResponse(repository.save(aeropuerto));
+    }
+
     public void cargarDesdeArchivo(Path rutaArchivo) {
 
         try {
 
             byte[] rawBytes = Files.readAllBytes(rutaArchivo);
-            String content = new String(rawBytes, java.nio.charset.StandardCharsets.UTF_16BE);
+            String content = new String(rawBytes, java.nio.charset.StandardCharsets.UTF_16);
 
             List<Aeropuerto> aeropuertos = new ArrayList<>();
 

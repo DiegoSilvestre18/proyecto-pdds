@@ -15,7 +15,7 @@ public class SimulationDayReport {
     private long startTime;
     private long endTime;
 
-    private List<Route> routes;
+
 
     private boolean colapsed;
     private int airportSaturation;
@@ -32,7 +32,11 @@ public class SimulationDayReport {
     /** Maletas efectivamente asignadas a vuelos (capacidadAsignada total). */
     private int malatetasAtendidas;
 
-    /** Maletas entregadas al cliente final (recogidas del almacén destino). */
+    /**
+     * Maletas entregadas al cliente durante este día de simulación (eventos BAGGAGE_PICKUP).
+     * Representa las maletas que efectivamente salieron del almacén destino.
+     * Invariante: maletasEntregadas <= malatetasAtendidas.
+     */
     private int maletasEntregadas;
 
     /**
@@ -41,4 +45,3 @@ public class SimulationDayReport {
      */
     private List<SuperLot> pendingLots = new ArrayList<>();
 }
-

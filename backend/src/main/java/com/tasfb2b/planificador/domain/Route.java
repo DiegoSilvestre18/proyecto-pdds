@@ -129,4 +129,10 @@ public class Route {
         this.deadline = 0;
         this.status = "normal";
     }
+
+    public long getDepartureTime() {
+        if (flights == null || flights.isEmpty()) return -1L;
+        // Obtenemos la salida real basada en el momento en que las maletas están listas
+        return flights.get(0).calcularSiguienteSalida(lot.getReadyTime());
+    }
 }

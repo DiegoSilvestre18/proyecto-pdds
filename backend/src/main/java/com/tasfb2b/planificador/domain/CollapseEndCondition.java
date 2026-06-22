@@ -5,6 +5,8 @@ package com.tasfb2b.planificador.domain;
  *
  * <p>La simulación termina solo cuando se cumple la condición elegida
  * por el operador al lanzar {@code POST /run-collapse/{dias}}.
+ *
+ * <p>Ver {@code PLANES/PLAN_COLAPSO_INFORMATIVO.md}.
  */
 public enum CollapseEndCondition {
 
@@ -19,6 +21,11 @@ public enum CollapseEndCondition {
      * (ocupación >= 90%) en el fin de día.
      */
     ALL_AIRPORTS_CRITICAL,
+
+    /**
+     * Terminar cuando se incumple la entrega de una maleta (SLA < 100% o Ecap > 0).
+     */
+    FAILED_DELIVERY,
 
     /**
      * Nunca terminar por condición. La simulación corre los N días completos

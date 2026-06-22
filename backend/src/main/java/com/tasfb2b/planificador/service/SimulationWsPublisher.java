@@ -10,31 +10,23 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
- * Publica periódicamente el estado de cada sesión via WebSocket (STOMP).
+ * Publica periodicamente el estado de cada sesion via WebSocket (STOMP).
  *
- * <p>Desacopla la emisión WebSocket del ciclo de simulación para evitar
- * ráfagas desordenadas y cuellos de botella de I/O.
- *
- * <p>Topics:
- * <ul>
- *   <li>{@code /topic/sim/{sessionId}/snapshot} — rutas activas del mapa</li>
- *   <li>{@code /topic/sim/{sessionId}/kpi} — métricas en tiempo real</li>
- *   <li>{@code /topic/sim/{sessionId}/eventLog} — bitácora de eventos</li>
- * </ul>
+ * Topics:
+ * - /topic/sim/{sessionId}/snapshot
+ * - /topic/sim/{sessionId}/kpi
+ * - /topic/sim/{sessionId}/eventLog
  */
 @Service
 @RequiredArgsConstructor
 public class SimulationWsPublisher {
 
-    private static final int DEFAULT_ROUTE_LIMIT = 220;
+    private static final int DEFAULT_ROUTE_LIMIT = 1400;
 
     private final SimulationProgressHolder progressHolder;
     private final SimpMessagingTemplate messaging;
@@ -42,9 +34,14 @@ public class SimulationWsPublisher {
     @Value("${tasf.sim.stream.routeLimit:" + DEFAULT_ROUTE_LIMIT + "}")
     private int routeLimit;
 
+    // seq por sesion: ayuda a debugging y orden en el front
     private final ConcurrentHashMap<String, Long> seqBySession = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Integer> lastEventIdxBySession = new ConcurrentHashMap<>();
     private final ConcurrentHashMap<String, Boolean> finalSentBySession = new ConcurrentHashMap<>();
+    
+    // -- DIAGNOSTIC STATE --
+    private final ConcurrentHashMap<String, Set<String>> prevIdsBySession = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, List<String>> trackedBySession = new ConcurrentHashMap<>();
 
     @Scheduled(fixedDelayString = "${tasf.sim.stream.intervalMs:500}")
     public void publishAllSessions() {
@@ -52,48 +49,130 @@ public class SimulationWsPublisher {
             SimulationSessionState session = progressHolder.get(sessionId);
             if (session == null) continue;
 
-            boolean isRunning = session.getStatus() == SimulationProgressHolder.Status.RUNNING;
+            SimulationProgressHolder.Status status = session.getStatus();
+            boolean isRunning = status == SimulationProgressHolder.Status.RUNNING || status == SimulationProgressHolder.Status.RECONSTRUCTING;
             if (isRunning) {
+                // Seguimos permitiendo el polling de KPIs globales/logs
                 pushImmediate(sessionId, session);
                 continue;
             }
 
-            // Publicar una última vez al terminar/fallar, y luego dejar de emitir
             if (finalSentBySession.putIfAbsent(sessionId, true) == null) {
                 pushImmediate(sessionId, session);
                 seqBySession.remove(sessionId);
                 lastEventIdxBySession.remove(sessionId);
+                prevIdsBySession.remove(sessionId);
+                trackedBySession.remove(sessionId);
             }
         }
     }
 
+    /** Publicación inmediata bajo demanda (Direct Push) */
     public void pushImmediate(String sessionId, SimulationSessionState session) {
+        long tStart = System.currentTimeMillis();
         long seq = seqBySession.merge(sessionId, 1L, Long::sum);
         int safeLimit = sanitizeLimit(routeLimit);
 
-        SimulationMapSnapshotDTO map = buildMapSnapshot(session, safeLimit);
+        // Leer frame WS una sola vez para consistencia temporal entre snapshot y KPI.
+        SimulationProgressHolder.WsFrame frame = session.getWsFrame();
+
+        SimulationMapSnapshotDTO map = buildMapSnapshot(session, frame, safeLimit);
+        
+        // --- DIAGNOSTIC INSTRUMENTATION ---
+        instrumentSnapshot(sessionId, map);
         messaging.convertAndSend(topic(sessionId, "snapshot"), new WsEnvelope<>(seq, map));
 
-        SimulationKpiSnapshotDTO kpi = buildKpiSnapshot(session);
+        SimulationKpiSnapshotDTO kpi = buildKpiSnapshot(session, frame);
         messaging.convertAndSend(topic(sessionId, "kpi"), new WsEnvelope<>(seq, kpi));
 
-        // Enviar solo eventos nuevos (delta)
         int lastIdx = lastEventIdxBySession.getOrDefault(sessionId, 0);
         List<String> logSnapshot = new ArrayList<>(session.getEventLog());
         for (int i = lastIdx; i < logSnapshot.size(); i++) {
-            messaging.convertAndSend(topic(sessionId, "eventLog"),
-                    new WsEnvelope<>(seq, logSnapshot.get(i)));
+            messaging.convertAndSend(topic(sessionId, "eventLog"), new WsEnvelope<>(seq, logSnapshot.get(i)));
         }
         lastEventIdxBySession.put(sessionId, logSnapshot.size());
+
+        long tEnd = System.currentTimeMillis();
+        int routesCount = (map.getActiveRoutes() != null) ? map.getActiveRoutes().size() : 0;
+        
+        // Log de monitoreo interno (opcional)
+        // System.out.printf("[PUBLISH] snapshotTime: %s | publishDelayMs: %d | Routes: %d%n", map.getSimulatedTime(), (tEnd - tStart), routesCount);
+    }
+
+    private void instrumentSnapshot(String sessionId, SimulationMapSnapshotDTO map) {
+        // --- DIAGNOSTIC INSTRUMENTATION REMOVED ---
+        // Los logs [SNAPSHOT_DIAG], [TRACK_FLIGHT], y [IDENTITY_DIAG]
+        // fueron comentados o eliminados para evitar spam en la consola
+        // durante simulaciones largas.
+        /*
+        List<SimulationMapRouteDTO> routesRaw = map.getActiveRoutes();
+        final List<SimulationMapRouteDTO> routes = (routesRaw == null) ? Collections.emptyList() : routesRaw;
+
+        Set<String> currentIds = routes.stream().map(SimulationMapRouteDTO::getId).collect(Collectors.toSet());
+        
+        System.out.printf("[SNAPSHOT_DIAG] Time=%s Flights=%d Ids=%s%n", 
+            map.getSimulatedTime(), routes.size(), 
+            routes.stream().limit(10).map(SimulationMapRouteDTO::getId).collect(Collectors.joining(",")));
+
+        List<String> tracked = trackedBySession.get(sessionId);
+        if (tracked == null || tracked.isEmpty()) {
+            tracked = routes.stream().limit(5).map(SimulationMapRouteDTO::getId).collect(Collectors.toList());
+            if (!tracked.isEmpty()) {
+                trackedBySession.put(sessionId, tracked);
+            }
+        }
+
+        for (String flightId : tracked) {
+            Optional<SimulationMapRouteDTO> r = routes.stream().filter(f -> f.getId().equals(flightId)).findFirst();
+            if (r.isPresent()) {
+                 System.out.printf("[TRACK_FLIGHT] Time=%s Flight=%s Present=true Origin=%s Destination=%s%n",
+                    map.getSimulatedTime(), flightId, r.get().getFrom(), r.get().getTo());
+            } else {
+                 System.out.printf("[TRACK_FLIGHT] Time=%s Flight=%s Present=false%n",
+                    map.getSimulatedTime(), flightId);
+            }
+        }
+
+        Set<String> prevIds = prevIdsBySession.getOrDefault(sessionId, Collections.emptySet());
+        Set<String> added = new HashSet<>(currentIds);
+        added.removeAll(prevIds);
+        Set<String> removed = new HashSet<>(prevIds);
+        removed.removeAll(currentIds);
+
+        System.out.printf("[IDENTITY_DIAG] Time=%s Added=%d Removed=%d%n", 
+            map.getSimulatedTime(), added.size(), removed.size());
+
+        for (String id : added) {
+            System.out.printf("[FLIGHT_CHANGE] Time=%s Type=ADDED Flight=%s%n", map.getSimulatedTime(), id);
+        }
+        for (String id : removed) {
+            System.out.printf("[FLIGHT_CHANGE] Time=%s Type=REMOVED Flight=%s%n", map.getSimulatedTime(), id);
+        }
+
+        prevIdsBySession.put(sessionId, currentIds);
+        */
     }
 
     private String topic(String sessionId, String channel) {
         return "/topic/sim/" + sessionId + "/" + channel;
     }
 
-    private SimulationMapSnapshotDTO buildMapSnapshot(SimulationSessionState session, int limit) {
-        SimulationProgressHolder.MapSnapshot snap = session.getMapSnapshot();
+    private SimulationMapSnapshotDTO buildMapSnapshot(SimulationSessionState session, SimulationProgressHolder.WsFrame frame, int limit) {
+        if (frame != null) {
+            return SimulationMapSnapshotDTO.builder()
+                    .sessionId(frame.sessionId())
+                    .status(frame.status())
+                    .simulatedTime(frame.simulatedTime())
+                    .currentEpochTime(frame.currentEpochTime())
+                    .snapshotEpochTime(System.currentTimeMillis())
+                    .planId(frame.planId())
+                    .activeRoutes(toRouteDtos(frame.activeRoutes(), limit))
+                    .masterPlan(frame.plannedRoutes())
+                    .build();
+        }
 
+        // Fallback: Leemos la referencia VOLATILE una sola vez
+        SimulationProgressHolder.MapSnapshot snap = session.getMapSnapshot();
         if (snap == null) {
             return SimulationMapSnapshotDTO.builder()
                     .sessionId(session.getSessionId())
@@ -101,6 +180,7 @@ public class SimulationWsPublisher {
                     .simulatedTime(session.getSimulatedTime())
                     .currentEpochTime(session.getCurrentEpochTime())
                     .snapshotEpochTime(System.currentTimeMillis())
+                    .planId(session.getCurrentPlanId())
                     .activeRoutes(toRouteDtos(session.getActiveRoutes(), limit))
                     .build();
         }
@@ -115,14 +195,38 @@ public class SimulationWsPublisher {
                 .build();
     }
 
-    private SimulationKpiSnapshotDTO buildKpiSnapshot(SimulationSessionState session) {
-        double globalOccupancy = 0;
-        if (session.getAirportLoads() != null && !session.getAirportLoads().isEmpty()) {
-            globalOccupancy = session.getAirportLoads().values().stream()
-                    .mapToInt(Integer::intValue)
-                    .average()
-                    .orElse(0);
+    private SimulationKpiSnapshotDTO buildKpiSnapshot(SimulationSessionState session, SimulationProgressHolder.WsFrame frame) {
+        Map<String, Map<String, Object>> loads = (frame != null) ? frame.airportLoads() : session.getAirportLoads();
+
+        // Usamos el cálculo de flota del backend si está disponible en el frame
+        double globalOccupancy = (frame != null && frame.globalFleetOccupancy() != null) 
+                ? frame.globalFleetOccupancy() 
+                : 0.0;
+
+        if (frame != null) {
+            return SimulationKpiSnapshotDTO.builder()
+                    .sessionId(frame.sessionId())
+                    .status(frame.status())
+                    .percent(frame.percent())
+                    .currentDay(frame.currentDay())
+                    .totalDays(frame.totalDays())
+                    .slaPercent(frame.slaPercent())
+                    .globalOccupancy(globalOccupancy)
+                    .criticalNodes(frame.criticalNodes())
+                    .airportLoads(loads)
+                    .totalBagsWaiting(frame.totalBagsWaiting())
+                    .simulatedTime(frame.simulatedTime())
+                    .currentEpochTime(frame.currentEpochTime())
+                    .isCollapseMode(frame.isCollapseMode())
+                    .rescuedFlights(frame.rescuedFlights())
+                    .errorMessage(frame.errorMessage())
+                    .startEpoch(frame.startEpoch())
+                    .algorithm(frame.algorithm())
+                    .taMs(frame.taMs())
+                    .saMinutes(frame.saMinutes())
+                    .build();
         }
+
         return SimulationKpiSnapshotDTO.builder()
                 .sessionId(session.getSessionId())
                 .status(session.getStatus().name())
@@ -132,7 +236,7 @@ public class SimulationWsPublisher {
                 .slaPercent(session.getSlaPercent())
                 .globalOccupancy(globalOccupancy)
                 .criticalNodes(session.getCriticalNodes())
-                .airportLoads(session.getAirportLoads())
+                .airportLoads(loads)
                 .totalBagsWaiting(session.getTotalBagsWaiting())
                 .simulatedTime(session.getSimulatedTime())
                 .currentEpochTime(session.getCurrentEpochTime())
@@ -141,6 +245,8 @@ public class SimulationWsPublisher {
                 .errorMessage(session.getErrorMessage())
                 .startEpoch(session.getStartEpoch())
                 .algorithm(session.getAlgorithm())
+                .taMs(session.getLastTaMs())
+                .saMinutes(session.getCurrentSaMinutes())
                 .build();
     }
 
@@ -148,7 +254,9 @@ public class SimulationWsPublisher {
         if (rawRoutes == null || rawRoutes.isEmpty()) {
             return Collections.emptyList();
         }
-        return new ArrayList<>(rawRoutes).stream()
+
+        List<Map<String, Object>> snapshot = new ArrayList<>(rawRoutes);
+        return snapshot.stream()
                 .limit(limit)
                 .map(this::toRouteDto)
                 .collect(Collectors.toList());
@@ -164,19 +272,34 @@ public class SimulationWsPublisher {
                 .departureTime(asLong(route.get("departureTime")))
                 .arrivalTime(asLong(route.get("arrivalTime")))
                 .capacityPercent(asDouble(route.get("capacityPercent")))
+                .ocupacionReal(asInteger(route.get("ocupacionReal")))
+                .capacidadMax(asInteger(route.get("capacidadMax")))
                 .build();
     }
 
     private int sanitizeLimit(int limit) {
-        return limit <= 0 ? DEFAULT_ROUTE_LIMIT : Math.min(limit, 600);
+        if (limit <= 0) {
+            return DEFAULT_ROUTE_LIMIT;
+        }
+        return Math.min(limit, 2000);
     }
 
     private Long asLong(Object value) {
-        return value instanceof Number n ? n.longValue() : null;
+        if (value instanceof Number number) {
+            return number.longValue();
+        }
+        return null;
     }
 
     private Double asDouble(Object value) {
-        return value instanceof Number n ? n.doubleValue() : null;
+        if (value instanceof Number number) {
+            return number.doubleValue();
+        }
+        return null;
+    }
+
+    private Integer asInteger(Object value) {
+        return value instanceof Number n ? n.intValue() : null;
     }
 
     private String asString(Object value) {

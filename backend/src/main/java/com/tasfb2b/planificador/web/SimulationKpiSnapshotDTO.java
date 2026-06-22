@@ -8,7 +8,6 @@ import java.util.Map;
 
 /**
  * DTO tipado para el snapshot de KPIs enviado por WebSocket.
- * Reemplaza {@code Map<String, Object>} genérico para type-safety.
  */
 @Data
 @Builder
@@ -24,7 +23,7 @@ public class SimulationKpiSnapshotDTO {
     private Double slaPercent;
     private Double globalOccupancy;
     private Integer criticalNodes;
-    private Map<String, Integer> airportLoads;
+    private Map<String, Map<String, Object>> airportLoads;
     private Integer totalBagsWaiting;
     private String simulatedTime;
     private Long currentEpochTime;
@@ -33,4 +32,10 @@ public class SimulationKpiSnapshotDTO {
     private String errorMessage;
     private Long startEpoch;
     private String algorithm;
+
+    /** Latencia de la última ejecución del ALNS (ms) */
+    private Long taMs;
+
+    /** Salto del algoritmo (minutos) */
+    private Integer saMinutes;
 }

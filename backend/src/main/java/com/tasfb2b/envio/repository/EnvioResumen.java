@@ -10,6 +10,7 @@ public interface EnvioResumen {
     int getCantidadMaletas();
     String getOrigenContinente();
     String getDestinoContinente();
+    int getOrigenGmtOffset();
 
     LocalDate getFecha();
     LocalTime getHora();

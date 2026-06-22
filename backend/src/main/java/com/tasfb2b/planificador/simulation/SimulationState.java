@@ -3,28 +3,13 @@ package com.tasfb2b.planificador.simulation;
 import com.tasfb2b.planificador.domain.Event;
 import com.tasfb2b.aeropuerto.domain.Aeropuerto;
 import com.tasfb2b.vuelo.domain.Vuelo;
+import com.tasfb2b.bloqueo.service.BloqueoService;
 import lombok.Getter;
 
 import java.util.*;
 
 /**
  * Estado mutable de la simulación, actualizado evento a evento.
- *
- * <p>El colapso es REVERSIBLE: si la carga de todos los aeropuertos
- * baja por debajo de su storageCapacity, el sistema se recupera
- * (colapso = false). Esto permite modelar escenarios de recuperación.
- *
- * <p>saturacionAeropuerto = suma de maletas en exceso ACTUALES
- * (no acumulativo histórico).
- *
- * <p>Mejoras V2 integradas:
- * <ul>
- *   <li>Cola FIFO por aeropuerto (carry-over cuando almacén está lleno)</li>
- *   <li>Hard Constraint tracking: maletas realmente embarcadas por (lote, vuelo)</li>
- *   <li>Evento STORAGE_RELEASE (permanencia 24h en destino)</li>
- *   <li>Evento FLIGHT_CANCELLED / REPLAN_TRIGGER</li>
- *   <li>Métricas de profiling (buildEventsTimeNanos, applyEventsTimeNanos)</li>
- * </ul>
  */
 @Getter
 public class SimulationState {
@@ -51,8 +36,7 @@ public class SimulationState {
     private boolean colapso = false;
 
     /**
-     * Acumulado de maletas entregadas al cliente (eventos BAGGAGE_PICKUP / STORAGE_RELEASE).
-     * Se usa para poblar SimulationDayReport.maletasEntregadas.
+     * Acumulado de maletas entregadas al cliente.
      */
     private int maletasEntregadas = 0;
 
@@ -84,6 +68,8 @@ public class SimulationState {
     /** Mapa de aeropuertos, necesario para reevaluar saturación en DEPARTURE. */
     private Map<String, Aeropuerto> airportMap;
 
+    private final BloqueoService bloqueoService;
+
     // ── COLA DE ESPERA (CARRY-OVER) ────────────────────────
     /**
      * Registro de maletas en espera por capacidad de almacén.
@@ -103,10 +89,12 @@ public class SimulationState {
 
     public SimulationState(List<Aeropuerto> airports,
                            List<Vuelo> vuelos,
-                           long startTime) {
+                           long startTime,
+                           BloqueoService bloqueoService) {
 
         this.currentTime = startTime;
         this.airportMap = new HashMap<>();
+        this.bloqueoService = bloqueoService;
 
         airports.forEach(a -> {
             cargaAeropuerto.put(a.getIcaoCode(), 0);
@@ -125,6 +113,15 @@ public class SimulationState {
                 capacidadVuelo.put(v.getId(), v.getCapacidadTotal());
             }
         });
+    }
+
+    /** Obtiene la capacidad de almacenamiento efectiva considerando averías vigentes */
+    private int getEffectiveStorageCapacity(Aeropuerto ap) {
+        if (ap == null) return 0;
+        int originalCapacity = ap.getStorageCapacity();
+        if (bloqueoService == null) return originalCapacity;
+        int pct = bloqueoService.getCapacidadEfectivaPct(ap.getIcaoCode(), java.time.Instant.ofEpochMilli(currentTime));
+        return (int) (originalCapacity * (pct / 100.0));
     }
 
     // ─────────────────────────────────────────────
@@ -168,13 +165,18 @@ public class SimulationState {
                 int actualLoad = maletasEmbarcadas.getOrDefault(
                         v.getId() + "-" + event.getLot().getId(), event.getLoad());
 
+                // Restaurar la capacidad del vuelo (el avión se vacía al llegar)
+                int remaining = capacidadVuelo.getOrDefault(v.getId(), 0);
+                capacidadVuelo.put(v.getId(), remaining + actualLoad);
+
                 String icao = v.getDestino().getIcaoCode();
                 Aeropuerto ap = airports.get(icao);
                 int current = cargaAeropuerto.getOrDefault(icao, 0);
 
+                int effectiveCapacity = getEffectiveStorageCapacity(ap);
                 // Cola de espera: si el almacén está lleno, encolar excedente
-                if (ap != null && current + actualLoad > ap.getStorageCapacity()) {
-                    int espacioLibre = Math.max(0, ap.getStorageCapacity() - current);
+                if (ap != null && current + actualLoad > effectiveCapacity) {
+                    int espacioLibre = Math.max(0, effectiveCapacity - current);
                     int excedente = actualLoad - espacioLibre;
 
                     if (espacioLibre > 0) {
@@ -198,8 +200,9 @@ public class SimulationState {
                 int actualLoad = event.getLoad();
                 int current = cargaAeropuerto.getOrDefault(icao, 0);
 
-                if (ap != null && current + actualLoad > ap.getStorageCapacity()) {
-                    int espacioLibre = Math.max(0, ap.getStorageCapacity() - current);
+                int effectiveCapacity = getEffectiveStorageCapacity(ap);
+                if (ap != null && current + actualLoad > effectiveCapacity) {
+                    int espacioLibre = Math.max(0, effectiveCapacity - current);
                     int excedente = actualLoad - espacioLibre;
 
                     if (espacioLibre > 0) {
@@ -255,11 +258,6 @@ public class SimulationState {
         }
     }
 
-    /**
-     * Recalcula la saturación total y el estado de colapso basándose en
-     * la carga ACTUAL de todos los aeropuertos. Al ser invocado tras cada
-     * DEPARTURE y ARRIVAL, el colapso puede activarse Y desactivarse.
-     */
     private void recalcularSaturacion(Map<String, Aeropuerto> airports) {
         int totalExceso = 0;
 
@@ -267,22 +265,16 @@ public class SimulationState {
             Aeropuerto ap = airports.get(entry.getKey());
             if (ap == null) continue;
 
-            int exceso = entry.getValue() - ap.getStorageCapacity();
+            int exceso = entry.getValue() - getEffectiveStorageCapacity(ap);
             if (exceso > 0) {
                 totalExceso += exceso;
             }
         }
 
         this.saturacionAeropuerto = totalExceso;
-        // Colapso reversible: se activa Y desactiva según la saturación actual
         this.colapso = totalExceso > 0;
     }
 
-    /**
-     * Drena la cola de espera de un aeropuerto, moviendo maletas encoladas
-     * al almacén mientras haya espacio disponible. Llamar después de cada
-     * evento que libere espacio (DEPARTURE, STORAGE_RELEASE, BAGGAGE_PICKUP).
-     */
     private void drainCola(String icao, Map<String, Aeropuerto> airports) {
         ArrayDeque<PendingBag> cola = colaEspera.get(icao);
         if (cola == null || cola.isEmpty()) return;
@@ -291,7 +283,8 @@ public class SimulationState {
         if (ap == null) return;
 
         int cargaActual = cargaAeropuerto.getOrDefault(icao, 0);
-        int espacioLibre = ap.getStorageCapacity() - cargaActual;
+        int effectiveCapacity = getEffectiveStorageCapacity(ap);
+        int espacioLibre = effectiveCapacity - cargaActual;
 
         while (!cola.isEmpty() && espacioLibre > 0) {
             PendingBag pb = cola.peek();
@@ -301,9 +294,8 @@ public class SimulationState {
                 espacioLibre -= pb.cantidad();
                 maletasEnCola -= pb.cantidad();
             } else {
-                // Mover parcial: llenar el espacio y dejar el resto en cola
                 cola.poll();
-                cargaAeropuerto.put(icao, ap.getStorageCapacity());
+                cargaAeropuerto.put(icao, effectiveCapacity);
                 int restante = pb.cantidad() - espacioLibre;
                 cola.addFirst(new PendingBag(pb.lotId(), restante, pb.enqueueTime()));
                 maletasEnCola -= espacioLibre;
@@ -311,7 +303,6 @@ public class SimulationState {
             }
         }
 
-        // Limpiar entrada del mapa si la cola quedó vacía
         if (cola.isEmpty()) colaEspera.remove(icao);
 
         recalcularSaturacion(airports);
@@ -321,22 +312,15 @@ public class SimulationState {
         return colapso;
     }
 
-    /**
-     * Retorna la carga actual (maletas) en un aeropuerto dado.
-     * Útil para que SimulationService calcule lotes pendientes.
-     */
     public int getLoadAt(String icao) {
         return cargaAeropuerto.getOrDefault(icao, 0);
     }
 
-    /**
-     * Retorna el porcentaje de ocupación de un aeropuerto respecto a su capacidad.
-     * Usado para construir el mapa de cargas en el DTO de status.
-     */
     public int getOccupancyPercent(String icao, Map<String, Aeropuerto> airports) {
         Aeropuerto ap = airports.get(icao);
-        if (ap == null || ap.getStorageCapacity() <= 0) return 0;
+        int effectiveCapacity = getEffectiveStorageCapacity(ap);
+        if (ap == null || effectiveCapacity <= 0) return 0;
         int carga = cargaAeropuerto.getOrDefault(icao, 0);
-        return (int) Math.min(100, (carga * 100.0) / ap.getStorageCapacity());
+        return (int) Math.min(100, Math.ceil((carga * 100.0) / effectiveCapacity));
     }
 }
