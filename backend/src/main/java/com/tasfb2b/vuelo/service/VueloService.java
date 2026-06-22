@@ -36,12 +36,15 @@ public class VueloService {
 
         boolean intercontinental = !origen.getContinent().equals(destino.getContinent());
 
+        int depUtc = (request.departureMinute() - (origen.getGmtOffset() * 60) + 1440) % 1440;
+        int arrUtc = (request.arrivalMinute() - (destino.getGmtOffset() * 60) + 1440) % 1440;
+
         Vuelo vuelo = Vuelo.builder()
                 .origen(origen)
                 .destino(destino)
                 .capacidadTotal(request.capacity())
-                .departureMinute(request.departureMinute())
-                .arrivalMinute(request.arrivalMinute())
+                .departureMinute(depUtc)
+                .arrivalMinute(arrUtc)
                 .intercontinental(intercontinental)
                 .cancelled(false)
                 .build();
