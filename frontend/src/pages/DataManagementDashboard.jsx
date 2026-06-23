@@ -7,6 +7,7 @@ import ShipmentManagement from '../components/management/ShipmentManagement';
 const DataManagementDashboard = () => {
     const [activeTab, setActiveTab] = useState('envios');
     const navigate = useNavigate();
+    const [flights, setFlights] = useState([]);
 
     const handleLogout = () => {
         sessionStorage.removeItem('userRole');
@@ -89,7 +90,7 @@ const DataManagementDashboard = () => {
                         >
                             Envíos Extra
                         </button>
-                        <button 
+                        <button
                             onClick={() => setActiveTab('vuelos')}
                             style={activeTab === 'vuelos' ? tabStyleActive : tabStyle}
                         >
@@ -106,7 +107,12 @@ const DataManagementDashboard = () => {
                     {/* CONTENIDO DE GESTIÓN */}
                     <div style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)', borderRadius: '12px', padding: '1.5rem', minHeight: '400px' }}>
                         {activeTab === 'almacenes' && <WarehouseManagement />}
-                        {activeTab === 'vuelos' && <FlightManagement />}
+                        {activeTab === 'vuelos' && (
+                            <FlightManagement
+                                flights={flights}
+                                setFlights={setFlights}
+                            />
+                        )}
                         {activeTab === 'envios' && <ShipmentManagement />}
                     </div>
 

@@ -33,7 +33,7 @@ import java.util.UUID;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.LinkedHashMap;
-
+import java.time.ZoneOffset;
 /**
  * Controlador REST para la simulación multi-día de TASF.B2B.
  */
@@ -84,7 +84,7 @@ public class SimulationController {
         if (effectiveStartTime == null || effectiveStartTime.isBlank()) {
             if (isRealTime) {
                 effectiveStartTime = java.time.LocalTime
-                        .now()
+                        .now(ZoneOffset.UTC)
                         .withSecond(0)
                         .withNano(0)
                         .toString();
@@ -92,7 +92,16 @@ public class SimulationController {
                 effectiveStartTime = "00:00";
             }
         }
-
+        if (isRealTime) {
+            effectiveStartTime = java.time.LocalTime
+                    .now(ZoneOffset.UTC)
+                    .withSecond(0)
+                    .withNano(0)
+                    .toString();
+        }
+        log.info("isRealTime={}", isRealTime);
+        log.info("effectiveStartTime={}", effectiveStartTime);
+        log.info("fechaInicio={}", fechaInicio);
         service.runAsync(sessionId, totalDays, algorithm, fechaInicio, playbackMinutes, preCancelledFlightIds, effectiveStartTime, saMinutes, planningHorizon, isRealTime);
 
         Map<String, String> response = new HashMap<>();

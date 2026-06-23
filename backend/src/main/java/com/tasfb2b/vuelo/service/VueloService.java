@@ -11,12 +11,14 @@ import com.tasfb2b.planificador.strategy.NetworkAdapter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import com.tasfb2b.vuelo.util.ParsedVuelo;
-
+import com.tasfb2b.aeropuerto.repository.AeropuertoRepository;
 import java.io.BufferedReader;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -27,21 +29,24 @@ public class VueloService {
     private final NetworkAdapter networkAdapter;
 
     public VueloResponse crear(VueloRequest request) {
+        Map<String, Aeropuerto> aeropuertoCache = aeropuertoRepo.findAll()
+                .stream()
+                .collect(Collectors.toMap(Aeropuerto::getIcaoCode, a -> a));
 
-        Aeropuerto origen = aeropuertoRepo.findById(request.origenId())
-                .orElseThrow(() -> new AeropuertoNotFoundException(request.origenId()));
-
-        Aeropuerto destino = aeropuertoRepo.findById(request.destinoId())
-                .orElseThrow(() -> new AeropuertoNotFoundException(request.destinoId()));
+        Aeropuerto origen = aeropuertoCache.get(request.origenIcao());
+        Aeropuerto destino = aeropuertoCache.get(request.destinoIcao());
 
         boolean intercontinental = !origen.getContinent().equals(destino.getContinent());
+
+        int depUtc = (request.departureMinute() - (origen.getGmtOffset() * 60) + 1440) % 1440;
+        int arrUtc = (request.arrivalMinute() - (destino.getGmtOffset() * 60) + 1440) % 1440;
 
         Vuelo vuelo = Vuelo.builder()
                 .origen(origen)
                 .destino(destino)
                 .capacidadTotal(request.capacity())
-                .departureMinute(request.departureMinute())
-                .arrivalMinute(request.arrivalMinute())
+                .departureMinute(depUtc)
+                .arrivalMinute(arrUtc)
                 .intercontinental(intercontinental)
                 .cancelled(false)
                 .build();
