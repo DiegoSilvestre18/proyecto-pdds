@@ -90,6 +90,54 @@ const FlightRow = React.memo(function FlightRow({ index, style, data }) {
       && prev.data.focusedEntity?.id === next.data.focusedEntity?.id;
 });
 
+
+
+function FlightDetailPanel({ flight, onClose }) {
+  if (!flight) return null;
+
+  const numericId = flight.id ? flight.id.toString().replace("vuelo-", "").split("-")[0] : null;
+
+  return (
+      <div style={{
+        background: 'rgba(0,0,0,0.4)',
+        borderRadius: '6px',
+        padding: '12px',
+        border: '1px solid rgba(96,165,250,0.3)',
+        position: 'relative',
+      }}>
+        <button
+            onClick={onClose}
+            style={{ position: 'absolute', top: 8, right: 8, background: 'transparent', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: 14 }}
+        >
+          ✕
+        </button>
+
+        <div style={{ fontSize: '12px', color: '#e2e8f0', marginBottom: '8px', fontWeight: 'bold' }}>
+          ✈ Vuelo {numericId} — {flight.from} ➔ {flight.to}
+        </div>
+
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', padding: '4px 0', color: '#9ca3af', borderBottom: '1px dashed rgba(255,255,255,0.1)' }}>
+          <span>Ocupación Real</span>
+          <span style={{ color: '#e2e8f0' }}>{flight.ocupacionReal || 0} maletas</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', padding: '4px 0', color: '#9ca3af', borderBottom: '1px dashed rgba(255,255,255,0.1)' }}>
+          <span>Capacidad Máxima</span>
+          <span style={{ color: '#e2e8f0' }}>{flight.capacidadMax || 0} maletas</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', padding: '4px 0', color: '#9ca3af', borderBottom: '1px dashed rgba(255,255,255,0.1)' }}>
+          <span>Progreso</span>
+          <span style={{ color: '#e2e8f0' }}>{((flight.progress ?? 0) * 100).toFixed(0)}%</span>
+        </div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', padding: '4px 0', color: '#9ca3af' }}>
+          <span>Estado</span>
+          <span style={{ color: statusColors[flight.status] || statusColors.default, fontWeight: 'bold', textTransform: 'uppercase' }}>
+          {flight.status}
+        </span>
+        </div>
+      </div>
+  );
+}
+
 const getLevelName = (percent) => {
   if (percent >= 90) return 'red';
   if (percent >= 70) return 'amber';
@@ -106,9 +154,9 @@ const SEMAPHORE_OPTIONS = [
 
 const FLIGHT_STATUS_OPTIONS = [
   { value: null,        label: '⬜ Todos',     color: '#94a3b8' },
-  { value: 'normal',    label: '🟢 Stock bajo',    color: '#10b981' },
-  { value: 'critical',  label: '🟡 Stock medio',   color: '#f59e0b' },
-  { value: 'cancelled', label: '🔴 Stock alto', color: '#ef4444' },
+  { value: 'normal',    label: '🟢 Baja ocupación',    color: '#10b981' },
+  { value: 'critical',  label: '🟡 Ocupación media',   color: '#f59e0b' },
+  { value: 'cancelled', label: '🔴 Alta ocupación', color: '#ef4444' },
 ];
 
 export default function EntitiesListPanel({ activeAircraft, airports, airportMetrics, onSelectFlight }) {
@@ -263,6 +311,11 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
     return result;
   }, [activeAircraft, utSearch, utSearchOrigin, utSearchDest, utSort, activeFilters.flightStatus]);
 
+  const selectedFlightDetail = useMemo(() => {
+    if (!expandedUt) return null;
+    return (activeAircraft || []).find(ut => ut.id === expandedUt) || null;
+  }, [expandedUt, activeAircraft]);
+
   const filteredWarehouses = useMemo(() => {
     if (activeTab !== 'wh') return [];
     let result = [...(airports || [])];
@@ -323,7 +376,7 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
   }, [activeAircraft]);
 
   return (
-    <aside className="ct-panel ct-panel--entities-list" style={{ display: 'flex', flexDirection: 'column', maxHeight: '500px', background: 'rgba(15, 23, 42, 0.9)', minWidth: "400px", flex: "1 1 400px", borderRadius: "8px", overflow: "hidden" }}>
+    <aside className="ct-panel ct-panel--entities-list" style={{ display: 'flex', flexDirection: 'column', maxHeight: '1000px', background: 'rgba(15, 23, 42, 0.9)', minWidth: "350px", flex: "1 1 350px", borderRadius: "8px", overflow: "hidden" }}>
       
       {/* HEADER TABS */}
       <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
@@ -350,84 +403,73 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
       }}>
         
         {/* TAB: UTs */}
-        {activeTab === 'ut' && filteredUTs.length > 0 && (
-            <>
-            <div style={{ display: 'flex', gap: '6px'}}>
-              <input
-                  placeholder="Buscar vuelo..."
-                  value={utSearch}
-                  onChange={(e) => setUtSearch(e.target.value)}
-                  style={{ flex: 2, padding: '6px 8px', fontSize: '12px', borderRadius: '6px' }}
-              />
+        {activeTab === 'ut' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
 
-              <input
-                  placeholder="Origen"
-                  value={utSearchOrigin}
-                  onChange={(e) => setUtSearchOrigin(e.target.value)}
-                  style={{ flex: 1, padding: '6px 8px', fontSize: '12px', borderRadius: '6px' }}
-              />
+              {/* Filtros de semáforo (igual que antes) */}
+              <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                {FLIGHT_STATUS_OPTIONS.map(opt => (
+                    <button key={opt.value ?? 'all'} onClick={() => handleFlightStatusFilter(opt.value)}
+                            style={{
+                              padding: '4px 10px', borderRadius: '8px', fontSize: '10px', fontWeight: 'bold',height: '24px',
+                              cursor: 'pointer', transition: 'all 0.15s',
+                              border: activeFilters.flightStatus === opt.value ? `1px solid ${opt.color}` : '1px solid rgba(255,255,255,0.1)',
+                              background: activeFilters.flightStatus === opt.value ? `${opt.color}20` : 'transparent',
+                              color: activeFilters.flightStatus === opt.value ? opt.color : '#64748b',
+                            }}
+                    >
+                      {opt.label}
+                    </button>
+                ))}
+              </div>
 
+              {/* Inputs de búsqueda (igual que antes) */}
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <input type="text" placeholder="ID..." value={utSearch} onChange={(e) => setUtSearch(e.target.value)}
+                       style={{ width: '55px', height: '10px',fontSize: '11px', padding: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '4px', fontSize: '12px' }} />
+                <input type="text" placeholder="Origen..." value={utSearchOrigin} onChange={(e) => setUtSearchOrigin(e.target.value)}
+                       style={{ flex: 1, height: '10px',fontSize: '11px',padding: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '4px', fontSize: '12px' }} />
+                <input type="text" placeholder="Destino..." value={utSearchDest} onChange={(e) => setUtSearchDest(e.target.value)}
+                       style={{ flex: 1, height: '10px', fontSize: '11px',padding: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '4px', fontSize: '12px' }} />
+              </div>
+              <div style={{ display: 'flex', gap: '4px' }}>
+                <select value={utSort} onChange={(e) => setUtSort(e.target.value)}
+                        style={{ flex: 1,  height: '30px', padding: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '4px', fontSize: '11px' }}
+                >
+                  <option value="occupancy_desc">Ocupación (Mayor a Menor)</option>
+                  <option value="occupancy_asc">Ocupación (Menor a Mayor)</option>
+                  <option value="dep_asc">Hora de Salida</option>
+                  <option value="arr_asc">Hora de Llegada</option>
+                  <option value="origin">Origen (A-Z)</option>
+                  <option value="dest">Destino (A-Z)</option>
+                </select>
+              </div>
 
-              <input
-                  placeholder="Destino"
-                  value={utSearchDest}
-                  onChange={(e) => setUtSearchDest(e.target.value)}
-                  style={{ flex: 1, padding: '6px 8px', fontSize: '12px', borderRadius: '6px'}}
-              />
-            </div>
+              {/* ── NUEVO: Panel de detalle, reemplaza la expansión inline ── */}
+              {selectedFlightDetail && (
+                  <FlightDetailPanel
+                      flight={selectedFlightDetail}
+                      onClose={() => setExpandedUt(null)}
+                  />
+              )}
 
-          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-          {FLIGHT_STATUS_OPTIONS.map(opt => (
-              <button
-                  key={opt.value ?? 'all'}
-                  onClick={() => handleFlightStatusFilter(opt.value)}
-                  style={{
-                    padding: '3px 8px',
-                    fontSize: '10px',
-                    borderRadius: '10px',
-                    border: activeFilters.flightStatus === opt.value
-                        ? `1px solid ${opt.color}`
-                        : '1px solid rgba(255,255,255,0.1)',
-                    background: activeFilters.flightStatus === opt.value
-                        ? `${opt.color}20`
-                        : 'transparent',
-                    color: activeFilters.flightStatus === opt.value
-                        ? opt.color
-                        : '#64748b'
-                  }}
-              >
-                {opt.label}
-              </button>
-          ))}
-            </div>
-            <div ref={listContainerRef} style={{
-              flex: 1,
-              minHeight: 0,
-              paddingTop: '6px'
-            }}>
-              <List
-                  height={listHeight}
-                  width="100%"
-                  itemCount={filteredUTs.length}
-                  itemSize={72}
-                  itemData={{
-                    flights: filteredUTs,
-                    expandedUt,
-                    setExpandedUt,
-                    handleSelectUT,
-                    focusedEntity,
-                    utRefsMap
-                  }}
-              >
-                {FlightRow}
-              </List>
-            </div>
-            </>
-        )}
-
-        {activeTab === 'ut' && filteredUTs.length === 0 && (
-            <div style={{ textAlign: 'center', color: '#64748b', fontSize: '12px', padding: '20px' }}>
-              No hay unidades de transporte activas.
+              {/* Lista virtualizada (sin cambios) */}
+              {filteredUTs.length > 0 && (
+                  <List
+                      height={selectedFlightDetail ? 300 : 420}
+                      width="100%"
+                      itemCount={filteredUTs.length}
+                      itemSize={72}
+                      itemData={{ flights: filteredUTs, expandedUt, setExpandedUt, handleSelectUT, focusedEntity, utRefsMap }}
+                  >
+                    {FlightRow}
+                  </List>
+              )}
+              {filteredUTs.length === 0 && (
+                  <div style={{ textAlign: 'center', color: '#64748b', fontSize: '12px', padding: '10px' }}>
+                    No hay unidades de transporte activas.
+                  </div>
+              )}
             </div>
         )}
 
@@ -441,7 +483,7 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
                   key={opt.value ?? 'all'}
                   onClick={() => handleSemaphoreFilter(opt.value)}
                   style={{
-                    padding: '4px 10px', borderRadius: '12px', fontSize: '10px', fontWeight: 'bold',
+                    padding: '2px 8px', borderRadius: '12px', fontSize: '9px', fontWeight: 'bold',
                     cursor: 'pointer', transition: 'all 0.15s',
                     border: activeFilters.semaphoreLevel === opt.value ? `1px solid ${opt.color}` : '1px solid rgba(255,255,255,0.1)',
                     background: activeFilters.semaphoreLevel === opt.value ? `${opt.color}20` : 'transparent',

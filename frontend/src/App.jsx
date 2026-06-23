@@ -206,7 +206,17 @@ const App = () => {
 
       {/* Renderizado de ventanas flotantes dinámicas desde DraggableWindow */}
       {isWindowOpen("telemetry") && (
-        <DraggableWindow title="Telemetría en Tiempo Real" onClose={() => handleToggleWindow("telemetry")} initialPosition={{x: 20, y: 100}} isActive={openWindowsQueue[openWindowsQueue.length-1] === "telemetry"} onFocus={() => handleFocusWindow("telemetry")}>
+          <DraggableWindow
+              title="Telemetría en Tiempo Real"
+              onClose={() => handleToggleWindow("telemetry")}
+              initialPosition={{ x: 20, y: 100 }}
+              defaultSize={{
+                  width: 600,
+                  height: 500
+              }}
+              isActive={openWindowsQueue[openWindowsQueue.length-1] === "telemetry"}
+              onFocus={() => handleFocusWindow("telemetry")}
+          >
           <TelemetryPanel isVisible={true} summary={summary} elapsedOperationTime={elapsedOperationTime} kpis={formattedKpis} onHide={() => handleToggleWindow("telemetry")} />
         </DraggableWindow>
       )}
@@ -253,7 +263,20 @@ const App = () => {
       )}
 
       {isWindowOpen("entities") && (
-        <DraggableWindow title="Monitoreo de Vuelos y Almacenes" onClose={() => handleToggleWindow("entities")} initialPosition={{x: window.innerWidth - 420, y: 120}} isActive={openWindowsQueue[openWindowsQueue.length-1] === "entities"} onFocus={() => handleFocusWindow("entities")}>
+          <DraggableWindow
+              title="Monitoreo de Vuelos y Almacenes"
+              onClose={() => handleToggleWindow("entities")}
+              initialPosition={{
+                  x: window.innerWidth - 600,
+                  y: 120
+              }}
+              defaultSize={{
+                  width: 400,
+                  height: 1000
+              }}
+              isActive={openWindowsQueue[openWindowsQueue.length - 1] === "entities"}
+              onFocus={() => handleFocusWindow("entities")}
+          >
           <EntitiesListPanel 
             activeAircraft={activeAircraft} 
             airports={AIRPORTS} 

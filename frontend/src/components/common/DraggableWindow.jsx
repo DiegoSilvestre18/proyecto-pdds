@@ -12,7 +12,7 @@ export default function DraggableWindow({
   const [position, setPosition] = useState(initialPosition);
   const [isDragging, setIsDragging] = useState(false);
   const dragRef = useRef({ startX: 0, startY: 0, initialX: 0, initialY: 0 });
-  const maxHeight = Math.min(window.innerHeight - 40, 480);
+  const maxHeight = Math.min(window.innerHeight - 40, 600);
 
   const handleMouseDown = (e) => {
     if (e.target.tagName.toLowerCase() === 'button' || e.target.closest('button')) return;
