@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react';
 import { useSelectionBridge } from '../../hooks/useSelectionBridge';
+import { FixedSizeList as List } from 'react-window';
 
 const statusColors = {
   critical: '#ef4444',
@@ -17,6 +18,78 @@ const getLevelColor = (percent) => {
   return '#10b981';
 };
 
+const FlightRow = React.memo(function FlightRow({ index, style, data }) {
+  const { flights, expandedUt, handleSelectUT, setExpandedUt, focusedEntity, utRefsMap } = data;
+  const ut = flights[index];
+  if (!ut) return null;
+
+  const numericId = ut.id ? ut.id.toString().replace("vuelo-", "").split("-")[0] : null;
+  const pct = ut.capacityPercent?.toFixed(1) || 0;
+  const semaforo = getLevelColor(pct);
+  const isExpanded = expandedUt === ut.id;
+  const isFocused = focusedEntity?.type === 'flight' && focusedEntity?.id === ut.id;
+
+  return (
+      <div style={{ ...style, padding: '2px 4px', boxSizing: 'border-box' }}>
+        <div style={{
+          background: isFocused ? 'rgba(96,165,250,0.12)' : 'rgba(255,255,255,0.05)',
+          borderRadius: '10px',
+          border: `1px solid ${isFocused ? '#60a5fa' : (statusColors[ut.status] || statusColors.default)}`,
+          overflow: 'hidden',
+          height: '100%',
+
+          // 👇 UX improvements
+          display: 'flex',
+          alignItems: 'center',
+          padding: '4px',
+        }}>
+          <div
+              style={{ padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', height: '100%', boxSizing: 'border-box' }}
+              onClick={() => { setExpandedUt(isExpanded ? null : ut.id); handleSelectUT(ut); }}
+          >
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                <span style={{ fontWeight: 'bold', color: '#e2e8f0', fontSize: '13px' }}>Vuelo {numericId}</span>
+                <span style={{ background: statusColors[ut.status] || statusColors.default, fontSize: '10px', padding: '2px 6px', borderRadius: '12px', color: '#fff', textTransform: 'uppercase' }}>{ut.status}</span>
+              </div>
+              <div
+                  style={{
+                    fontSize: '11px',
+                    color: '#9ca3af',
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: '4px',
+                    maxWidth: '100%',
+                    alignItems: 'center'
+                  }}
+              >
+                <span style={{ whiteSpace: 'nowrap' }}>{ut.from}</span>
+                <span>➔</span>
+                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100px', display: 'inline-block',verticalAlign: 'bottom' }}>
+    {ut.to}
+  </span>
+              </div>
+            </div>
+            <div style={{ textAlign: 'right' }}>
+              <div style={{ fontSize: '14px', fontWeight: 'bold', color: semaforo }}>{pct}%</div>
+              <div style={{ fontSize: '10px', color: '#94a3b8' }}>{ut.ocupacionReal || 0} / {ut.capacidadMax || 0} maletas</div>
+            </div>
+          </div>
+        </div>
+      </div>
+  );
+}, (prev, next) => {
+  // Comparador fino: solo re-renderiza si ESTE vuelo cambió relevantemente
+  const a = prev.data.flights[prev.index];
+  const b = next.data.flights[next.index];
+  return a?.id === b?.id
+      && a?.status === b?.status
+      && a?.capacityPercent === b?.capacityPercent
+      && a?.ocupacionReal === b?.ocupacionReal
+      && prev.data.expandedUt === next.data.expandedUt
+      && prev.data.focusedEntity?.id === next.data.focusedEntity?.id;
+});
+
 const getLevelName = (percent) => {
   if (percent >= 90) return 'red';
   if (percent >= 70) return 'amber';
@@ -33,24 +106,13 @@ const SEMAPHORE_OPTIONS = [
 
 const FLIGHT_STATUS_OPTIONS = [
   { value: null,        label: '⬜ Todos',     color: '#94a3b8' },
-  { value: 'normal',    label: '🟢 Normal',    color: '#10b981' },
-  { value: 'critical',  label: '🟡 Crítico',   color: '#f59e0b' },
-  { value: 'rescued',   label: '🔵 Rescatado', color: '#3b82f6' },
-  { value: 'cancelled', label: '🔴 Cancelado', color: '#ef4444' },
+  { value: 'normal',    label: '🟢 Stock bajo',    color: '#10b981' },
+  { value: 'critical',  label: '🟡 Stock medio',   color: '#f59e0b' },
+  { value: 'cancelled', label: '🔴 Stock alto', color: '#ef4444' },
 ];
 
 export default function EntitiesListPanel({ activeAircraft, airports, airportMetrics, onSelectFlight }) {
   const [activeTab, setActiveTab] = useState('ut');
-  
-  // ── Selection Bridge ─────────────────────────────────────────────────────
-  const {
-    focusedEntity,
-    setFocusedEntity,
-    dispatchMapCommand,
-    activeFilters,
-    setActiveFilters,
-  } = useSelectionBridge();
-
   // UT Filters & Sort
   const [utSearch, setUtSearch] = useState('');
   const [utSearchOrigin, setUtSearchOrigin] = useState('');
@@ -62,6 +124,40 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
   const [whSearch, setWhSearch] = useState('');
   const [whSort, setWhSort] = useState('occupancy_desc');
   const [expandedWh, setExpandedWh] = useState(null);
+
+  const listContainerRef = useRef(null);
+  const [listHeight, setListHeight] = useState(0);
+
+
+
+
+  useEffect(() => {
+    if (!listContainerRef.current) return;
+
+    const updateHeight = () => {
+      const rect = listContainerRef.current.getBoundingClientRect();
+      setListHeight(rect.height);
+    };
+
+    updateHeight();
+    const ro = new ResizeObserver(updateHeight);
+    ro.observe(listContainerRef.current);
+
+    return () => ro.disconnect();
+  }, [activeTab]);
+
+
+  
+  // ── Selection Bridge ─────────────────────────────────────────────────────
+  const {
+    focusedEntity,
+    setFocusedEntity,
+    dispatchMapCommand,
+    activeFilters,
+    setActiveFilters,
+  } = useSelectionBridge();
+
+
 
   // ── Refs para scroll automático ────────────────────────────────────────
   const utRefsMap = useRef({});
@@ -131,8 +227,9 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
   }, [setActiveFilters]);
 
   const filteredUTs = useMemo(() => {
+    if (activeTab !== 'ut') return []; // ← evita filtrar/ordenar si no se muestra
     let result = [...(activeAircraft || [])];
-    
+
     if (utSearch) {
       const q = utSearch.toLowerCase();
       result = result.filter(ut => ut.id?.toLowerCase().includes(q));
@@ -167,6 +264,7 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
   }, [activeAircraft, utSearch, utSearchOrigin, utSearchDest, utSort, activeFilters.flightStatus]);
 
   const filteredWarehouses = useMemo(() => {
+    if (activeTab !== 'wh') return [];
     let result = [...(airports || [])];
     
     if (whSearch) {
@@ -243,119 +341,94 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
         </button>
       </div>
 
-      <div ref={scrollContainerRef} style={{ flex: 1, overflowY: 'auto', padding: '16px' }}>
+      <div style={{
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        minHeight: 0,
+        overflow: 'hidden'
+      }}>
         
         {/* TAB: UTs */}
-        {activeTab === 'ut' && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {/* Paso 6: Filtros por semáforo de vuelo */}
-            <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-              {FLIGHT_STATUS_OPTIONS.map(opt => (
-                <button
+        {activeTab === 'ut' && filteredUTs.length > 0 && (
+            <>
+            <div style={{ display: 'flex', gap: '6px'}}>
+              <input
+                  placeholder="Buscar vuelo..."
+                  value={utSearch}
+                  onChange={(e) => setUtSearch(e.target.value)}
+                  style={{ flex: 2, padding: '6px 8px', fontSize: '12px', borderRadius: '6px' }}
+              />
+
+              <input
+                  placeholder="Origen"
+                  value={utSearchOrigin}
+                  onChange={(e) => setUtSearchOrigin(e.target.value)}
+                  style={{ flex: 1, padding: '6px 8px', fontSize: '12px', borderRadius: '6px' }}
+              />
+
+
+              <input
+                  placeholder="Destino"
+                  value={utSearchDest}
+                  onChange={(e) => setUtSearchDest(e.target.value)}
+                  style={{ flex: 1, padding: '6px 8px', fontSize: '12px', borderRadius: '6px'}}
+              />
+            </div>
+
+          <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+          {FLIGHT_STATUS_OPTIONS.map(opt => (
+              <button
                   key={opt.value ?? 'all'}
                   onClick={() => handleFlightStatusFilter(opt.value)}
                   style={{
-                    padding: '4px 10px', borderRadius: '12px', fontSize: '10px', fontWeight: 'bold',
-                    cursor: 'pointer', transition: 'all 0.15s',
-                    border: activeFilters.flightStatus === opt.value ? `1px solid ${opt.color}` : '1px solid rgba(255,255,255,0.1)',
-                    background: activeFilters.flightStatus === opt.value ? `${opt.color}20` : 'transparent',
-                    color: activeFilters.flightStatus === opt.value ? opt.color : '#64748b',
+                    padding: '3px 8px',
+                    fontSize: '10px',
+                    borderRadius: '10px',
+                    border: activeFilters.flightStatus === opt.value
+                        ? `1px solid ${opt.color}`
+                        : '1px solid rgba(255,255,255,0.1)',
+                    background: activeFilters.flightStatus === opt.value
+                        ? `${opt.color}20`
+                        : 'transparent',
+                    color: activeFilters.flightStatus === opt.value
+                        ? opt.color
+                        : '#64748b'
                   }}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-
-            <div style={{ display: 'flex', gap: '4px' }}>
-              <input type="text" placeholder="ID..." value={utSearch} onChange={(e) => setUtSearch(e.target.value)}
-                style={{ width: '70px', padding: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '4px', fontSize: '12px' }} />
-              <input type="text" placeholder="Origen..." value={utSearchOrigin} onChange={(e) => setUtSearchOrigin(e.target.value)}
-                style={{ flex: 1, padding: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '4px', fontSize: '12px' }} />
-              <input type="text" placeholder="Destino..." value={utSearchDest} onChange={(e) => setUtSearchDest(e.target.value)}
-                style={{ flex: 1, padding: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '4px', fontSize: '12px' }} />
-            </div>
-            <div style={{ display: 'flex', gap: '8px' }}>
-              <select value={utSort} onChange={(e) => setUtSort(e.target.value)}
-                style={{ flex: 1, padding: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '4px', fontSize: '12px' }}
               >
-                <option value="occupancy_desc">Ocupación (Mayor a Menor)</option>
-                <option value="occupancy_asc">Ocupación (Menor a Mayor)</option>
-                <option value="dep_asc">Hora de Salida</option>
-                <option value="arr_asc">Hora de Llegada</option>
-                <option value="origin">Origen (A-Z)</option>
-                <option value="dest">Destino (A-Z)</option>
-              </select>
+                {opt.label}
+              </button>
+          ))}
             </div>
-            
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {filteredUTs.map(ut => {
-                const numericId = ut.id?.toString().replace("vuelo-", "").split("-")[0];
-                const pct = ut.capacityPercent?.toFixed(1) || 0;
-                const semaforo = getLevelColor(pct);
-                const isExpanded = expandedUt === ut.id;
-                const isFocused = focusedEntity?.type === 'flight' && focusedEntity?.id === ut.id;
-
-                return (
-                  <div
-                    key={ut.id}
-                    ref={el => { utRefsMap.current[ut.id] = el; }}
-                    style={{
-                      background: isFocused ? 'rgba(96,165,250,0.12)' : 'rgba(255,255,255,0.05)',
-                      borderRadius: '6px',
-                      border: `1px solid ${isFocused ? '#60a5fa' : (statusColors[ut.status] || statusColors.default)}`,
-                      overflow: 'hidden',
-                      transition: 'background 0.3s ease, border-color 0.3s ease',
-                    }}
-                  >
-                    <div 
-                      style={{ padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
-                      onClick={() => {
-                        setExpandedUt(isExpanded ? null : ut.id);
-                        // Paso 2: Panel→Mapa — enfocar en mapa
-                        handleSelectUT(ut);
-                      }}
-                    >
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                          <span style={{ fontWeight: 'bold', color: '#e2e8f0', fontSize: '13px' }}>Vuelo {numericId}</span>
-                          <span style={{ background: statusColors[ut.status] || statusColors.default, fontSize: '10px', padding: '2px 6px', borderRadius: '12px', color: '#fff', textTransform: 'uppercase' }}>{ut.status}</span>
-                        </div>
-                        <div style={{ fontSize: '11px', color: '#9ca3af' }}>{ut.from} ➔ {ut.to}</div>
-                      </div>
-                      <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: '14px', fontWeight: 'bold', color: semaforo }}>{pct}%</div>
-                        <div style={{ fontSize: '10px', color: '#94a3b8' }}>{ut.ocupacionReal || 0} / {ut.capacidadMax || 0} maletas</div>
-                      </div>
-                    </div>
-
-                    {isExpanded && (
-                      <div style={{ background: 'rgba(0,0,0,0.3)', padding: '12px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                        <div style={{ fontSize: '11px', color: '#cbd5e1', marginBottom: '8px', fontWeight: 'bold' }}>📦 DATOS DEL VUELO</div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', padding: '4px 0', color: '#9ca3af', borderBottom: '1px dashed rgba(255,255,255,0.1)' }}>
-                          <span>Ocupación Real</span>
-                          <span style={{ color: '#e2e8f0' }}>{ut.ocupacionReal || 0} maletas</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', padding: '4px 0', color: '#9ca3af', borderBottom: '1px dashed rgba(255,255,255,0.1)' }}>
-                          <span>Capacidad Máxima</span>
-                          <span style={{ color: '#e2e8f0' }}>{ut.capacidadMax || 0} maletas</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', padding: '4px 0', color: '#9ca3af', borderBottom: '1px dashed rgba(255,255,255,0.1)' }}>
-                          <span>Progreso</span>
-                          <span style={{ color: '#e2e8f0' }}>{((ut.progress ?? 0) * 100).toFixed(0)}%</span>
-                        </div>
-                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', padding: '4px 0', color: '#9ca3af' }}>
-                          <span>Estado</span>
-                          <span style={{ color: statusColors[ut.status] || statusColors.default, fontWeight: 'bold', textTransform: 'uppercase' }}>{ut.status}</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-              {filteredUTs.length === 0 && <div style={{ textAlign: 'center', color: '#64748b', fontSize: '12px', padding: '20px' }}>No hay unidades de transporte activas.</div>}
+            <div ref={listContainerRef} style={{
+              flex: 1,
+              minHeight: 0,
+              paddingTop: '6px'
+            }}>
+              <List
+                  height={listHeight}
+                  width="100%"
+                  itemCount={filteredUTs.length}
+                  itemSize={72}
+                  itemData={{
+                    flights: filteredUTs,
+                    expandedUt,
+                    setExpandedUt,
+                    handleSelectUT,
+                    focusedEntity,
+                    utRefsMap
+                  }}
+              >
+                {FlightRow}
+              </List>
             </div>
-          </div>
+            </>
+        )}
+
+        {activeTab === 'ut' && filteredUTs.length === 0 && (
+            <div style={{ textAlign: 'center', color: '#64748b', fontSize: '12px', padding: '20px' }}>
+              No hay unidades de transporte activas.
+            </div>
         )}
 
         {/* TAB: ALMACENES */}
