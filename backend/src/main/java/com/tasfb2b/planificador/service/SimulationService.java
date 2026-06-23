@@ -33,7 +33,8 @@ import java.time.ZoneOffset;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
-
+import java.time.Instant;
+import java.time.LocalTime;
 /**
  * Servicio de simulación multi-día con ejecución asíncrona y micro-batching.
  */
@@ -233,7 +234,10 @@ public class SimulationService {
                                         targetEpoch = dayStartEpochMs + (h * 3600_000L) + (m * 60_000L);
                                 } catch (Exception ignored) {}
                         }
-
+                        log.info("Hora JVM local={}", LocalTime.now());
+                        log.info("Hora UTC={}", LocalTime.now(ZoneOffset.UTC));
+                        log.info("startTimeStr={}", startTimeStr);
+                        log.info("targetInstantUTC={}", Instant.ofEpochMilli(targetEpoch));
                         int currentSimMinuteOfDay = 0;
                         List<Route> masterPlan = new ArrayList<>();
 
@@ -245,7 +249,7 @@ public class SimulationService {
                                 if (currentSimMinuteOfDay + currentSa > 1440) currentSa = 1440 - currentSimMinuteOfDay;
                                 session.setCurrentSaMinutes(currentSa);
 
-                                java.time.ZonedDateTime zdt = java.time.Instant.ofEpochMilli(currentSimTime).atZone(java.time.ZoneId.systemDefault());
+                                java.time.ZonedDateTime zdt = java.time.Instant.ofEpochMilli(currentSimTime).atZone(ZoneOffset.UTC);
                                 String simulatedTimeStr = String.format("Día %d - %02d:%02d", day + 1, zdt.getHour(), zdt.getMinute());
 
                                 // Cancelaciones manuales

@@ -15,8 +15,7 @@ import AirportDetailPanel from "./components/floating/AirportDetailPanel";
 import FlightCancellationPanel from "./components/scenarios/FlightCancellationPanel";
 import ReportsPanel from "./components/floating/ReportsPanel";
 import EntitiesListPanel from "./components/floating/EntitiesListPanel";
-import KpiStrip from "./components/kpi/KpiStrip";
-import KpiControls from "./components/kpi/KpiControls";
+
 import DayToDayConfig from "./components/scenarios/DayToDayConfig";
 import PeriodSimConfig from "./components/scenarios/PeriodSimConfig";
 import CollapseSimConfig from "./components/scenarios/CollapseSimConfig";
@@ -91,7 +90,7 @@ const App = () => {
 
   // ── Lógica FIFO de Paneles (Draggable Windows) ──
   const [maxWindows, setMaxWindows] = useState(1);
-  const [openWindowsQueue, setOpenWindowsQueue] = useState([]);
+  const [openWindowsQueue, setOpenWindowsQueue] = useState(["telemetry"]);
 
   const handleToggleWindow = (panelKey) => {
     setOpenWindowsQueue(prev => {
@@ -126,6 +125,30 @@ const App = () => {
 
   const [mapZoom, setMapZoom] = useState(2.0);
   const [mapCenter, setMapCenter] = useState([22, 15]);
+
+  const formattedKpis = [
+      ...kpiCards.map(kpi => {
+          if (kpi.key === "progress" && activeTab === "vivo") {
+              return {
+                  ...kpi,
+                  title: "Estado Operativo",
+                  value: "TRANSMISIÓN EN VIVO",
+                  subtitle: "Monitoreo continuo",
+                  progress: undefined
+              };
+          }
+          return kpi;
+      }),
+      ...(isSimScenario || (activeTab === "vivo" && simState !== "idle") ? [
+          {
+              key: "sim_elapsed_times",
+              title: "T. Ejecución (Real)",
+              value: summary.realTimeElapsed || "00:00:00",
+              subtitle: isSimScenario ? `Restante est: ~${summary.realTimeRemaining || "00:00:00"}` : "Transcurrido",
+              status: "default"
+          }
+      ] : [])
+  ];
 
   return (
     <div
@@ -162,34 +185,7 @@ const App = () => {
         realClock={summary.realClock}
       />
 
-      <div className="ct-kpi-region">
-          <KpiStrip isCollapsed={isKpiCollapsed} kpiCards={[
-              ...kpiCards.map(kpi => {
-                  if (kpi.key === "progress" && activeTab === "vivo") {
-                      return {
-                          ...kpi,
-                          title: "Estado Operativo",
-                          value: "TRANSMISIÓN EN VIVO",
-                          subtitle: "Monitoreo continuo",
-                          progress: undefined
-                      };
-                  }
-                  return kpi;
-              }),
-              ...(isSimScenario || (activeTab === "vivo" && simState !== "idle") ? [
 
-                  {
-                      key: "sim_elapsed_times",
-                      title: "T. Ejecución (Real)",
-                      value: summary.realTimeElapsed || "00:00:00",
-                      subtitle: isSimScenario ? `Restante est: ~${summary.realTimeRemaining || "00:00:00"}` : "Transcurrido",
-                      status: "default"
-                  }
-              ] : [])
-          ]} />
-
-        <KpiControls isCollapsed={isKpiCollapsed} onToggle={toggleKpiStrip} />
-      </div>
 
       {isWindowOpen("cancellation") && (
         <DraggableWindow 
@@ -210,8 +206,18 @@ const App = () => {
 
       {/* Renderizado de ventanas flotantes dinámicas desde DraggableWindow */}
       {isWindowOpen("telemetry") && (
-        <DraggableWindow title="Telemetría en Tiempo Real" onClose={() => handleToggleWindow("telemetry")} initialPosition={{x: 20, y: 150}} isActive={openWindowsQueue[openWindowsQueue.length-1] === "telemetry"} onFocus={() => handleFocusWindow("telemetry")}>
-          <TelemetryPanel isVisible={true} summary={summary} elapsedOperationTime={elapsedOperationTime} onHide={() => handleToggleWindow("telemetry")} />
+          <DraggableWindow
+              title="Telemetría en Tiempo Real"
+              onClose={() => handleToggleWindow("telemetry")}
+              initialPosition={{ x: 20, y: 100 }}
+              defaultSize={{
+                  width: 600,
+                  height: 500
+              }}
+              isActive={openWindowsQueue[openWindowsQueue.length-1] === "telemetry"}
+              onFocus={() => handleFocusWindow("telemetry")}
+          >
+          <TelemetryPanel isVisible={true} summary={summary} elapsedOperationTime={elapsedOperationTime} kpis={formattedKpis} onHide={() => handleToggleWindow("telemetry")} />
         </DraggableWindow>
       )}
       {isWindowOpen("occupancy") && (
@@ -257,7 +263,20 @@ const App = () => {
       )}
 
       {isWindowOpen("entities") && (
-        <DraggableWindow title="Monitoreo de Vuelos y Almacenes" onClose={() => handleToggleWindow("entities")} initialPosition={{x: window.innerWidth - 420, y: 120}} isActive={openWindowsQueue[openWindowsQueue.length-1] === "entities"} onFocus={() => handleFocusWindow("entities")}>
+          <DraggableWindow
+              title="Monitoreo de Vuelos y Almacenes"
+              onClose={() => handleToggleWindow("entities")}
+              initialPosition={{
+                  x: window.innerWidth - 600,
+                  y: 120
+              }}
+              defaultSize={{
+                  width: 400,
+                  height: 1000
+              }}
+              isActive={openWindowsQueue[openWindowsQueue.length - 1] === "entities"}
+              onFocus={() => handleFocusWindow("entities")}
+          >
           <EntitiesListPanel 
             activeAircraft={activeAircraft} 
             airports={AIRPORTS} 

@@ -20,7 +20,22 @@ function formatFlightId(id) {
 
 function formatTimeWithDate(epoch) {
   if (!epoch) return '--';
-  return new Date(epoch).toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+  return new Date(epoch).toISOString().toLocaleString('es-ES', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit', timeZone: 'UTC', timeZoneName: 'short'});
+}
+
+function formatTimeWithGMT(epoch, gmtOffset) {
+    if (!epoch) return '--';
+    const date = new Date(epoch);
+    // Apply GMT offset (in hours) of the airport
+    date.setUTCHours(date.getUTCHours() + (gmtOffset ?? 0));
+    return date.toLocaleString('es-ES', {
+        day: '2-digit',
+        month: 'short',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'UTC',
+        timeZoneName: 'short',
+    });
 }
 
 function ShipmentDetailPanel({ isVisible, selectedAircraft = null }) {      
@@ -30,8 +45,8 @@ function ShipmentDetailPanel({ isVisible, selectedAircraft = null }) {
 
   const statusLabel = STATUS_LABELS[selectedAircraft.status] ?? selectedAircraft.status ?? "En vuelo";
   const bagsLabel = `${selectedAircraft.ocupacionReal} / ${selectedAircraft.capacidadMax}`;
-  const depTime = formatTimeWithDate(selectedAircraft.departureTime);
-  const arrTime = formatTimeWithDate(selectedAircraft.arrivalTime);
+  const depTime = formatTimeWithGMT(selectedAircraft.departureTime, selectedAircraft.fromGmt);
+  const arrTime = formatTimeWithGMT(selectedAircraft.arrivalTime, selectedAircraft.toGmt);
   
   const progressPct = Math.min(100, Math.max(0, Math.round((selectedAircraft.progress ?? 0) * 100)));
 

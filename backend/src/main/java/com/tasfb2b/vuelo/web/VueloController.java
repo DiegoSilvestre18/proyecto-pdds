@@ -15,7 +15,7 @@ public class VueloController {
 
     private final VueloService service;
 
-    @PostMapping
+    @PostMapping("/create")
     public VueloResponse crear(@Valid @RequestBody VueloRequest request) {
         return service.crear(request);
     }

@@ -15,7 +15,7 @@ public class AeropuertoController {
 
     private final AeropuertoService service;
 
-    @PostMapping
+    @PostMapping("/create")
     public AeropuertoResponse crear(@Valid @RequestBody AeropuertoRequest request) {
         return service.crear(request);
     }

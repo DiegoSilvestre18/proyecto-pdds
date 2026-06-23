@@ -47,20 +47,33 @@ const LegendButton = () => {
 };
 
 const MapZoomControls = ({ zoom, center, onMoveEnd }) => (
-  <div className="map-zoom-controls">
-    <button
-      title="Acercar (+)"
-      onClick={() => onMoveEnd({ zoom: clampZoom(zoom * 1.3), coordinates: center })}
-    >+</button>
-    <button
-      title="Alejar (-)"
-      onClick={() => onMoveEnd({ zoom: clampZoom(zoom / 1.3), coordinates: center })}
-    >−</button>
-    <button
-      title="Centrar vista"
-      onClick={() => onMoveEnd({ zoom: 2.0, coordinates: [22, 15] })}
-    >◎</button>
-  </div>
+    <div className="map-zoom-controls">
+      <input
+          type="range"
+          min="0.5"
+          max="10"
+          step="0.01"
+          value={zoom}
+          onChange={(e) =>
+              onMoveEnd({
+                zoom: Number(e.target.value),
+                coordinates: center
+              })
+          }
+      />
+
+      <button
+          title="Centrar vista"
+          onClick={() =>
+              onMoveEnd({
+                zoom: 0.86,
+                coordinates: [7, 17]
+              })
+          }
+      >
+        ◎
+      </button>
+    </div>
 );
 
 

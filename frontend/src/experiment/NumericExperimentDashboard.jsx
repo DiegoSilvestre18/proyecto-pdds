@@ -294,7 +294,7 @@ const NumericExperimentDashboard = () => {
             {/* ────────── BARRA SUPERIOR ────────── */}
             <div style={s.topBar}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-                    <button onClick={() => navigate('/')} style={s.backBtn}>← Torre de Control</button>
+                    <button onClick={() => navigate('/map')} style={s.backBtn}>← Torre de Control</button>
                     <div>
                         <h1 style={s.pageTitle}>🧪 Tablero de Experimentación Numérica</h1>
                         <p style={s.pageSubtitle}>Esquema Académico DOE · Análisis sobre Archivos Planos · 1 Día Comprimido por Nivel</p>
