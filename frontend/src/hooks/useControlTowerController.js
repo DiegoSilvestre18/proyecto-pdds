@@ -767,7 +767,7 @@ const envelope = JSON.parse(msg.body);
       .slice(0, 8)
       .map(([icao, data]) => ({
         city: AIRPORT_BY_ICAO[icao]?.city ?? icao,
-        capacity: `${data.occupancy || 0}%`,
+        capacity: `${Number(data.occupancy || 0).toFixed(2)}%`,
         icao,
       }));
   }, [airportLoads, isCollapseScenario]);
