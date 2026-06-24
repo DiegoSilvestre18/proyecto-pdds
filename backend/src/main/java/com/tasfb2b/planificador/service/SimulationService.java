@@ -242,6 +242,12 @@ public class SimulationService {
                         List<Route> masterPlan = new ArrayList<>();
 
                         while (currentSimMinuteOfDay < 1440) {
+                                while (!vuelosInyectadosEnVivo.isEmpty()) {
+                                        Vuelo nuevo = vuelosInyectadosEnVivo.poll();
+                                        todosLosVuelos.add(nuevo);
+                                        globalState.registerFlights(List.of(nuevo));
+                                        networkAdapter.invalidateGraph();
+                                }
                                 long currentSimTime = dayStartEpochMs + ((long) currentSimMinuteOfDay * 60_000L);
                                 boolean isCatchingUp = isRealTime && currentSimTime < targetEpoch;
                                 
@@ -333,6 +339,12 @@ public class SimulationService {
 
         private SuperLot elevateToMaxPriority(SuperLot lot, long currentTime) {
                 return new SuperLot(lot.getId(), lot.getOrigenIcao(), lot.getDestinoIcao(), lot.getTotalMaletas(), currentTime + 86400000L, lot.getSla(), lot.isIntercontinental(), Integer.MAX_VALUE);
+        }
+
+        private final java.util.Queue<Vuelo> vuelosInyectadosEnVivo = new java.util.concurrent.ConcurrentLinkedQueue<>();
+
+        public void inyectarVueloEnVivo(Vuelo vuelo) {
+                vuelosInyectadosEnVivo.offer(vuelo);
         }
 
         private void updateProgress(SimulationProgressHolder.SimulationSessionState session, int completedDays, int totalDays, int currentPercent, String simulatedTime, double slaPercent, SimulationState state, Map<String, Aeropuerto> airportMap, List<Route> activeRoutesList, long currentSimTime, long baseTime, String algorithm, String planId, List<Route> masterPlan, List<Vuelo> todosLosVuelos, Map<Integer, SuperLot> planifiablePool, boolean isRealTime) {
