@@ -9,6 +9,7 @@ import { AIRPORT_BY_ICAO } from "../../data/airportsData";
 import { createAirportsLayers } from "./layers/AirportsLayer";
 import { createFlightsLayer } from "./layers/FlightsLayer";
 import { createRoutesLayers } from "./layers/RoutesLayer";
+import { getStraightPath } from "./layers/utils";
 
 const LEGEND_ITEMS = [
   { color: '#10b981', label: 'Nodo Estable (<70%)' },
