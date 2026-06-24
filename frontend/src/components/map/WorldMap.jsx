@@ -85,8 +85,8 @@ const PROJECTION_CONFIG = {
 
 // Zoom continuo con wheel — factor suavizado
 const ZOOM_SPEED = 0.0012;
-const MIN_ZOOM = 1.2;
-const MAX_ZOOM = 12;
+const MIN_ZOOM = 0.5;
+const MAX_ZOOM = 10;
 
 const clampZoom = (z) => Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, z));
 
@@ -387,7 +387,7 @@ const WorldMap = ({
         onClick={(e) => { if (e.target === e.currentTarget && onBackgroundClick) onBackgroundClick(); }}
         style={{ width: "100%", height: "100%" }}
       >
-        <ZoomableGroup zoom={zoom} center={center} onMoveEnd={onMoveEnd} maxZoom={8}>
+        <ZoomableGroup zoom={zoom} center={center} onMoveEnd={onMoveEnd} minZoom={0.5} maxZoom={10}>
           
           <MapBackground isCollapseScenario={isCollapseScenario} />
 
