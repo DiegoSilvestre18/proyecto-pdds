@@ -10,6 +10,7 @@ import com.tasfb2b.envio.util.ParsedEnvio;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import com.tasfb2b.envio.dto.EnvioResponse;
 
 import java.time.LocalDateTime;
 import java.time.LocalDate;
@@ -23,6 +24,11 @@ import java.util.HashSet;
 import java.util.Set;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -32,6 +38,41 @@ public class EnvioService {
     private final AeropuertoRepository aeropuertoRepo;
 
     private static final int BATCH_SIZE = 500;
+
+    @Transactional(readOnly = true)
+    public Page<EnvioResponse> listar(Pageable pageable) {
+        return envioRepo.findAll(pageable)
+                .map(this::toResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public Page<EnvioResponse> buscar(
+            String origen,
+            String codigo,
+            Pageable pageable
+    ) {
+        origen = (origen == null || origen.isBlank()) ? null : origen;
+        codigo = (codigo == null || codigo.isBlank()) ? null : codigo;
+        return envioRepo
+                .buscar(
+                        origen,
+                        codigo,
+                        pageable
+                )
+                .map(this::toResponse);
+    }
+
+    private EnvioResponse toResponse(Envio e) {
+        return new EnvioResponse(
+                e.getId(),
+                e.getCodigoPedido(),
+                e.getOrigen().getIcaoCode(),
+                e.getDestino().getIcaoCode(),
+                e.getCantidadMaletas(),
+                e.getFecha(),
+                e.getHora()
+        );
+    }
 
     @Transactional(propagation = org.springframework.transaction.annotation.Propagation.REQUIRES_NEW)
     public void cargarDesdeLineasArchivo(String nombreArchivo, List<String> lineas) {

@@ -158,7 +158,7 @@ const FLIGHT_STATUS_OPTIONS = [
   { value: 'cancelled', label: '🔴 Alta ocupación', color: '#ef4444' },
 ];
 
-export default function EntitiesListPanel({ activeAircraft, airports, airportMetrics, onSelectFlight }) {
+export default function EntitiesListPanel({ activeAircraft, airports, airportMetrics, onSelectFlight, onAirportSelect }) {
   const [activeTab, setActiveTab] = useState('ut');
   // UT Filters & Sort
   const [utSearch, setUtSearch] = useState('');
@@ -199,6 +199,7 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
   const {
     focusedEntity,
     setFocusedEntity,
+    clearFocusedEntity,
     dispatchMapCommand,
     activeFilters,
     setActiveFilters,
@@ -252,13 +253,19 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
   }, [setFocusedEntity, onSelectFlight]);
 
   const handleSelectWarehouse = useCallback((wh) => {
+    if (!wh) {
+      clearFocusedEntity();
+      if (onAirportSelect) onAirportSelect(null);
+      return;
+    }
     setFocusedEntity('airport', wh.icao, 'panel');
+    if (onAirportSelect) onAirportSelect(wh.icao);
     dispatchMapCommand('flyTo', {
       coordinates: wh.coordinates,
-      zoom: 5,
+      zoom: 3,
       targetId: wh.icao,
     });
-  }, [setFocusedEntity, dispatchMapCommand]);
+  }, [setFocusedEntity, clearFocusedEntity, dispatchMapCommand, onAirportSelect]);
 
   // ── Paso 6: Handler de filtro por semáforo ──────────────────────────────
   const handleSemaphoreFilter = useCallback((level) => {
@@ -558,7 +565,7 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
                       onClick={() => {
                         setExpandedWh(isExpanded ? null : wh.icao);
                         // Paso 2: Panel→Mapa — enfocar en mapa
-                        handleSelectWarehouse(wh);
+                        handleSelectWarehouse(isExpanded ? null : wh);
                       }}
                     >
                       <div>
@@ -566,8 +573,8 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
                         <div style={{ fontSize: '10px', color: '#9ca3af' }}>{wh.city}</div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: '13px', fontWeight: 'bold', color: semaforo }}>{Math.trunc(pct).toFixed(2)}%</div>
-                        <div style={{ fontSize: '9px', color: '#94a3b8' }}>{metrics.storedBags ?? 0} / {metrics.warehouseCapacity ?? 0} stock</div>
+                        <div style={{ fontSize: '14px', fontWeight: 'bold', color: semaforo }}>{pct.toFixed(1)}%</div>
+                        <div style={{ fontSize: '10px', color: '#94a3b8' }}>{metrics.storedBags ?? 0} / {metrics.warehouseCapacity ?? 0} stock</div>
                       </div>
                     </div>
 

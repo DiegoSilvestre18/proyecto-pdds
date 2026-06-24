@@ -51,7 +51,7 @@ const LegendButton = () => {
   );
 };
 
-const MapZoomControls = ({ zoom, center, onMoveEnd }) => (
+const MapZoomControls = ({ zoom, center, onMoveEnd, onBackgroundClick }) => (
     <div className="map-zoom-controls" style={{ zIndex: 200, position: 'absolute' }}>
       <input
           type="range"
@@ -68,17 +68,19 @@ const MapZoomControls = ({ zoom, center, onMoveEnd }) => (
       />
       <button
           title="Centrar vista"
-          onClick={() =>
+          onClick={() => {
+              onBackgroundClick?.()
               onMoveEnd({
                 zoom: 2,
                 coordinates: [15, 22] // Europe/Africa center
               })
-          }
+          }}
       >
         ◎
       </button>
     </div>
 );
+
 
 const WorldMap = ({
   airports = [],
@@ -264,6 +266,23 @@ const WorldMap = ({
     }
   }, [onAirportSelect, onAircraftSelect, onBackgroundClick, setFocusedEntity]);
 
+  // Precompute full paths per route — recomputed only when activeAircraft changes, not every frame
+  const routeFullPaths = useMemo(() => {
+    const cache = {};
+    const pathByRoute = {};
+    activeAircraft.forEach(plane => {
+      const from = airportByIcao[plane.from];
+      const to = airportByIcao[plane.to];
+      if (!from || !to) return;
+      const key = `${plane.from}__${plane.to}`;
+      if (!pathByRoute[key]) {
+        pathByRoute[key] = getStraightPath(from.coordinates, to.coordinates);
+      }
+      cache[plane.id] = pathByRoute[key];
+    });
+    return cache;
+  }, [activeAircraft, airportByIcao]);
+
   return (
     <div 
       className="ct-world-map" 
@@ -284,6 +303,7 @@ const WorldMap = ({
 
       <LegendButton />
       <MapZoomControls zoom={viewState.zoom} center={[viewState.longitude, viewState.latitude]} onMoveEnd={onMoveEnd} />
+
 
       {trackedRoute && (
         <button
@@ -331,6 +351,7 @@ const WorldMap = ({
           preventStyleDiffing
         />
       </DeckGL>
+
 
       {simState === "completed" && (
         <div style={{

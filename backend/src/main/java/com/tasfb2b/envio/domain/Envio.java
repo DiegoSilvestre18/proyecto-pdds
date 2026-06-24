@@ -12,6 +12,12 @@ import java.time.LocalTime;
         name = "envios",
         uniqueConstraints = {
                 @UniqueConstraint(columnNames = {"codigo_pedido", "origen_id"})
+        },
+        indexes = {
+            @Index(
+                    name = "idx_envio_origen_codigo",
+                    columnList = "origen_id,codigo_pedido"
+            )
         }
 )
 @Getter
