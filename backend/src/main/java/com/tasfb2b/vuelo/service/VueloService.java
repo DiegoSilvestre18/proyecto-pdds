@@ -28,6 +28,10 @@ public class VueloService {
     private final AeropuertoRepository aeropuertoRepo;
     private final NetworkAdapter networkAdapter;
 
+    @org.springframework.beans.factory.annotation.Autowired
+    @org.springframework.context.annotation.Lazy
+    private com.tasfb2b.planificador.service.SimulationService simulationService;
+
     public VueloResponse crear(VueloRequest request) {
         Map<String, Aeropuerto> aeropuertoCache = aeropuertoRepo.findAll()
                 .stream()
@@ -52,6 +56,10 @@ public class VueloService {
                 .build();
 
         vueloRepo.save(vuelo);
+        
+        try {
+            simulationService.inyectarVueloEnVivo(vuelo);
+        } catch(Exception ignored) {}
 
         return new VueloResponse(
                 vuelo.getId(),
