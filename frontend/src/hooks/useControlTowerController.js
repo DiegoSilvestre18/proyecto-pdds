@@ -18,7 +18,7 @@ const PANEL_VISIBILITY_DEFAULT = {
 };
 
 const KPI_COLLAPSED_STORAGE_KEY = "ct-kpi-collapsed";
-const MAX_MAP_ROUTES = 140;
+const MAX_MAP_ROUTES = 1200;
 const STATUS_PRIORITY = {
   critical: 3,
   blocked: 3,
