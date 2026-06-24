@@ -2,13 +2,25 @@ package com.tasfb2b.envio.repository;
 
 import com.tasfb2b.envio.domain.Envio;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.repository.CrudRepository;
+import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.repository.query.Param;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Stream;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
-public interface EnvioRepository extends CrudRepository<Envio, Long> {
+public interface EnvioRepository extends JpaRepository<Envio, Long> {
+
+
+    @Query("""
+    SELECT e FROM Envio e
+    WHERE (:origen IS NULL OR e.origen.icaoCode = :origen)
+    AND (:codigo IS NULL OR e.codigoPedido LIKE CONCAT(:codigo, '%'))
+    """)
+    Page<Envio> buscar(String origen, String codigo, Pageable pageable);
 
     @org.springframework.transaction.annotation.Transactional
     @org.springframework.data.jpa.repository.Modifying

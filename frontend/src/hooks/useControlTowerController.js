@@ -18,7 +18,7 @@ const PANEL_VISIBILITY_DEFAULT = {
 };
 
 const KPI_COLLAPSED_STORAGE_KEY = "ct-kpi-collapsed";
-const MAX_MAP_ROUTES = 1200;
+const MAX_MAP_ROUTES = 140;
 const STATUS_PRIORITY = {
   critical: 3,
   blocked: 3,
@@ -767,7 +767,7 @@ const envelope = JSON.parse(msg.body);
       .slice(0, 8)
       .map(([icao, data]) => ({
         city: AIRPORT_BY_ICAO[icao]?.city ?? icao,
-        capacity: `${data.occupancy || 0}%`,
+        capacity: `${Number(data.occupancy || 0).toFixed(2)}%`,
         icao,
       }));
   }, [airportLoads, isCollapseScenario]);
