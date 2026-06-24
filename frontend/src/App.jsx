@@ -15,6 +15,7 @@ import AirportDetailPanel from "./components/floating/AirportDetailPanel";
 import FlightCancellationPanel from "./components/scenarios/FlightCancellationPanel";
 import ReportsPanel from "./components/floating/ReportsPanel";
 import EntitiesListPanel from "./components/floating/EntitiesListPanel";
+import ShipmentsPanel from "./components/floating/ShipmentsPanel";
 
 import DayToDayConfig from "./components/scenarios/DayToDayConfig";
 import PeriodSimConfig from "./components/scenarios/PeriodSimConfig";
@@ -245,6 +246,32 @@ const App = () => {
         metrics={activeMetrics[selectedAirportCode]}
         currentEpochTime={liveStatus?.interpolatedTime || currentEpochTime}
       />
+
+        {isWindowOpen("shipments") && (
+            <DraggableWindow
+                title="Gestión de Envíos"
+                onClose={() => handleToggleWindow("shipments")}
+                initialPosition={{
+                    x: 250,
+                    y: 120
+                }}
+                defaultSize={{
+                    width: 700,
+                    height: 800
+                }}
+                isActive={
+                    openWindowsQueue[
+                    openWindowsQueue.length - 1
+                        ] === "shipments"
+                }
+                onFocus={() => handleFocusWindow("shipments")}
+            >
+                <ShipmentsPanel
+
+                />
+            </DraggableWindow>
+        )}
+
       {isWindowOpen("reports") && (
         <DraggableWindow title="Reportes y Exportación" onClose={() => handleToggleWindow("reports")} initialPosition={{x: window.innerWidth / 2 - 200, y: window.innerHeight / 2 - 150}} isActive={openWindowsQueue[openWindowsQueue.length-1] === "reports"} onFocus={() => handleFocusWindow("reports")}>
           <ReportsPanel 

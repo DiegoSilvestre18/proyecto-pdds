@@ -4,10 +4,16 @@ import com.tasfb2b.envio.service.EnvioService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import com.tasfb2b.envio.dto.EnvioResponse;
 
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.util.List;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 
 @RestController
 @RequestMapping("/api/v1/envios")
@@ -15,6 +21,25 @@ import java.util.List;
 public class EnvioController {
 
     private final EnvioService envioService;
+
+    // Se llamaría a la api así: GET /api/v1/envios?page=0&size=50
+    @GetMapping
+    public Page<EnvioResponse> listar(
+            @RequestParam(required = false) String origen,
+            @RequestParam(required = false) String codigo,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size
+    ) {
+        Pageable pageable = PageRequest.of(
+                page,
+                size,
+                Sort.by("fecha").descending().and(Sort.by("hora").descending())
+        );
+
+        return envioService.buscar(origen, codigo, pageable);
+    }
+
+
 
     @PostMapping("/carga")
     public String cargarArchivo(@RequestParam("file") MultipartFile file) {
