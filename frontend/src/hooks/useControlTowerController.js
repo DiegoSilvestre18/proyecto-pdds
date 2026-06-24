@@ -18,7 +18,7 @@ const PANEL_VISIBILITY_DEFAULT = {
 };
 
 const KPI_COLLAPSED_STORAGE_KEY = "ct-kpi-collapsed";
-const MAX_MAP_ROUTES = 140;
+const MAX_MAP_ROUTES = 1200;
 const STATUS_PRIORITY = {
   critical: 3,
   blocked: 3,
@@ -917,7 +917,17 @@ if (selected && !finalSelection.some((p) => p.id === selected.id)) {
     
     prevActiveIds.forEach(id => {
         if (!activeIds.has(id)) {
-             console.log(`[AIRCRAFT_REMOVE] (Visual/Filter) Flight=${id}`);
+          const stillExists =
+              activeAircraftAll.some(a => a.id === id);
+
+          console.log(
+              `[AIRCRAFT_REMOVE] ${id}`,
+              {
+                stillExists,
+                totalAircraft: aircraft.length,
+                totalVisible: finalSelection.length
+              }
+          );
         }
     });
     prevActiveIdsRef.current = activeIds;
