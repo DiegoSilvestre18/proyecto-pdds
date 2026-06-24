@@ -767,7 +767,7 @@ const envelope = JSON.parse(msg.body);
       .slice(0, 8)
       .map(([icao, data]) => ({
         city: AIRPORT_BY_ICAO[icao]?.city ?? icao,
-        capacity: `${data.occupancy || 0}%`,
+        capacity: `${Number(data.occupancy || 0).toFixed(2)}%`,
         icao,
       }));
   }, [airportLoads, isCollapseScenario]);
@@ -917,7 +917,17 @@ if (selected && !finalSelection.some((p) => p.id === selected.id)) {
     
     prevActiveIds.forEach(id => {
         if (!activeIds.has(id)) {
-             console.log(`[AIRCRAFT_REMOVE] (Visual/Filter) Flight=${id}`);
+          const stillExists =
+              activeAircraftAll.some(a => a.id === id);
+
+          console.log(
+              `[AIRCRAFT_REMOVE] ${id}`,
+              {
+                stillExists,
+                totalAircraft: aircraft.length,
+                totalVisible: finalSelection.length
+              }
+          );
         }
     });
     prevActiveIdsRef.current = activeIds;
