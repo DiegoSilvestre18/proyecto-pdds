@@ -159,7 +159,12 @@ function PeriodSimConfig({
                   className="ct-config-form__select"
                   style={{ flex: 2 }}
                   value={month}
-                  onChange={e => { setMonth(Number(e.target.value)); setDay(1); }}
+                  onChange={e => {
+                    const newMonth = Number(e.target.value);
+                    setMonth(newMonth);
+                    const newDaysInSel = newMonth === 2 && year % 4 === 0 ? 29 : DAYS_IN_MONTH[newMonth - 1];
+                    if (day > newDaysInSel) setDay(newDaysInSel);
+                  }}
                 >
                   {MONTHS.map((m, i) => (
                     <option key={i+1} value={i+1}>{m}</option>
@@ -171,7 +176,12 @@ function PeriodSimConfig({
                   className="ct-config-form__select"
                   style={{ flex: 1 }}
                   value={year}
-                  onChange={e => setYear(Number(e.target.value))}
+                  onChange={e => {
+                    const newYear = Number(e.target.value);
+                    setYear(newYear);
+                    const newDaysInSel = month === 2 && newYear % 4 === 0 ? 29 : DAYS_IN_MONTH[month - 1];
+                    if (day > newDaysInSel) setDay(newDaysInSel);
+                  }}
                 >
                   {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
                 </select>

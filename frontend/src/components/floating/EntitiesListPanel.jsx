@@ -30,27 +30,26 @@ const FlightRow = React.memo(function FlightRow({ index, style, data }) {
   const isFocused = focusedEntity?.type === 'flight' && focusedEntity?.id === ut.id;
 
   return (
-      <div style={{ ...style, padding: '2px 4px', boxSizing: 'border-box' }}>
+      <div style={{ ...style, padding: '4px 4px', boxSizing: 'border-box' }}>
         <div style={{
           background: isFocused ? 'rgba(96,165,250,0.12)' : 'rgba(255,255,255,0.05)',
-          borderRadius: '10px',
+          borderRadius: '8px',
           border: `1px solid ${isFocused ? '#60a5fa' : (statusColors[ut.status] || statusColors.default)}`,
           overflow: 'hidden',
           height: '100%',
-
-          // 👇 UX improvements
           display: 'flex',
           alignItems: 'center',
-          padding: '4px',
+          padding: '2px',
+          width: '100%',
         }}>
           <div
-              style={{ padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', height: '100%', boxSizing: 'border-box' }}
+              style={{ padding: '4px 8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', height: '100%', boxSizing: 'border-box', width: '100%' }}
               onClick={() => { setExpandedUt(isExpanded ? null : ut.id); handleSelectUT(ut); }}
           >
             <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                <span style={{ fontWeight: 'bold', color: '#e2e8f0', fontSize: '13px' }}>Vuelo {numericId}</span>
-                <span style={{ background: statusColors[ut.status] || statusColors.default, fontSize: '10px', padding: '2px 6px', borderRadius: '12px', color: '#fff', textTransform: 'uppercase' }}>{ut.status}</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '2px' }}>
+                <span style={{ fontWeight: 'bold', color: '#e2e8f0', fontSize: '12px' }}>Vuelo {numericId}</span>
+                <span style={{ background: statusColors[ut.status] || statusColors.default, fontSize: '9px', padding: '1px 5px', borderRadius: '10px', color: '#fff', textTransform: 'uppercase' }}>{ut.status}</span>
               </div>
               <div
                   style={{
@@ -70,9 +69,9 @@ const FlightRow = React.memo(function FlightRow({ index, style, data }) {
   </span>
               </div>
             </div>
-            <div style={{ minWidth: '170px',textAlign: 'right' }}>
-              <div style={{ fontSize: '14px', fontWeight: 'bold', color: semaforo }}>{pct}%</div>
-              <div style={{ fontSize: '10px', color: '#94a3b8' }}>{ut.ocupacionReal || 0} / {ut.capacidadMax || 0} maletas</div>
+            <div style={{ minWidth: '150px',textAlign: 'right' }}>
+              <div style={{ fontSize: '13px', fontWeight: 'bold', color: semaforo }}>{pct}%</div>
+              <div style={{ fontSize: '9px', color: '#94a3b8' }}>{ut.ocupacionReal || 0} / {ut.capacidadMax || 0} maletas</div>
             </div>
           </div>
         </div>
@@ -376,7 +375,7 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
   }, [activeAircraft]);
 
   return (
-    <aside className="ct-panel ct-panel--entities-list" style={{ display: 'flex', flexDirection: 'column', maxHeight: '1000px', background: 'rgba(15, 23, 42, 0.9)', minWidth: "350px", flex: "1 1 350px", borderRadius: "8px", overflow: "hidden" }}>
+    <aside className="ct-panel ct-panel--entities-list" style={{ display: 'flex', flexDirection: 'column', maxHeight: activeTab === 'ut' ? 'none' : '1000px', background: 'rgba(15, 23, 42, 0.9)', minWidth: "350px", flex: "1 1 350px", borderRadius: "8px", overflow: "hidden" }}>
       
       {/* HEADER TABS */}
       <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
@@ -399,7 +398,7 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
         display: 'flex',
         flexDirection: 'column',
         minHeight: 0,
-        overflow: 'hidden'
+        overflow: activeTab === 'wh' ? 'auto' : 'visible'
       }}>
         
         {/* TAB: UTs */}
@@ -456,10 +455,11 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
               {/* Lista virtualizada (sin cambios) */}
               {filteredUTs.length > 0 && (
                   <List
-                      height={selectedFlightDetail ? 300 : 420}
+                      height={selectedFlightDetail ? 300 : Math.max(filteredUTs.length * 54, 54)}
                       width="100%"
                       itemCount={filteredUTs.length}
-                      itemSize={72}
+                      itemSize={54}
+                      style={{ overflow: 'hidden' }}
                       itemData={{ flights: filteredUTs, expandedUt, setExpandedUt, handleSelectUT, focusedEntity, utRefsMap }}
                   >
                     {FlightRow}
@@ -532,7 +532,7 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
               </select>
             </div>
             
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
               {filteredWarehouses.map(wh => {
                 const metrics = airportMetrics[wh.icao] || {};
                 const pct = metrics.occupancy ?? 0;
@@ -554,7 +554,7 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
                     }}
                   >
                     <div 
-                      style={{ padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
+                      style={{ padding: '6px 10px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
                       onClick={() => {
                         setExpandedWh(isExpanded ? null : wh.icao);
                         // Paso 2: Panel→Mapa — enfocar en mapa
@@ -562,12 +562,12 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
                       }}
                     >
                       <div>
-                        <div style={{ fontWeight: 'bold', color: '#e2e8f0', fontSize: '14px', marginBottom: '2px' }}>{wh.icao}</div>
-                        <div style={{ fontSize: '11px', color: '#9ca3af' }}>{wh.city}</div>
+                        <div style={{ fontWeight: 'bold', color: '#e2e8f0', fontSize: '13px', marginBottom: '2px' }}>{wh.icao}</div>
+                        <div style={{ fontSize: '10px', color: '#9ca3af' }}>{wh.city}</div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: '14px', fontWeight: 'bold', color: semaforo }}>{Math.trunc(pct).toFixed(2)}%</div>
-                        <div style={{ fontSize: '10px', color: '#94a3b8' }}>{metrics.storedBags ?? 0} / {metrics.warehouseCapacity ?? 0} stock</div>
+                        <div style={{ fontSize: '13px', fontWeight: 'bold', color: semaforo }}>{Math.trunc(pct).toFixed(2)}%</div>
+                        <div style={{ fontSize: '9px', color: '#94a3b8' }}>{metrics.storedBags ?? 0} / {metrics.warehouseCapacity ?? 0} stock</div>
                       </div>
                     </div>
 

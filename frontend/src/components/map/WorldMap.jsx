@@ -531,6 +531,7 @@ const WorldMap = ({
 
                   const passesFilter = flightPassesFilter(plane.status);
                   const strokeColor = getStrokeColor(plane.status, plane.ocupacionReal, plane.capacidadMax);
+                  const isGreenPlane = strokeColor === "#10b981";
                   
                   // Posición actual del avión
                   const position = interpolateCoordinates(from, to, progress);
@@ -543,7 +544,7 @@ const WorldMap = ({
                   return (
                     <React.Fragment key={plane.id}>
                       {/* Tramo recorrido (estela) — línea sólida tenue */}
-                      {traveledPath && (
+                      {isGreenPlane && traveledPath && (
                         <Line
                           key={`trail-${plane.id}`}
                           coordinates={traveledPath}
@@ -558,19 +559,21 @@ const WorldMap = ({
                         />
                       )}
                       {/* Tramo restante — línea discontinua */}
-                      <Line
-                        key={`path-${plane.id}`}
-                        coordinates={remainingPath}
-                        stroke={strokeColor}
-                        strokeWidth={0.8}
-                        strokeLinecap="round"
-                        strokeDasharray="4 3"
-                        style={{
-                          opacity: passesFilter ? getOpacity(plane.id, 0.45) : 0,
-                          transition: "opacity 0.3s ease",
-                          pointerEvents: "none"
-                        }}
-                      />
+                      {isGreenPlane && (
+                        <Line
+                          key={`path-${plane.id}`}
+                          coordinates={remainingPath}
+                          stroke={strokeColor}
+                          strokeWidth={0.8}
+                          strokeLinecap="round"
+                          strokeDasharray="4 3"
+                          style={{
+                            opacity: passesFilter ? getOpacity(plane.id, 0.45) : 0,
+                            transition: "opacity 0.3s ease",
+                            pointerEvents: "none"
+                          }}
+                        />
+                      )}
                     </React.Fragment>
                   );
                 })}
