@@ -70,7 +70,7 @@ const FlightRow = React.memo(function FlightRow({ index, style, data }) {
   </span>
               </div>
             </div>
-            <div style={{ textAlign: 'right' }}>
+            <div style={{ minWidth: '170px',textAlign: 'right' }}>
               <div style={{ fontSize: '14px', fontWeight: 'bold', color: semaforo }}>{pct}%</div>
               <div style={{ fontSize: '10px', color: '#94a3b8' }}>{ut.ocupacionReal || 0} / {ut.capacidadMax || 0} maletas</div>
             </div>
@@ -566,7 +566,7 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
                         <div style={{ fontSize: '11px', color: '#9ca3af' }}>{wh.city}</div>
                       </div>
                       <div style={{ textAlign: 'right' }}>
-                        <div style={{ fontSize: '14px', fontWeight: 'bold', color: semaforo }}>{pct}%</div>
+                        <div style={{ fontSize: '14px', fontWeight: 'bold', color: semaforo }}>{Math.trunc(pct).toFixed(2)}%</div>
                         <div style={{ fontSize: '10px', color: '#94a3b8' }}>{metrics.storedBags ?? 0} / {metrics.warehouseCapacity ?? 0} stock</div>
                       </div>
                     </div>
