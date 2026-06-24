@@ -46,7 +46,7 @@ const LegendButton = () => {
   );
 };
 
-const MapZoomControls = ({ zoom, center, onMoveEnd }) => (
+const MapZoomControls = ({ zoom, center, onMoveEnd, onBackgroundClick }) => (
     <div className="map-zoom-controls">
       <input
           type="range"
@@ -64,12 +64,13 @@ const MapZoomControls = ({ zoom, center, onMoveEnd }) => (
 
       <button
           title="Centrar vista"
-          onClick={() =>
+          onClick={() => {
+              onBackgroundClick?.()
               onMoveEnd({
                 zoom: 0.86,
                 coordinates: [7, 17]
               })
-          }
+          }}
       >
         ◎
       </button>
@@ -109,7 +110,7 @@ const MapBackground = React.memo(({ isCollapseScenario }) => (
 // Esto evita que react-simple-maps dibuje arcos geodésicos curvos.
 const getStraightPath = (start, end) => {
   if (!start || !end) return [];
-  const steps = 100; // Suficientes puntos para una curva suave en proyección Mercator
+  const steps = 40;
   const path = [];
   for (let i = 0; i <= steps; i++) {
     const t = i / steps;
@@ -279,6 +280,23 @@ const WorldMap = ({
     }
   };
 
+  // Precompute full paths per route — recomputed only when activeAircraft changes, not every frame
+  const routeFullPaths = useMemo(() => {
+    const cache = {};
+    const pathByRoute = {};
+    activeAircraft.forEach(plane => {
+      const from = airportByIcao[plane.from];
+      const to = airportByIcao[plane.to];
+      if (!from || !to) return;
+      const key = `${plane.from}__${plane.to}`;
+      if (!pathByRoute[key]) {
+        pathByRoute[key] = getStraightPath(from.coordinates, to.coordinates);
+      }
+      cache[plane.id] = pathByRoute[key];
+    });
+    return cache;
+  }, [activeAircraft, airportByIcao]);
+
   return (
     <div 
       className="ct-world-map" 
@@ -342,7 +360,7 @@ const WorldMap = ({
       <LegendButton />
 
       {/* ── Controles de Zoom Dark Mode ─────────────────────────────────────── */}
-      <MapZoomControls zoom={zoom} center={center} onMoveEnd={onMoveEnd} />
+      <MapZoomControls zoom={zoom} center={center} onMoveEnd={onMoveEnd} onBackgroundClick={onBackgroundClick} />
 
       {/* ── Botón Limpiar Ruta Rastreada ────────────────────────────────────── */}
       {trackedRoute && (
@@ -521,24 +539,19 @@ const WorldMap = ({
               <>
                 {/* ── Trayectoria restante (Dashed line) ── */}
                 {activeAircraft.map((plane) => {
-                  const from = airportByIcao[plane.from];
-                  const to   = airportByIcao[plane.to];
-                  if (!from || !to) return null;
+                  const fullPath = routeFullPaths[plane.id];
+                  if (!fullPath) return null;
 
-                  const progress = plane.progress ?? 0;
-                  // Optimización: No renderizar ruta si el avión ya llegó
+                  const progress = (currentEpochTime > 0 && plane.departureTime && plane.arrivalTime)
+                    ? Math.max(0, Math.min(1, (currentEpochTime - plane.departureTime) / (plane.arrivalTime - plane.departureTime)))
+                    : (plane.progress ?? 0);
                   if (progress >= 0.99) return null;
 
                   const passesFilter = flightPassesFilter(plane.status);
                   const strokeColor = getStrokeColor(plane.status, plane.ocupacionReal, plane.capacidadMax);
-                  
-                  // Posición actual del avión
-                  const position = interpolateCoordinates(from, to, progress);
-
-                  // Trayectoria lineal restante
-                  const remainingPath = getStraightPath(position, to.coordinates);
-                  // Trayectoria ya recorrida (estela)
-                  const traveledPath = progress > 0.02 ? getStraightPath(from.coordinates, position) : null;
+                  const splitIdx = Math.max(0, Math.min(fullPath.length - 1, Math.round(progress * (fullPath.length - 1))));
+                  const traveledPath = progress > 0.02 ? fullPath.slice(0, splitIdx + 1) : null;
+                  const remainingPath = fullPath.slice(splitIdx);
 
                   return (
                     <React.Fragment key={plane.id}>
@@ -584,7 +597,9 @@ const WorldMap = ({
                   const to   = airportByIcao[plane.to];
                   if (!from || !to) return null;
 
-                  const progress   = plane.progress ?? 0;
+                  const progress = (currentEpochTime > 0 && plane.departureTime && plane.arrivalTime)
+                    ? Math.max(0, Math.min(1, (currentEpochTime - plane.departureTime) / (plane.arrivalTime - plane.departureTime)))
+                    : (plane.progress ?? 0);
                   const position   = interpolateCoordinates(from, to, progress);
                   const isBlocked  = plane.status === "blocked";
                   const isCancelled= plane.status === "cancelled";

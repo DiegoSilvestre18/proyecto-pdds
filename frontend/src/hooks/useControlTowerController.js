@@ -767,7 +767,7 @@ const envelope = JSON.parse(msg.body);
       .slice(0, 8)
       .map(([icao, data]) => ({
         city: AIRPORT_BY_ICAO[icao]?.city ?? icao,
-        capacity: `${Number(data.occupancy || 0).toFixed(2)}%`,
+        capacity: `${Number(data.occupancy || 0).toFixed(1)}%`,
         icao,
       }));
   }, [airportLoads, isCollapseScenario]);
@@ -892,14 +892,21 @@ const viewWindow = 12 * 3600 * 1000;
     });
   }, [activeAircraftAll]);
 
+  const warehouseFiltered = useMemo(() => {
+    if (!selectedAirportCode) return rankedAircraftBase;
+    return rankedAircraftBase.filter(
+      p => p.from === selectedAirportCode || p.to === selectedAirportCode
+    );
+  }, [rankedAircraftBase, selectedAirportCode]);
+
   const activeAircraft = useMemo(() => {
-    if (rankedAircraftBase.length === 0) return [];
-    if (rankedAircraftBase.length <= MAX_MAP_ROUTES && !selectedAircraftId) return rankedAircraftBase;
+    if (warehouseFiltered.length === 0) return [];
+    if (warehouseFiltered.length <= MAX_MAP_ROUTES && !selectedAircraftId) return warehouseFiltered;
     const now = smoothSimTime || currentEpochTime;
     const inAir = [];
     const onGround = [];
     let selected = null;
-    for (const p of rankedAircraftBase) {
+    for (const p of warehouseFiltered) {
       if (selectedAircraftId && p.id === selectedAircraftId) selected = p;
       const isCurrentlyInAir = now ? (p.departureTime <= now && now < p.arrivalTime) : true;
       if (isCurrentlyInAir) inAir.push(p); else onGround.push(p);
@@ -932,7 +939,7 @@ if (selected && !finalSelection.some((p) => p.id === selected.id)) {
     });
     prevActiveIdsRef.current = activeIds;
     return finalSelection;
-  }, [rankedAircraftBase, currentEpochTime, smoothSimTime, selectedAircraftId]);
+  }, [warehouseFiltered, currentEpochTime, smoothSimTime, selectedAircraftId]);
 
   const selectedAircraft = useMemo(
     () => activeAircraftAll.find((p) => p.id === selectedAircraftId) ?? null,
