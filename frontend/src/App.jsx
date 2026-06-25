@@ -212,7 +212,7 @@ const App = () => {
               onClose={() => handleToggleWindow("telemetry")}
               initialPosition={{ x: 20, y: 100 }}
               defaultSize={{
-                  width: 600,
+                  width: 400,
                   height: 500
               }}
               isActive={openWindowsQueue[openWindowsQueue.length-1] === "telemetry"}
@@ -256,8 +256,8 @@ const App = () => {
                     y: 120
                 }}
                 defaultSize={{
-                    width: 700,
-                    height: 800
+                    width: 450,
+                    height: 480
                 }}
                 isActive={
                     openWindowsQueue[

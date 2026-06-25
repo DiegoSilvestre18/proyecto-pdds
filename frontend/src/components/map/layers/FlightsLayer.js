@@ -10,7 +10,8 @@ export const createFlightsLayer = ({
   flightPassesFilter,
   showEmptyFlights,
   showTestFlights,
-  hasAnySelection
+  hasAnySelection,
+  selectedAirportCode
 }) => {
   
   const planeData = [];
@@ -33,7 +34,8 @@ export const createFlightsLayer = ({
     
     const isSelected = selectedAircraftId === plane.id;
     const isHighlighted = highlightedId === plane.id;
-    const passesFilter = flightPassesFilter(plane.status);
+    const isWarehouseFlight = selectedAirportCode && (plane.from === selectedAirportCode || plane.to === selectedAirportCode);
+    const passesFilter = flightPassesFilter(plane.status, plane.from, plane.to);
     
     const isOnGround = progress <= 0.01 || progress >= 0.99;
     const isPreDeparture = progress <= 0.01;
@@ -43,7 +45,7 @@ export const createFlightsLayer = ({
     const nextPosition = interpolateCoordinates(from, to, nextProgress);
     const bearing = getVisualBearing(position, nextPosition);
 
-    const baseOpacity = passesFilter ? (hasAnySelection ? (isSelected ? 255 : 50) : 255) : 20;
+    const baseOpacity = passesFilter ? (hasAnySelection ? (isSelected ? 255 : isWarehouseFlight ? 200 : 50) : 255) : 20;
     const color = isCancelled 
       ? [239, 68, 68, baseOpacity] 
       : isRescued 
@@ -83,7 +85,7 @@ export const createFlightsLayer = ({
       getAngle: d => -d.angle,
       updateTriggers: {
         getPosition: [activeAircraft],
-        getColor: [activeAircraft, selectedAircraftId, hasAnySelection],
+        getColor: [activeAircraft, selectedAircraftId, hasAnySelection, selectedAirportCode],
         getAngle: [activeAircraft]
       }
     }),
@@ -104,7 +106,7 @@ export const createFlightsLayer = ({
       outlineColor: [0, 0, 0, 200],
       updateTriggers: {
         getPosition: [activeAircraft],
-        getColor: [activeAircraft, selectedAircraftId, hasAnySelection]
+        getColor: [activeAircraft, selectedAircraftId, hasAnySelection, selectedAirportCode]
       }
     })
   ];

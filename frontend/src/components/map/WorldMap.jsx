@@ -195,10 +195,24 @@ const WorldMap = ({
     return level === activeFilters.semaphoreLevel;
   }, [activeFilters.semaphoreLevel, activeFilters.continent, activeMetrics, airports]);
 
-  const flightPassesFilter = useCallback((status) => {
-    if (!activeFilters.flightStatus) return true;
-    return status === activeFilters.flightStatus;
-  }, [activeFilters.flightStatus]);
+  const flightPassesFilter = useCallback((status, fromIcao, toIcao) => {
+    if (activeFilters.flightStatus && status !== activeFilters.flightStatus) return false;
+    if (activeFilters.continent) {
+      const fromAirport = airports.find(a => a.icao === fromIcao);
+      const toAirport = airports.find(a => a.icao === toIcao);
+      const fromMatch = fromAirport?.continent === activeFilters.continent;
+      const toMatch = toAirport?.continent === activeFilters.continent;
+      if (!fromMatch && !toMatch) return false;
+    }
+    if (activeFilters.semaphoreLevel) {
+      const checkSemaphore = (icao) => {
+        const m = activeMetrics[icao];
+        return (m?.level ?? "green") === activeFilters.semaphoreLevel;
+      };
+      if (!checkSemaphore(fromIcao) && !checkSemaphore(toIcao)) return false;
+    }
+    return true;
+  }, [activeFilters.flightStatus, activeFilters.continent, activeFilters.semaphoreLevel, airports, activeMetrics]);
 
   const hasAnySelection = selectedAircraftId != null || (selectedAirportCode != null && selectedAirportCode !== "");
 
@@ -215,7 +229,8 @@ const WorldMap = ({
       exceptionHighlight,
       selectedAircraftId,
       hasAnySelection,
-      flightPassesFilter
+      flightPassesFilter,
+      selectedAirportCode
     }));
 
     // 2. Airports
@@ -239,7 +254,8 @@ const WorldMap = ({
       flightPassesFilter,
       showEmptyFlights,
       showTestFlights,
-      hasAnySelection
+      hasAnySelection,
+      selectedAirportCode
     }));
 
     return layerDefs;

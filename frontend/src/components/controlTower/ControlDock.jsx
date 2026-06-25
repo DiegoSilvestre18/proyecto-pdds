@@ -32,20 +32,20 @@ const ControlDock = ({
       style={{
         position: 'fixed',
         left: 0,
-        top: 160,
+        top: '50%',
+        transform: 'translateY(-50%)',
         zIndex: 400,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        gap: '2px',
-        padding: '6px 4px',
+        gap: '1px',
+        padding: '4px 3px',
         background: 'rgba(8, 14, 30, 0.88)',
         backdropFilter: 'blur(12px)',
         borderRight: '1px solid rgba(56, 189, 248, 0.18)',
         borderRadius: '0 12px 12px 0',
         boxShadow: '4px 0 20px rgba(0,0,0,0.4)',
-        minWidth: isCollapsed ? 42 : 52,
-        transition: 'min-width 0.2s ease',
+        width: 42,
       }}
     >
       {NAV_ITEMS.map((item) => {
@@ -72,7 +72,7 @@ const ControlDock = ({
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '16px',
+                fontSize: '14px',
                 background: isActive
                   ? 'rgba(56, 189, 248, 0.18)'
                   : 'transparent',
