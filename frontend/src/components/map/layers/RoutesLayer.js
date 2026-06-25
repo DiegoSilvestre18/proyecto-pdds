@@ -11,7 +11,8 @@ export const createRoutesLayers = ({
   exceptionHighlight,
   selectedAircraftId,
   hasAnySelection,
-  flightPassesFilter
+  flightPassesFilter,
+  selectedAirportCode
 }) => {
   const layers = [];
 
@@ -29,7 +30,7 @@ export const createRoutesLayers = ({
     
     if (progress >= 0.99) return;
 
-    const passesFilter = flightPassesFilter(plane.status);
+    const passesFilter = flightPassesFilter(plane.status, plane.from, plane.to);
     if (!passesFilter) return;
 
     // Solo dibujar línea de ruta si el avión tiene envíos
@@ -40,8 +41,8 @@ export const createRoutesLayers = ({
     const isGreenPlane = colorRgb[0] === 16 && colorRgb[1] === 185 && colorRgb[2] === 129; 
 
     const isSelected = selectedAircraftId === plane.id;
-    // Opacidad incrementada para mejor visibilidad:
-    const opacity = hasAnySelection ? (isSelected ? 255 : 40) : 220;
+    const isWarehouseFlight = selectedAirportCode && (plane.from === selectedAirportCode || plane.to === selectedAirportCode);
+    const opacity = hasAnySelection ? (isSelected ? 255 : isWarehouseFlight ? 200 : 50) : 220;
     const trailColor = [colorRgb[0], colorRgb[1], colorRgb[2], opacity];
     const remainingColor = [colorRgb[0], colorRgb[1], colorRgb[2], Math.max(30, opacity - 100)];
 

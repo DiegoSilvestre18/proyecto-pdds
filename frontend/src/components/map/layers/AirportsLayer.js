@@ -1,4 +1,4 @@
-import { ScatterplotLayer, TextLayer } from '@deck.gl/layers';
+import { IconLayer, ScatterplotLayer, TextLayer } from '@deck.gl/layers';
 import { getAirportLevelRgb, UNICODE_CHARACTERS } from './utils';
 
 const nearbyOffsets = {
@@ -31,17 +31,18 @@ export const createAirportsLayers = ({
     const isDimmed = hasAnySelection && !isSelected;
 
     const offset = nearbyOffsets[airport.icao];
-    let pixelOffset = [0, -13];
+    // Icon is 30px centered at coordinate (±15px). Ring radius ~18px. Text clears ring.
+    let pixelOffset = [0, -22];
     let alignment = ['middle', 'bottom'];
-    
-    if (offset === 'left') { alignment = ['end', 'center']; pixelOffset = [-10, -4]; }
-    else if (offset === 'right') { alignment = ['start', 'center']; pixelOffset = [10, -4]; }
-    else if (offset === 'top') { alignment = ['middle', 'bottom']; pixelOffset = [0, -28]; }
-    else if (offset === 'bottom') { alignment = ['middle', 'top']; pixelOffset = [0, 14]; }
-    else if (offset === 'topRight') { alignment = ['start', 'bottom']; pixelOffset = [8, -18]; }
-    else if (offset === 'topLeft') { alignment = ['end', 'bottom']; pixelOffset = [-8, -18]; }
-    else if (offset === 'bottomRight') { alignment = ['start', 'top']; pixelOffset = [8, 8]; }
-    else if (offset === 'bottomLeft') { alignment = ['end', 'top']; pixelOffset = [-8, 8]; }
+
+    if (offset === 'left')        { alignment = ['end', 'center'];   pixelOffset = [-22,   0]; }
+    else if (offset === 'right')  { alignment = ['start', 'center']; pixelOffset = [ 22,   0]; }
+    else if (offset === 'top')    { alignment = ['middle', 'bottom']; pixelOffset = [  0, -26]; }
+    else if (offset === 'bottom') { alignment = ['middle', 'top'];    pixelOffset = [  0,  22]; }
+    else if (offset === 'topRight')    { alignment = ['start', 'bottom']; pixelOffset = [ 16, -22]; }
+    else if (offset === 'topLeft')     { alignment = ['end', 'bottom'];   pixelOffset = [-16, -22]; }
+    else if (offset === 'bottomRight') { alignment = ['start', 'top'];    pixelOffset = [ 16,  20]; }
+    else if (offset === 'bottomLeft')  { alignment = ['end', 'top'];      pixelOffset = [-16,  20]; }
 
     return {
       ...airport,
@@ -61,42 +62,45 @@ export const createAirportsLayers = ({
   const visibleData = data.filter(d => d.passesFilter);
 
   return [
-    // Base dot
-    new ScatterplotLayer({
+    // Tower icon
+    new IconLayer({
       id: 'airports-layer',
       data: visibleData,
       pickable: true,
-      opacity: 1,
-      stroked: true,
-      filled: true,
-      radiusScale: 6,
-      radiusMinPixels: 4,
-      radiusMaxPixels: 12,
-      lineWidthMinPixels: 2,
+      billboard: false,
       getPosition: d => d.coordinates,
-      getFillColor: d => getAirportLevelRgb(d.level, d.isDimmed ? 80 : 255),
-      getLineColor: d => d.isSelected ? [255, 255, 255, 255] : [0, 0, 0, 255],
-      getFilterValue: d => d.isDimmed ? 0.3 : 1, // Si quisieramos usar opacidad dinámica por filter
+      getIcon: d => ({
+        url: '/tower-icon.svg',
+        width: 512,
+        height: 512,
+        anchorX: 256,
+        anchorY: 256,
+        mask: true,
+      }),
+      sizeScale: 1,
+      getSize: 30,
+      getColor: d => getAirportLevelRgb(d.level, d.isDimmed ? 80 : 255),
       updateTriggers: {
-        getFillColor: [activeMetrics, hasAnySelection],
-        getLineColor: [selectedAirportCode, focusedEntity]
+        getColor: [activeMetrics, hasAnySelection],
       }
     }),
     
-    // Selection Ring
+    // Selection Ring — centered on icon (anchorY=256 centers icon at coordinate)
     new ScatterplotLayer({
       id: 'airports-selection-ring',
       data: visibleData.filter(d => d.isSelected),
       pickable: false,
-      opacity: 0.7,
+      opacity: 0.85,
       stroked: true,
       filled: false,
-      radiusScale: 16,
-      radiusMinPixels: 10,
-      radiusMaxPixels: 24,
+      radiusMinPixels: 18,
+      radiusMaxPixels: 22,
       lineWidthMinPixels: 2,
       getPosition: d => d.coordinates,
-      getLineColor: d => [255, 255, 255, 200]
+      getLineColor: d => getAirportLevelRgb(d.level, 220),
+      updateTriggers: {
+        getLineColor: [activeMetrics]
+      }
     }),
 
     // Label Layer: ICAO + City + Inventory
