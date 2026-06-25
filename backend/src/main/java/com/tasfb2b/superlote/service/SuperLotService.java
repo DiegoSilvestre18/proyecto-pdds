@@ -18,6 +18,9 @@ import lombok.RequiredArgsConstructor;
 public class SuperLotService {
 
     private final EnvioRepository envioRepo;
+    // Contador global para IDs de MegaLots
+    private final java.util.concurrent.atomic.AtomicInteger megaLotIdCounter =
+            new java.util.concurrent.atomic.AtomicInteger(1_000_000); //tracking
 
     @Transactional(readOnly = true)
     public List<SuperLot> agruparEnvios() {
@@ -38,43 +41,10 @@ public class SuperLotService {
                         e.getOrigenContinente(),
                         e.getDestinoContinente(),
                         readyTime
-                )).add(e.getCantidadMaletas(), readyTime);
+                )).add(e.getCantidadMaletas(), readyTime, e.getCodigoPedido());
             });
         }
-
-        List<SuperLot> superLots = new ArrayList<>();
-
-        for (var entry : grupos.entrySet()) {
-
-            String[] partes = entry.getKey().split("-");
-            Accumulator acc = entry.getValue();
-
-            boolean intercontinental = !acc.origenCont.equals(acc.destinoCont);
-
-            // READY TIME REAL (mínimo del grupo)
-            long readyTime = acc.minReadyTime;
-
-            // SLA base por tipo de operación
-            long sla = intercontinental
-                    ? 48L * 3600_000
-                    : 24L * 3600_000;
-
-            SuperLot lot = new SuperLot(
-                    megaLotIdCounter.getAndIncrement(),
-                    partes[0],
-                    partes[1],
-                    acc.totalMaletas,
-                    readyTime,
-                    sla,
-                    intercontinental,
-                    0
-            );
-
-            lot.validate();
-            superLots.add(lot);
-        }
-
-        return superLots;
+        return construirLotes(grupos);
     }
 
     /**
@@ -99,30 +69,11 @@ public class SuperLotService {
                         e.getOrigenContinente(),
                         e.getDestinoContinente(),
                         readyTime
-                )).add(e.getCantidadMaletas(), readyTime);
+                )).add(e.getCantidadMaletas(), readyTime, e.getCodigoPedido());
             });
         }
 
-        List<SuperLot> superLots = new ArrayList<>();
-
-        for (var entry : grupos.entrySet()) {
-            String[] partes = entry.getKey().split("-");
-            Accumulator acc = entry.getValue();
-
-            boolean intercontinental = !acc.origenCont.equals(acc.destinoCont);
-
-            long sla = intercontinental ? 48L * 3600_000 : 24L * 3600_000;
-
-            SuperLot lot = new SuperLot(
-                    megaLotIdCounter.getAndIncrement(), partes[0], partes[1],
-                    acc.totalMaletas, acc.minReadyTime,
-                    sla, intercontinental, 0);
-
-            lot.validate();
-            superLots.add(lot);
-        }
-
-        return superLots;
+        return construirLotes(grupos);
     }
 
     @Transactional(readOnly = true)
@@ -145,13 +96,20 @@ public class SuperLotService {
                             e.getOrigenContinente(),
                             e.getDestinoContinente(),
                             readyTime
-                    )).add(e.getCantidadMaletas(), readyTime);
+                    )).add(e.getCantidadMaletas(), readyTime, e.getCodigoPedido());
                 }
             });
         }
 
+        return construirLotes(grupos);
+    }
+
+    private List<SuperLot> construirLotes(Map<String, Accumulator> grupos) {
+
         List<SuperLot> superLots = new ArrayList<>();
+
         for (var entry : grupos.entrySet()) {
+
             String[] partes = entry.getKey().split("-");
             Accumulator acc = entry.getValue();
 
@@ -159,9 +117,16 @@ public class SuperLotService {
             long sla = intercontinental ? 48L * 3600_000 : 24L * 3600_000;
 
             SuperLot lot = new SuperLot(
-                    megaLotIdCounter.getAndIncrement(), partes[0], partes[1],
-                    acc.totalMaletas, acc.minReadyTime,
-                    sla, intercontinental, 0);
+                    megaLotIdCounter.getAndIncrement(),
+                    partes[0],
+                    partes[1],
+                    acc.totalMaletas,
+                    acc.minReadyTime,
+                    sla,
+                    intercontinental,
+                    0,
+                    acc.bagIds
+            );
 
             lot.validate();
             superLots.add(lot);
@@ -170,8 +135,8 @@ public class SuperLotService {
         return superLots;
     }
 
-    // Contador global para IDs de MegaLots
-    private final java.util.concurrent.atomic.AtomicInteger megaLotIdCounter = new java.util.concurrent.atomic.AtomicInteger(1_000_000);
+
+
 
     /**
      * Fusiona lotes remanentes (carry-over) que tienen el mismo origen, destino e intercontinentalidad.
@@ -200,9 +165,11 @@ public class SuperLotService {
             long minReadyTime = Long.MAX_VALUE;
             long minDeadline = Long.MAX_VALUE;
             int maxPriority = 0;
+            List<String> mergedBagIds = new ArrayList<>();
 
             for (SuperLot lot : grupo) {
                 totalMaletas += lot.getTotalMaletas();
+                mergedBagIds.addAll(lot.getBagIds());
                 if (lot.getReadyTime() < minReadyTime) minReadyTime = lot.getReadyTime();
                 if (lot.getDeadline() < minDeadline) minDeadline = lot.getDeadline();
                 if (lot.getPriority() > maxPriority) maxPriority = lot.getPriority();
@@ -219,7 +186,8 @@ public class SuperLotService {
                     minReadyTime,
                     newSla,
                     first.isIntercontinental(),
-                    maxPriority
+                    maxPriority,
+                    mergedBagIds
             );
             result.add(mergedLot);
         }
@@ -236,6 +204,7 @@ public class SuperLotService {
         String origenCont;
         String destinoCont;
         long minReadyTime;
+        List<String> bagIds = new ArrayList<>();
 
         Accumulator(String origenContName, String destinoContName, long readyTime) {
             this.totalMaletas = 0;
@@ -244,9 +213,12 @@ public class SuperLotService {
             this.minReadyTime = readyTime;
         }
 
-        void add(int bags, long readyTime) {
+        void add(int bags, long readyTime, String codigoPedido) {
             this.totalMaletas += bags;
             this.minReadyTime = Math.min(this.minReadyTime, readyTime);
+            for (int i = 1; i <= bags; i++) {
+                this.bagIds.add(codigoPedido + "-" + i);
+            }
         }
     }
 }

@@ -82,16 +82,7 @@ public class RegretRepairOp implements RepairOperator {
                                           Map<Long, Integer> capacidadDisponible) {
 
         // Perturbar readyTime para obtener segunda alternativa
-        SuperLot lotPerturbado = new SuperLot(
-                lot.getId(),
-                lot.getOrigenIcao(),
-                lot.getDestinoIcao(),
-                lot.getTotalMaletas(),
-                lot.getReadyTime() + PERTURBACION_MS,
-                lot.getSla(),
-                lot.isIntercontinental(),
-                lot.getPriority()
-        );
+        SuperLot lotPerturbado = lot.withReadyTime(lot.getReadyTime() + PERTURBACION_MS);
 
         Route segundaMejor = routeBuilder.build(lotPerturbado, airportMap,
                 new HashMap<>(), capacidadDisponible);
