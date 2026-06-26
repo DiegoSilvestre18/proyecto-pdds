@@ -212,7 +212,7 @@ const App = () => {
               onClose={() => handleToggleWindow("telemetry")}
               initialPosition={{ x: 20, y: 100 }}
               defaultSize={{
-                  width: 400,
+                  width: 600,
                   height: 500
               }}
               isActive={openWindowsQueue[openWindowsQueue.length-1] === "telemetry"}
@@ -256,8 +256,8 @@ const App = () => {
                     y: 120
                 }}
                 defaultSize={{
-                    width: 450,
-                    height: 480
+                    width: 700,
+                    height: 800
                 }}
                 isActive={
                     openWindowsQueue[
@@ -309,7 +309,7 @@ const App = () => {
             airports={AIRPORTS} 
             airportMetrics={activeMetrics} 
             onSelectFlight={setSelectedAircraftId}
-            onAirportSelect={(code) => { setSelectedAirportCode(code); setSelectedAircraftId(null); }}
+            sessionId={sessionId}
           />
         </DraggableWindow>
       )}

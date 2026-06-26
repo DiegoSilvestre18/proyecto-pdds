@@ -1,12 +1,13 @@
 package com.tasfb2b.planificador.service;
-
+import com.tasfb2b.tracking.service.ShipmentTracker;
+import com.tasfb2b.tracking.service.ShipmentTrackerRegistry;
 /*
  * Sistema TASF.B2B — Motor de Optimización Logística
  * Grupo 4D — Curso de Proyecto de Diseño de Software
  * Autores: Jim Navarrete, Diego Silvestre, Jose Avalos, Mathias Medina
  * Fecha: Mayo 2026
  */
-
+import com.tasfb2b.planificador.domain.Event;
 import com.tasfb2b.aeropuerto.domain.Aeropuerto;
 import com.tasfb2b.aeropuerto.repository.AeropuertoRepository;
 import com.tasfb2b.planificador.domain.CollapseEndCondition;
@@ -55,6 +56,7 @@ public class SimulationService {
         private final CollapseHelper collapseHelper;
         private final NetworkAdapter networkAdapter;
         private final BloqueoService bloqueoService;
+        private final ShipmentTrackerRegistry trackerRegistry; //Trazabilidad
 
         @Value("${tasf.data.path}")
         private String dataPath;
@@ -123,7 +125,7 @@ public class SimulationService {
                         int saMinutes,
                         int planningHorizon,
                         boolean isRealTime) {
-
+                ShipmentTracker shipmentTracker = trackerRegistry.getOrCreate(session.getSessionId());
                 List<PreCancellation> preCancellations = new ArrayList<>();
                 if (preCancelledFlightIds != null && !preCancelledFlightIds.isBlank()) {
                         for (String entry : preCancelledFlightIds.split(",")) {
@@ -185,7 +187,7 @@ public class SimulationService {
                         bloqueoService
                 );
                 
-                PriorityQueue<com.tasfb2b.planificador.domain.Event> globalEventQueue = 
+                PriorityQueue<com.tasfb2b.planificador.domain.Event> globalEventQueue =
                         new PriorityQueue<>(Comparator.comparingLong(com.tasfb2b.planificador.domain.Event::getTime));
 
                 long totalFlightLegs = 0;
@@ -268,7 +270,7 @@ public class SimulationService {
                                                         .toList();
                                                 for (Route r : afectadas) {
                                                         r.setStatus("cancelled");
-                                                        SuperLot replanLot = elevateToMaxPriority(r.getLot(), currentSimTime);
+                                                        SuperLot replanLot = elevateToMaxPriority(r, currentSimTime);
                                                         replanLot.setTotalMaletas(r.getCapacidadAsignada());
                                                         r.setCapacidadAsignada(0);
                                                         planifiablePool.put(replanLot.getId(), replanLot);
@@ -311,7 +313,11 @@ public class SimulationService {
                                 for (int step = 0; step < microSteps; step++) {
                                         long tMicroStart = System.nanoTime();
                                         long microEnd = currentSimTime + ((step + 1) * stepDurationMs);
-                                        while (!globalEventQueue.isEmpty() && globalEventQueue.peek().getTime() <= microEnd) globalState.apply(globalEventQueue.poll(), airportMap);
+                                        while (!globalEventQueue.isEmpty() && globalEventQueue.peek().getTime() <= microEnd) {
+                                                Event event = globalEventQueue.poll();
+                                                globalState.apply(event, airportMap);
+                                                shipmentTracker.observe(event);
+                                        }
 
                                         int mPercent = (int) ((((day * 1440.0) + currentSimMinuteOfDay + step) / (dias * 1440.0)) * 100);
                                         if (microEnd >= targetEpoch || (isCatchingUp && step == microSteps - 1)) {
@@ -337,8 +343,12 @@ public class SimulationService {
                 return history;
         }
 
-        private SuperLot elevateToMaxPriority(SuperLot lot, long currentTime) {
-                return new SuperLot(lot.getId(), lot.getOrigenIcao(), lot.getDestinoIcao(), lot.getTotalMaletas(), currentTime + 86400000L, lot.getSla(), lot.isIntercontinental(), Integer.MAX_VALUE);
+        private SuperLot elevateToMaxPriority(Route r, long currentTime) {
+                SuperLot lot = r.getLot();
+                List<String> bagIds = r.getBagIds() != null ? r.getBagIds() : List.of();
+                return new SuperLot(lot.getId(), lot.getOrigenIcao(), lot.getDestinoIcao(),
+                        bagIds.size(), currentTime + 86400000L, lot.getSla(),
+                        lot.isIntercontinental(), Integer.MAX_VALUE, bagIds);
         }
 
         private final java.util.Queue<Vuelo> vuelosInyectadosEnVivo = new java.util.concurrent.ConcurrentLinkedQueue<>();
