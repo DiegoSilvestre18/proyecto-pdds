@@ -76,26 +76,36 @@ const ShipmentsPanel = () => {
     }, [page, loading, hasMore, searchOrigin, searchCode]);
 
     return (
-        <div style={{ padding: "12px", color: "#e2e8f0" }}>
-            <h3>Envíos</h3>
+        <div style={{ padding: "12px", color: "#e2e8f0", display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <h3 style={{ margin: 0, fontSize: '14px', color: '#f8fafc' }}>Envíos</h3>
 
             {/* SEARCH */}
-            <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
+            <div style={{ display: "flex", gap: "6px" }}>
                 <input
                     placeholder="Origen (SKBO)"
                     value={searchOrigin}
                     onChange={(e) => setSearchOrigin(e.target.value.toUpperCase())}
+                    style={{
+                        flex: 1, padding: '6px 8px', borderRadius: '6px', fontSize: '12px',
+                        background: 'rgba(15,23,42,0.9)', border: '1px solid rgba(255,255,255,0.1)',
+                        color: 'white', outline: 'none'
+                    }}
                 />
 
                 <input
                     placeholder="Código"
                     value={searchCode}
                     onChange={(e) => setSearchCode(e.target.value)}
+                    style={{
+                        flex: 1, padding: '6px 8px', borderRadius: '6px', fontSize: '12px',
+                        background: 'rgba(15,23,42,0.9)', border: '1px solid rgba(255,255,255,0.1)',
+                        color: 'white', outline: 'none'
+                    }}
                 />
             </div>
 
             {/* LISTA */}
-            <div>
+            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '2px' }}>
                 {shipments.map((shipment, index) => {
                     const isLast = index === shipments.length - 1;
 
@@ -104,17 +114,19 @@ const ShipmentsPanel = () => {
                             key={shipment.id}
                             ref={isLast ? lastItemRef : null}
                             style={{
-                                padding: "8px",
-                                borderBottom: "1px solid #334155",
+                                padding: "6px 8px",
+                                background: 'rgba(255,255,255,0.02)',
+                                borderRadius: '6px',
+                                border: '1px solid rgba(255,255,255,0.04)',
                             }}
                         >
-                            <div><b>{shipment.codigoPedido}</b></div>
+                            <div style={{ fontSize: '12px', fontWeight: 'bold', color: '#38bdf8' }}>{shipment.codigoPedido}</div>
 
-                            <div>
+                            <div style={{ fontSize: '11px', color: '#cbd5e1' }}>
                                 {shipment.origenIcao} ➔ {shipment.destinoIcao}
                             </div>
 
-                            <div style={{ fontSize: "12px", color: "#94a3b8" }}>
+                            <div style={{ fontSize: "10px", color: "#64748b" }}>
                                 {shipment.cantidadMaletas} maletas
                             </div>
                         </div>

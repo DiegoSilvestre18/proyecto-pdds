@@ -66,15 +66,12 @@ public class Vuelo {
      * Maneja cruce de medianoche.
      */
     public int getDuracionMinutos() {
-        int depUtc = departureMinute;
-        int arrUtc = arrivalMinute;
-
-        if (arrUtc >= depUtc) {
-            return arrUtc - depUtc;
-        } else {
-            // cruza medianoche
-            return (1440 - depUtc) + arrUtc;
+        int diff = arrivalMinute - departureMinute;
+        if (diff < 0) {
+            diff += 1440;
         }
+
+        return diff;
     }
 
     /**
@@ -166,11 +163,8 @@ public class Vuelo {
      * @param dayStartEpochMs epoch UTC del inicio del día simulado.
      */
     public long getArrivalEpoch(long dayStartEpochMs) {
-        long dep = dayStartEpochMs + (departureMinute * 60_000L);
-        long arr = dayStartEpochMs + (arrivalMinute * 60_000L);
-        // Cruce de medianoche: el avión llega al día siguiente
-        if (arr <= dep) arr += 24L * 60 * 60_000L;
-        return arr;
+        long dep = getDepartureEpoch(dayStartEpochMs);
+        return dep + getDuracionMs();
     }
 
 }

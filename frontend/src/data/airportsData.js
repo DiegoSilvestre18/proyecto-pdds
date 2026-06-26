@@ -310,6 +310,8 @@ export const getCapacityLabel = (level = "green") => {
   return "Operación estable";
 };
 
+import { interpolateMercator } from '../components/map/layers/utils';
+
 /** Construye métricas de aeropuerto para un escenario dado */
 export const buildAirportMetrics = (airports = [], occupancyMap = null) =>
   airports.reduce((acc, airport, index) => {
