@@ -309,6 +309,7 @@ const App = () => {
             airports={AIRPORTS} 
             airportMetrics={activeMetrics} 
             onSelectFlight={setSelectedAircraftId}
+            sessionId={sessionId}
           />
         </DraggableWindow>
       )}
