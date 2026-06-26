@@ -68,7 +68,7 @@ export default function DraggableWindow({
         border: `1px solid ${isActive ? 'rgba(96, 165, 250, 0.8)' : 'rgba(255, 255, 255, 0.15)'}`,
         borderRadius: '8px',
         boxShadow: isActive ? '0 10px 30px rgba(0,0,0,0.6), 0 0 0 1px rgba(96,165,250,0.4)' : '0 10px 25px rgba(0,0,0,0.5)',
-        zIndex: isActive ? 1000 : 900,
+        zIndex: isActive ? 'var(--z-draggable-active)' : 'var(--z-draggable)',
         display: 'flex',
         flexDirection: 'column',
         overflow: 'auto',
