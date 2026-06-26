@@ -90,8 +90,8 @@ const App = () => {
   const currentFlight = activeAircraft.find(p => p.id === selectedAircraftId) ?? null;
 
   // ── Lógica FIFO de Paneles (Draggable Windows) ──
-  const [maxWindows, setMaxWindows] = useState(1);
-  const [openWindowsQueue, setOpenWindowsQueue] = useState(["telemetry"]);
+  const [maxWindows, setMaxWindows] = useState(3);
+  const [openWindowsQueue, setOpenWindowsQueue] = useState([]);
 
   const handleToggleWindow = (panelKey) => {
     setOpenWindowsQueue(prev => {
@@ -236,16 +236,18 @@ const App = () => {
           <AlgorithmComparisonPanel isVisible={true} onHide={() => handleToggleWindow("comparison")} sessionId={sessionId} comparisonData={comparisonData} />
         </DraggableWindow>
       )}
-      <ShipmentDetailPanel 
-        isVisible={!!currentFlight || !!searchedShipment} 
-        selectedAircraft={currentFlight}
-      />
-      <AirportDetailPanel
-        isVisible={!!selectedAirportCode}
-        selectedAirport={airportNodes.find(a => a.icao === selectedAirportCode)}
-        metrics={activeMetrics[selectedAirportCode]}
-        currentEpochTime={liveStatus?.interpolatedTime || currentEpochTime}
-      />
+      <div className="ct-panel-corner-stack">
+        <ShipmentDetailPanel 
+          isVisible={!!currentFlight || !!searchedShipment} 
+          selectedAircraft={currentFlight}
+        />
+        <AirportDetailPanel
+          isVisible={!!selectedAirportCode}
+          selectedAirport={airportNodes.find(a => a.icao === selectedAirportCode)}
+          metrics={activeMetrics[selectedAirportCode]}
+          currentEpochTime={liveStatus?.interpolatedTime || currentEpochTime}
+        />
+      </div>
 
         {isWindowOpen("shipments") && (
             <DraggableWindow

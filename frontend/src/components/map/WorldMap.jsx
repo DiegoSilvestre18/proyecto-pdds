@@ -108,6 +108,7 @@ const WorldMap = ({
 }) => {
   const [showEmptyFlights, setShowEmptyFlights] = useState(true);
   const [showTestFlights, setShowTestFlights] = useState(true);
+  const [showFilters, setShowFilters] = useState(false);
 
   const {
     focusedEntity,
@@ -306,16 +307,27 @@ const WorldMap = ({
       aria-label="Mapa de operaciones global" 
       style={{ position: "relative", width: "100%", height: "100%", background: "#061828" }}
     >
-      <div style={{ position: 'absolute', top: 16, right: 16, background: 'rgba(15, 23, 42, 0.85)', padding: '12px 16px', borderRadius: '12px', border: '1px solid rgba(56, 189, 248, 0.2)', zIndex: 1000, display: 'flex', flexDirection: 'column', gap: '10px', boxShadow: '0 4px 15px rgba(0,0,0,0.5)', backdropFilter: 'blur(5px)' }}>
-        <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 'bold', marginBottom: '2px', letterSpacing: '0.5px' }}>FILTROS DE VUELOS</div>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '12px', color: '#cbd5e1' }}>
-          <input type="checkbox" checked={showEmptyFlights} onChange={(e) => setShowEmptyFlights(e.target.checked)} style={{ accentColor: '#64748b', cursor: 'pointer', width: '14px', height: '14px' }} />
-          <span>👁️ Mostrar vuelos sin envíos</span>
-        </label>
-        <label style={{ display: 'flex', alignItems: 'center', gap: '10px', cursor: 'pointer', fontSize: '12px', color: '#cbd5e1' }}>
-          <input type="checkbox" checked={showTestFlights} onChange={(e) => setShowTestFlights(e.target.checked)} style={{ accentColor: '#f97316', cursor: 'pointer', width: '14px', height: '14px' }} />
-          <span>👁️ Mostrar vuelos con envíos</span>
-        </label>
+      <div className="ct-map-filter">
+        <button
+          onClick={() => setShowFilters(p => !p)}
+          className={`ct-map-filter-btn${showFilters ? ' ct-map-filter-btn--active' : ''}`}
+          title="Filtros de vuelos"
+        >
+          ⚙ FILTROS {showFilters ? '▲' : '▼'}
+        </button>
+
+        {showFilters && (
+          <div className="ct-map-filter-panel">
+            <label className="ct-map-filter-check">
+              <input type="checkbox" checked={showEmptyFlights} onChange={(e) => setShowEmptyFlights(e.target.checked)} style={{ accentColor: '#64748b' }} />
+              <span>Vuelos sin envíos</span>
+            </label>
+            <label className="ct-map-filter-check">
+              <input type="checkbox" checked={showTestFlights} onChange={(e) => setShowTestFlights(e.target.checked)} style={{ accentColor: '#f97316' }} />
+              <span>Vuelos con envíos</span>
+            </label>
+          </div>
+        )}
       </div>
 
       <LegendButton />

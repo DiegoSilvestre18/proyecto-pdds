@@ -8,7 +8,7 @@ import {
 import { AIRPORT_BY_ICAO, buildAirportMetrics, AIRPORTS } from "../data/airportsData";
 
 const PANEL_VISIBILITY_DEFAULT = {
-  telemetry: true,
+  telemetry: false,
   legend: true,
   occupancy: true,
   transitInventory: false,
