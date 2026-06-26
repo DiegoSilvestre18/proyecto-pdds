@@ -198,11 +198,11 @@ const WorldMap = ({
   const flightPassesFilter = useCallback((status, fromIcao, toIcao) => {
     if (activeFilters.flightStatus && status !== activeFilters.flightStatus) return false;
     if (activeFilters.continent) {
-      const fromAirport = airports.find(a => a.icao === fromIcao);
-      const toAirport = airports.find(a => a.icao === toIcao);
+      const fromAirport = airportByIcao[fromIcao];
+      const toAirport = airportByIcao[toIcao];
       const fromMatch = fromAirport?.continent === activeFilters.continent;
       const toMatch = toAirport?.continent === activeFilters.continent;
-      if (!fromMatch && !toMatch) return false;
+      if (!fromMatch || !toMatch) return false;
     }
     if (activeFilters.semaphoreLevel) {
       const checkSemaphore = (icao) => {
@@ -212,7 +212,7 @@ const WorldMap = ({
       if (!checkSemaphore(fromIcao) && !checkSemaphore(toIcao)) return false;
     }
     return true;
-  }, [activeFilters.flightStatus, activeFilters.continent, activeFilters.semaphoreLevel, airports, activeMetrics]);
+  }, [activeFilters.flightStatus, activeFilters.continent, activeFilters.semaphoreLevel, activeMetrics, airportByIcao]);
 
   const hasAnySelection = selectedAircraftId != null || (selectedAirportCode != null && selectedAirportCode !== "");
 

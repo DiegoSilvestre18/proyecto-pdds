@@ -304,6 +304,16 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
       result = result.filter(ut => ut.status === activeFilters.flightStatus);
     }
 
+    // Filtro por continente para los vuelos en la lista
+    if (activeFilters.continent) {
+      result = result.filter(ut => {
+        const fromAirport = airports.find(a => a.icao === ut.from);
+        const toAirport = airports.find(a => a.icao === ut.to);
+        return fromAirport?.continent === activeFilters.continent && 
+               toAirport?.continent === activeFilters.continent;
+      });
+    }
+
     result.sort((a, b) => {
       if (utSort === 'occupancy_desc') return (b.capacityPercent || 0) - (a.capacityPercent || 0);
       if (utSort === 'occupancy_asc') return (a.capacityPercent || 0) - (b.capacityPercent || 0);
@@ -315,7 +325,7 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
     });
 
     return result;
-  }, [activeAircraft, utSearch, utSearchOrigin, utSearchDest, utSort, activeFilters.flightStatus]);
+  }, [activeAircraft, utSearch, utSearchOrigin, utSearchDest, utSort, activeFilters.flightStatus, activeFilters.continent, airports]);
 
   const selectedFlightDetail = useMemo(() => {
     if (!expandedUt) return null;
