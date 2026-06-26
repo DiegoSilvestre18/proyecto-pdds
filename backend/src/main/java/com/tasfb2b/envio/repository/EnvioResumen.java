@@ -7,7 +7,7 @@ public interface EnvioResumen {
     //Añadidos para trazabilidad de envíos
     String getCodigoPedido();
     Long getId();
-    String getCliente();
+    String getClienteId();
 
     String getOrigenIcao();
     String getDestinoIcao();
