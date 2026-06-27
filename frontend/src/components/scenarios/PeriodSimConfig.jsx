@@ -20,13 +20,10 @@ function PeriodSimConfig({
   isOpen,
   onClose,
   selectedAlgorithm,
-  onAlgorithmChange,
   onStart,           // (dias: number, startDate: string) => void
   liveStatus,
   simState,
   sessionId,
-  targetPlaybackMinutes,
-  setTargetPlaybackMinutes,
   onExportExcel,
   onExportMd,
   onExportDetails,
@@ -37,12 +34,8 @@ function PeriodSimConfig({
   const [month,      setMonth]      = useState(1);
   const [year,       setYear]       = useState(2026);
   const [startTime,  setStartTime]  = useState("00:00");
-  const [destroyFraction, setDestroyFraction] = useState(20);
-  const [mutationRate, setMutationRate] = useState(15);
   const [isStarting, setIsStarting] = useState(false);
-  const [preCancelledFlights, setPreCancelledFlights] = useState([]);
-  const [tempFlightId, setTempFlightId] = useState("");
-  const [tempDay, setTempDay] = useState("all");
+  const [preCancelledFlights] = useState([]);
 
   const PLAYBACK_OPTIONS = [
     { label: "Balanceado", value: 15, sub: "15 min" },
@@ -113,8 +106,14 @@ function PeriodSimConfig({
   const handleStart = async () => {
     if (!onStart) return;
     setIsStarting(true);
-    await onStart(DIAS_SIMULACION, startDate, preCancelledFlights, startTime);
-    setIsStarting(false);
+    try {
+      await onStart(DIAS_SIMULACION, startDate, preCancelledFlights, startTime);
+    } catch (e) {
+      // Antes el botón quedaba bloqueado en "iniciando" si onStart fallaba.
+      console.error('[PeriodSim] Error al iniciar simulación:', e);
+    } finally {
+      setIsStarting(false);
+    }
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -214,39 +213,6 @@ function PeriodSimConfig({
 
             {/* Playback fijo en 30 min — sin controles visibles para el usuario */}
 
-            {/* Selector de algoritmo */}
-            {/* EXPERIMENTAL MODE - DISABLED FOR BUSINESS UI
-            <div className="ct-config-section">
-              <p className="ct-config-section__title">⚡ ALGORITMO</p>
-              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                {[
-                  { val: "alns", icon: "⚡", name: "ALNS", sub: "Adaptive Large Neighborhood Search" },
-                ].map(opt => (
-                  <button key={opt.val} id={`period-algo-${opt.val}`} type="button"
-                    onClick={() => onAlgorithmChange(opt.val)}
-                    style={{
-                      flex: 1, padding: "10px 0", borderRadius: 8, border: "none",
-                      fontWeight: 700, fontSize: 13, cursor: "pointer",
-                      transition: "all 0.2s",
-                      background: selectedAlgorithm === opt.val
-                        ? "linear-gradient(135deg, #4f46e5, #7c3aed)"
-                        : "rgba(255,255,255,0.06)",
-                      color: selectedAlgorithm === opt.val ? "#fff" : "#94a3b8",
-                      boxShadow: selectedAlgorithm === opt.val ? "0 4px 15px rgba(79,70,229,0.4)" : "none",
-                    }}
-                  >
-                    {opt.icon} {opt.name}
-                    <span style={{ display: "block", fontSize: 9, fontWeight: 400, opacity: 0.75, marginTop: 2 }}>
-                      {opt.sub}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-            */}
-
-            {/* Parámetros del algoritmo y cancelaciones — ocultos para usuario final */}
-
             {/* Botón iniciar */}
             <div style={{ paddingBottom: 8 }}>
               <button
@@ -290,7 +256,14 @@ function PeriodSimConfig({
                   <span>Día {liveStatus?.currentDay ?? 0} / {liveStatus?.totalDays ?? DIAS_SIMULACION}</span>
                   <span style={{ color: "#38bdf8", fontWeight: 700 }}>{liveStatus?.percent ?? 0}%</span>
                 </div>
-                <div style={{ height: 8, background: "rgba(255,255,255,0.08)", borderRadius: 4 }}>
+                <div
+                  style={{ height: 8, background: "rgba(255,255,255,0.08)", borderRadius: 4 }}
+                  role="progressbar"
+                  aria-valuenow={Math.round(liveStatus?.percent ?? 0)}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label="Progreso de la simulación por periodo"
+                >
                   <div style={{
                     height: "100%", borderRadius: 4,
                     width: `${liveStatus?.percent ?? 0}%`,

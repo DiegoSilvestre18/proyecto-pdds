@@ -51,18 +51,24 @@ function AirportDetailPanel({ isVisible, selectedAirport = null, metrics = null,
       style={{ '--status-color': color, '--bag-color': isFull ? '#ef4444' : 'white' }}
     >
       {/* Pill comprimida — siempre visible */}
-      <button className='ct-pill' onClick={() => setCollapsed(p => !p)}>
+      <button
+        className='ct-pill'
+        onClick={() => setCollapsed(p => !p)}
+        aria-expanded={!collapsed}
+        aria-controls='ct-airport-expand'
+        aria-label={`Detalle de almacén ${code}, ${collapsed ? 'expandir' : 'contraer'}`}
+      >
         <span className='ct-pill__dot' style={{ '--dot-color': color }} />
         <span className='ct-pill__id'>{code}</span>
         <span className='ct-pill__route'>{city || name || code}</span>
         <div className='ct-pill__bar'>
           <div className='ct-pill__bar-fill' style={{ width: `${pct}%`, background: color }} />
         </div>
-        <span className={`ct-pill__chevron${collapsed ? '' : ' ct-pill__chevron--open'}`}>▲</span>
+        <span className={`ct-pill__chevron${collapsed ? '' : ' ct-pill__chevron--open'}`} aria-hidden="true">▲</span>
       </button>
 
       {/* Panel expandido */}
-      <div className={`ct-expand${collapsed ? '' : ' ct-expand--open'}`}>
+      <div id='ct-airport-expand' className={`ct-expand${collapsed ? '' : ' ct-expand--open'}`}>
         <div className='ct-airport-expand__body'>
           <div className='ct-airport-header'>
             <div>

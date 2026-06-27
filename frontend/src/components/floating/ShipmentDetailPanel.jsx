@@ -27,13 +27,18 @@ function formatFlightId(id) {
 
 function formatTimeWithGMT(epoch, gmtOffset) {
   if (!epoch) return '--'
-  const date = new Date(epoch)
-  date.setUTCHours(date.getUTCHours() + (gmtOffset ?? 0))
-  return date.toLocaleString('es-ES', {
+  // Computa el epoch en la zona horaria destino sin mutar el objeto Date.
+  // Se desplaza el epoch por el offset y se formatea como UTC, de modo que los
+  // números mostrados corresponden a la hora local del aeropuerto.
+  const offset = gmtOffset ?? 0
+  const localEpoch = epoch + offset * 3600000
+  const timeStr = new Date(localEpoch).toLocaleString('es-ES', {
     day: '2-digit', month: 'short',
     hour: '2-digit', minute: '2-digit',
-    timeZone: 'UTC', timeZoneName: 'short',
+    timeZone: 'UTC',
   })
+  const gmtLabel = `GMT${offset >= 0 ? '+' : ''}${offset}`
+  return `${timeStr} ${gmtLabel}`
 }
 
 function ShipmentDetailPanel({ isVisible, selectedAircraft = null }) {
@@ -63,18 +68,24 @@ function ShipmentDetailPanel({ isVisible, selectedAircraft = null }) {
       style={{ '--panel-border-color': collapsed ? undefined : 'rgba(56,189,248,0.35)' }}
     >
       {/* ── Pill comprimida ──────────────────────────────────────── */}
-      <button className='ct-pill' onClick={() => setCollapsed(p => !p)}>
+      <button
+        className='ct-pill'
+        onClick={() => setCollapsed(p => !p)}
+        aria-expanded={!collapsed}
+        aria-controls='ct-shipment-expand'
+        aria-label={`Detalle de vuelo ${flightId}, ${collapsed ? 'expandir' : 'contraer'}`}
+      >
         <span className='ct-pill__dot' style={{ '--dot-color': statusColor }} />
         <span className='ct-pill__id'>{flightId}</span>
         <span className='ct-pill__route'>{selectedAircraft.from} → {selectedAircraft.to}</span>
         <div className='ct-pill__bar'>
           <div className='ct-pill__bar-fill' style={{ width: `${progressPct}%` }} />
         </div>
-        <span className={`ct-pill__chevron${collapsed ? '' : ' ct-pill__chevron--open'}`}>▲</span>
+        <span className={`ct-pill__chevron${collapsed ? '' : ' ct-pill__chevron--open'}`} aria-hidden="true">▲</span>
       </button>
 
       {/* ── Panel expandido ──────────────────────────────────────── */}
-      <div className={`ct-expand${collapsed ? '' : ' ct-expand--open'}`}>
+      <div id='ct-shipment-expand' className={`ct-expand${collapsed ? '' : ' ct-expand--open'}`}>
         <div className='ct-expand__body'>
 
           {/* Ruta + tiempos */}

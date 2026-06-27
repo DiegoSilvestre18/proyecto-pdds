@@ -12,10 +12,12 @@ export default function FlightCancellationPanel({ sessionId, isRunning, startEpo
   const [cancellingId, setCancellingId] = useState(null)
   const [resultado, setResultado] = useState(null)
 
-  // Calcular el minuto actual del día en la simulación
+  // Minutos absolutos transcurridos desde el inicio de la simulación.
+  // Antes se aplicaba `% 86400000` (un día), lo que reiniciaba el contador cada
+  // 24 h y rompía la comparación con departureMinute en simulaciones multi-día.
   const currentSimMinute = useMemo(() => {
     if (!startEpoch || !currentEpochTime) return 0;
-    return Math.floor(((currentEpochTime - startEpoch) % 86400000) / 60000);
+    return Math.floor((currentEpochTime - startEpoch) / 60000);
   }, [startEpoch, currentEpochTime]);
 
   // Cargar vuelos cuando cambia la query o se monta
