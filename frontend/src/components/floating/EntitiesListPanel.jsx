@@ -75,30 +75,45 @@ function FlightDetailPanel({ flight, onClose }) {
 
   const numericId = flight.id ? flight.id.toString().replace('vuelo-', '').split('-')[0] : null
   const statusColor = statusColors[flight.status] || statusColors.default
+  const progress = ((flight.progress ?? 0) * 100).toFixed(0)
 
   return (
-    <div className='ct-flight-detail-card'>
-      <button className='ct-flight-detail-card__close' onClick={onClose}>✕</button>
-
-      <div className='ct-flight-detail-card__title'>
-        ✈ Vuelo {numericId} — {flight.from} ➔ {flight.to}
+    <div className='ct-flight-detail-view' role='region' aria-label='Detalle de vuelo'>
+      <div className='ct-flight-detail-view__header'>
+        <button className='ct-flight-detail-view__back' onClick={onClose}>← Volver</button>
+        <span className='ct-flight-detail-view__status' style={{ color: statusColor, borderColor: statusColor }}>
+          {flight.status}
+        </span>
       </div>
 
-      <div className='ct-flight-detail-row'>
-        <span>Ocupación Real</span>
-        <span className='ct-flight-detail-row__value'>{flight.ocupacionReal || 0} maletas</span>
+      <div className='ct-flight-detail-view__route'>
+        <span className='ct-flight-detail-view__flight-id'>✈ Vuelo {numericId}</span>
+        <div>
+          <span className='ct-flight-detail-view__airport'>{flight.from}</span>
+          <span className='ct-flight-detail-view__arrow'>➔</span>
+          <span className='ct-flight-detail-view__airport'>{flight.to}</span>
+        </div>
       </div>
-      <div className='ct-flight-detail-row'>
-        <span>Capacidad Máxima</span>
-        <span className='ct-flight-detail-row__value'>{flight.capacidadMax || 0} maletas</span>
+
+      <div className='ct-flight-detail-view__metrics'>
+        <div className='ct-flight-detail-card'>
+          <span className='ct-flight-detail-card__label'>Ocupación Real</span>
+          <strong className='ct-flight-detail-card__value'>{flight.ocupacionReal || 0} maletas</strong>
+        </div>
+        <div className='ct-flight-detail-card'>
+          <span className='ct-flight-detail-card__label'>Capacidad Máxima</span>
+          <strong className='ct-flight-detail-card__value'>{flight.capacidadMax || 0} maletas</strong>
+        </div>
       </div>
-      <div className='ct-flight-detail-row'>
-        <span>Progreso</span>
-        <span className='ct-flight-detail-row__value'>{((flight.progress ?? 0) * 100).toFixed(0)}%</span>
-      </div>
-      <div className='ct-flight-detail-row'>
-        <span>Estado</span>
-        <span className='ct-flight-detail-row__status' style={{ '--row-color': statusColor }}>{flight.status}</span>
+
+      <div className='ct-flight-detail__progress'>
+        <div className='ct-flight-detail__progress-header'>
+          <span>Progreso</span>
+          <span className='ct-flight-detail__progress-pct'>{progress}%</span>
+        </div>
+        <div className='ct-flight-detail__progress-track'>
+          <div className='ct-flight-detail__progress-fill' style={{ width: `${progress}%` }} />
+        </div>
       </div>
     </div>
   )
@@ -132,7 +147,7 @@ const CONTINENT_OPTIONS = [
 ]
 
 export default function EntitiesListPanel({ activeAircraft, airports, airportMetrics, onSelectFlight, onAirportSelect }) {
-  const [activeTab, setActiveTab] = useState('ut')
+  const [activeTab, setActiveTab] = useState('wh')
   const [utSearch, setUtSearch] = useState('')
   const [utSearchOrigin, setUtSearchOrigin] = useState('')
   const [utSearchDest, setUtSearchDest] = useState('')
@@ -142,6 +157,7 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
   const [whSearch, setWhSearch] = useState('')
   const [whSort, setWhSort] = useState('occupancy_desc')
   const [expandedWh, setExpandedWh] = useState(null)
+  const [whShowAllFlights, setWhShowAllFlights] = useState({})
 
   const listContainerRef = useRef(null)
   const [listHeight, setListHeight] = useState(0)
@@ -219,11 +235,14 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
     }
     setFocusedEntity('airport', wh.icao, 'panel')
     if (onAirportSelect) onAirportSelect(wh.icao)
-    dispatchMapCommand('flyTo', {
-      coordinates: wh.coordinates,
-      zoom: 3,
-      targetId: wh.icao,
-    })
+    // Guard: sin coordenadas válidas no se despacha flyTo (evita centrar en undefined).
+    if (Array.isArray(wh.coordinates) && wh.coordinates.length === 2) {
+      dispatchMapCommand('flyTo', {
+        coordinates: wh.coordinates,
+        zoom: 3,
+        targetId: wh.icao,
+      })
+    }
   }, [setFocusedEntity, clearFocusedEntity, dispatchMapCommand, onAirportSelect])
 
   const handleSemaphoreFilter = useCallback((level) => {
@@ -327,11 +346,14 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
     return result
   }, [airports, airportMetrics, activeAircraft, whSearch, activeFilters.continent, whSort, activeFilters.semaphoreLevel])
 
-  const getWarehouseFlights = useCallback((icao) => {
+  const getWarehouseFlights = useCallback((icao, showAll) => {
     if (!activeAircraft || activeAircraft.length === 0) return { incoming: [], outgoing: [] }
-    const incoming = activeAircraft.filter(f => f.to === icao && f.status !== 'cancelled').slice(0, 5)
-    const outgoing = activeAircraft.filter(f => f.from === icao && f.status !== 'cancelled').slice(0, 5)
-    return { incoming, outgoing }
+    const limit = showAll ? Infinity : 5
+    const incoming = activeAircraft.filter(f => f.to === icao && f.status !== 'cancelled').slice(0, limit)
+    const outgoing = activeAircraft.filter(f => f.from === icao && f.status !== 'cancelled').slice(0, limit)
+    const totalIncoming = activeAircraft.filter(f => f.to === icao && f.status !== 'cancelled').length
+    const totalOutgoing = activeAircraft.filter(f => f.from === icao && f.status !== 'cancelled').length
+    return { incoming, outgoing, totalIncoming, totalOutgoing }
   }, [activeAircraft])
 
   return (
@@ -358,59 +380,61 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
         {/* TAB: UTs */}
         {activeTab === 'ut' && (
           <>
-            <div className='ct-filter-chips'>
-              {FLIGHT_STATUS_OPTIONS.map(opt => (
-                <button
-                  key={opt.value ?? 'all'}
-                  onClick={() => handleFlightStatusFilter(opt.value)}
-                  className={`ct-filter-chip${activeFilters.flightStatus === opt.value ? ' ct-filter-chip--active' : ''}`}
-                  style={{ '--chip-color': opt.color }}
-                >
-                  {opt.label}
-                </button>
-              ))}
-            </div>
-
-            <div className='ct-search-row'>
-              <input type='text' placeholder='ID...' value={utSearch} onChange={(e) => setUtSearch(e.target.value)}
-                className='ct-search-input ct-search-input--narrow' />
-              <input type='text' placeholder='Origen...' value={utSearchOrigin} onChange={(e) => setUtSearchOrigin(e.target.value)}
-                className='ct-search-input' />
-              <input type='text' placeholder='Destino...' value={utSearchDest} onChange={(e) => setUtSearchDest(e.target.value)}
-                className='ct-search-input' />
-            </div>
-            <div className='ct-search-row'>
-              <select value={utSort} onChange={(e) => setUtSort(e.target.value)} className='ct-select'>
-                <option value='occupancy_desc'>Ocupación (Mayor a Menor)</option>
-                <option value='occupancy_asc'>Ocupación (Menor a Mayor)</option>
-                <option value='dep_asc'>Hora de Salida</option>
-                <option value='arr_asc'>Hora de Llegada</option>
-                <option value='origin'>Origen (A-Z)</option>
-                <option value='dest'>Destino (A-Z)</option>
-              </select>
-            </div>
-
-            {selectedFlightDetail && (
+            {selectedFlightDetail ? (
               <FlightDetailPanel
                 flight={selectedFlightDetail}
                 onClose={() => setExpandedUt(null)}
               />
-            )}
+            ) : (
+              <>
+                <div className='ct-filter-chips'>
+                  {FLIGHT_STATUS_OPTIONS.map(opt => (
+                    <button
+                      key={opt.value ?? 'all'}
+                      onClick={() => handleFlightStatusFilter(opt.value)}
+                      className={`ct-filter-chip${activeFilters.flightStatus === opt.value ? ' ct-filter-chip--active' : ''}`}
+                      style={{ '--chip-color': opt.color }}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
 
-            {filteredUTs.length > 0 && (
-              <List
-                height={selectedFlightDetail ? 300 : Math.max(filteredUTs.length * 54, 54)}
-                width='100%'
-                itemCount={filteredUTs.length}
-                itemSize={54}
-                style={{ overflow: 'hidden' }}
-                itemData={{ flights: filteredUTs, expandedUt, setExpandedUt, handleSelectUT, focusedEntity, utRefsMap }}
-              >
-                {FlightRow}
-              </List>
-            )}
-            {filteredUTs.length === 0 && (
-              <div className='ct-entities-empty'>No hay unidades de transporte activas.</div>
+                <div className='ct-search-row'>
+                  <input type='text' placeholder='ID...' value={utSearch} onChange={(e) => setUtSearch(e.target.value)}
+                    className='ct-search-input ct-search-input--narrow' />
+                  <input type='text' placeholder='Origen...' value={utSearchOrigin} onChange={(e) => setUtSearchOrigin(e.target.value)}
+                    className='ct-search-input' />
+                  <input type='text' placeholder='Destino...' value={utSearchDest} onChange={(e) => setUtSearchDest(e.target.value)}
+                    className='ct-search-input' />
+                </div>
+                <div className='ct-search-row'>
+                  <select value={utSort} onChange={(e) => setUtSort(e.target.value)} className='ct-select'>
+                    <option value='occupancy_desc'>Ocupación (Mayor a Menor)</option>
+                    <option value='occupancy_asc'>Ocupación (Menor a Mayor)</option>
+                    <option value='dep_asc'>Hora de Salida</option>
+                    <option value='arr_asc'>Hora de Llegada</option>
+                    <option value='origin'>Origen (A-Z)</option>
+                    <option value='dest'>Destino (A-Z)</option>
+                  </select>
+                </div>
+
+                {filteredUTs.length > 0 && (
+                  <List
+                    height={Math.max(filteredUTs.length * 54, 54)}
+                    width='100%'
+                    itemCount={filteredUTs.length}
+                    itemSize={54}
+                    style={{ overflow: 'hidden' }}
+                    itemData={{ flights: filteredUTs, expandedUt, setExpandedUt, handleSelectUT, focusedEntity, utRefsMap }}
+                  >
+                    {FlightRow}
+                  </List>
+                )}
+                {filteredUTs.length === 0 && (
+                  <div className='ct-entities-empty'>No hay unidades de transporte activas.</div>
+                )}
+              </>
             )}
           </>
         )}
@@ -464,7 +488,8 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
                 const semaforo = getLevelColor(pct)
                 const isExpanded = expandedWh === wh.icao
                 const isFocused = focusedEntity?.type === 'airport' && focusedEntity?.id === wh.icao
-                const flights = isExpanded ? getWarehouseFlights(wh.icao) : null
+                const showAllWh = whShowAllFlights[wh.icao]
+                const flights = isExpanded ? getWarehouseFlights(wh.icao, showAllWh) : null
 
                 return (
                   <div
@@ -493,36 +518,54 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
                     {isExpanded && (
                       <div className='ct-wh-expand'>
                         <div className='ct-wh-expand__title'>📥 Vuelos entrantes ({flights?.incoming?.length || 0})</div>
-                        {flights?.incoming?.length > 0 ? flights.incoming.map(f => {
-                          const fId = f.id?.toString().replace('vuelo-', '').split('-')[0]
-                          return (
-                            <div key={f.id} className='ct-wh-flight-row'
-                              onClick={(e) => { e.stopPropagation(); handleSelectUT(f) }}
-                            >
-                              <span>✈ Vuelo {fId} ({f.from})</span>
-                              <span className='ct-wh-flight-badge' style={{ '--badge-color': f.ocupacionReal > 0 ? '#10b981' : '#64748b' }}>
-                                {f.ocupacionReal > 0 ? `+${f.ocupacionReal} maletas` : 'En tránsito vacío'}
-                              </span>
-                            </div>
-                          )
-                        }) : (
+                        {flights?.incoming?.length > 0 ? (
+                          <>
+                            {flights.incoming.map(f => {
+                              const fId = f.id?.toString().replace('vuelo-', '').split('-')[0]
+                              return (
+                                <div key={f.id} className='ct-wh-flight-row'
+                                  onClick={(e) => { e.stopPropagation(); handleSelectUT(f) }}
+                                >
+                                  <span>✈ Vuelo {fId} ({f.from})</span>
+                                  <span className='ct-wh-flight-badge' style={{ '--badge-color': f.ocupacionReal > 0 ? '#10b981' : '#64748b' }}>
+                                    {f.ocupacionReal > 0 ? `+${f.ocupacionReal} maletas` : 'En tránsito vacío'}
+                                  </span>
+                                </div>
+                              )
+                            })}
+                            {flights.totalIncoming > 5 && (
+                              <button className='ct-wh-show-more' onClick={(e) => { e.stopPropagation(); setWhShowAllFlights(prev => ({ ...prev, [wh.icao]: !showAllWh })) }}>
+                                {showAllWh ? '▲ Mostrar menos' : `▼ Mostrar más (${flights.totalIncoming - 5} más)`}
+                              </button>
+                            )}
+                          </>
+                        ) : (
                           <div className='ct-wh-empty'>Sin vuelos entrantes activos</div>
                         )}
 
                         <div className='ct-wh-expand__title ct-wh-expand__title--spaced'>📤 Vuelos salientes ({flights?.outgoing?.length || 0})</div>
-                        {flights?.outgoing?.length > 0 ? flights.outgoing.map(f => {
-                          const fId = f.id?.toString().replace('vuelo-', '').split('-')[0]
-                          return (
-                            <div key={f.id} className='ct-wh-flight-row'
-                              onClick={(e) => { e.stopPropagation(); handleSelectUT(f) }}
-                            >
-                              <span>✈ Vuelo {fId} (→{f.to})</span>
-                              <span className='ct-wh-flight-badge' style={{ '--badge-color': f.ocupacionReal > 0 ? '#f59e0b' : '#64748b' }}>
-                                {f.ocupacionReal > 0 ? `-${f.ocupacionReal} maletas` : 'En tránsito vacío'}
-                              </span>
-                            </div>
-                          )
-                        }) : (
+                        {flights?.outgoing?.length > 0 ? (
+                          <>
+                            {flights.outgoing.map(f => {
+                              const fId = f.id?.toString().replace('vuelo-', '').split('-')[0]
+                              return (
+                                <div key={f.id} className='ct-wh-flight-row'
+                                  onClick={(e) => { e.stopPropagation(); handleSelectUT(f) }}
+                                >
+                                  <span>✈ Vuelo {fId} (→{f.to})</span>
+                                  <span className='ct-wh-flight-badge' style={{ '--badge-color': f.ocupacionReal > 0 ? '#f59e0b' : '#64748b' }}>
+                                    {f.ocupacionReal > 0 ? `-${f.ocupacionReal} maletas` : 'En tránsito vacío'}
+                                  </span>
+                                </div>
+                              )
+                            })}
+                            {flights.totalOutgoing > 5 && (
+                              <button className='ct-wh-show-more' onClick={(e) => { e.stopPropagation(); setWhShowAllFlights(prev => ({ ...prev, [wh.icao]: !showAllWh })) }}>
+                                {showAllWh ? '▲ Mostrar menos' : `▼ Mostrar más (${flights.totalOutgoing - 5} más)`}
+                              </button>
+                            )}
+                          </>
+                        ) : (
                           <div className='ct-wh-empty'>Sin vuelos salientes activos</div>
                         )}
                       </div>

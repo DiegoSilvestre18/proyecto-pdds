@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import { SkeletonList, Spinner, EmptyState } from "../common/Skeleton";
 
 
 const PAGE_SIZE = 50;
@@ -13,9 +14,8 @@ const ShipmentsPanel = () => {
     const [page, setPage] = useState(0);
     const [hasMore, setHasMore] = useState(true);
 
-    const debounceRef = useRef(null);
-    const observerRef = useRef(null);
-    const lastItemRef = useRef(null);
+    const containerRef = useRef(null);
+    const scrollTimerRef = useRef(null);
 
     const fetchShipments = async (pageToLoad = 0, reset = false) => {
         if (loading) return;
@@ -55,29 +55,35 @@ const ShipmentsPanel = () => {
         return () => clearTimeout(timer);
     }, [searchOrigin, searchCode]);
 
-    const containerRef = useRef(null);
-
-    // Scroll infinito
+    // Scroll infinito con debounce (antes disparaba en cada evento de scroll).
     useEffect(() => {
         const el = containerRef.current;
         if (!el) return;
 
         const handleScroll = () => {
-            const bottom =
-                el.scrollTop + el.clientHeight >= el.scrollHeight - 100;
-
-            if (bottom && !loading && hasMore) {
-                fetchShipments(page + 1, false);   // ← reset=false explícito y correcto
-            }
+            if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
+            scrollTimerRef.current = setTimeout(() => {
+                const bottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 100;
+                if (bottom && !loading && hasMore) {
+                    fetchShipments(page + 1, false);
+                }
+            }, 150);
         };
 
-        el.addEventListener("scroll", handleScroll);
-        return () => el.removeEventListener("scroll", handleScroll);
+        el.addEventListener("scroll", handleScroll, { passive: true });
+        return () => {
+            el.removeEventListener("scroll", handleScroll);
+            if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
+        };
     }, [page, loading, hasMore, searchOrigin, searchCode]);
 
     return (
         <div style={{ padding: "12px", color: "#e2e8f0", display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <h3 style={{ margin: 0, fontSize: '14px', color: '#f8fafc' }}>Envíos</h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <h3 style={{ margin: 0, fontSize: '14px', color: '#f8fafc' }}>Envíos</h3>
+                {/* Indicador de refresco: solo cuando ya hay datos en pantalla. */}
+                {loading && shipments.length > 0 && <Spinner size={14} label="Actualizando envíos…" />}
+            </div>
 
             {/* SEARCH */}
             <div style={{ display: "flex", gap: "6px" }}>
@@ -105,14 +111,25 @@ const ShipmentsPanel = () => {
             </div>
 
             {/* LISTA */}
-            <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '2px' }}>
-                {shipments.map((shipment, index) => {
-                    const isLast = index === shipments.length - 1;
+            <div ref={containerRef} style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                {/* Carga inicial: skeleton en lugar de hueco vacío. */}
+                {loading && shipments.length === 0 && (
+                    <SkeletonList rows={8} rowHeight={46} label="Cargando envíos…" />
+                )}
 
+                {/* Empty state: búsqueda sin resultados o sin envíos. */}
+                {!loading && shipments.length === 0 && (
+                    <EmptyState
+                        icon="📦"
+                        title={searchOrigin || searchCode ? 'Sin envíos que coincidan' : 'No hay envíos'}
+                        hint={searchOrigin || searchCode ? 'Ajusta los filtros de búsqueda.' : null}
+                    />
+                )}
+
+                {shipments.map((shipment) => {
                     return (
                         <div
                             key={shipment.id}
-                            ref={isLast ? lastItemRef : null}
                             style={{
                                 padding: "6px 8px",
                                 background: 'rgba(255,255,255,0.02)',
@@ -134,9 +151,10 @@ const ShipmentsPanel = () => {
                 })}
             </div>
 
-            {loading && (
-                <div style={{ fontSize: "12px", marginTop: "10px" }}>
-                    Cargando...
+            {/* Paginación: indicador al cargar más páginas. */}
+            {loading && shipments.length > 0 && (
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: "12px", marginTop: "10px", color: '#94a3b8' }}>
+                    <Spinner size={14} label="Cargando más…" /> Cargando más…
                 </div>
             )}
         </div>

@@ -62,10 +62,18 @@ const ControlDock = ({
           >
             <button
               type="button"
+              className="ct-dock-btn"
               aria-pressed={isActive}
+              aria-label={item.label}
               onClick={() =>
                 item.isScenario ? onToggleScenarioConfig() : onTogglePanel(item.key)
               }
+              onFocus={() => setHovered(item.key)}
+              onBlur={(e) => {
+                if (!e.currentTarget.contains(e.relatedTarget)) {
+                  setHovered(null)
+                }
+              }}
               style={{
                 width: '100%',
                 aspectRatio: '1',
@@ -83,11 +91,10 @@ const ControlDock = ({
                 color: '#e2e8f0',
                 cursor: 'pointer',
                 transition: 'all 0.15s ease',
-                outline: 'none',
               }}
               title={item.label}
             >
-              {item.icon}
+              <span aria-hidden="true">{item.icon}</span>
             </button>
 
             {hovered === item.key && (
@@ -135,12 +142,16 @@ const ControlDock = ({
       >
         <button
           type="button"
+          className="ct-dock-btn"
+          aria-label="Aumentar máximo de paneles simultáneos"
           onClick={() => setMaxWindows(Math.min(5, maxWindows + 1))}
           style={btnStyle}
         >+</button>
-        <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 700 }}>{maxWindows}</span>
+        <span style={{ fontSize: '10px', color: '#94a3b8', fontWeight: 700 }} aria-label={`Máximo de paneles: ${maxWindows}`}>{maxWindows}</span>
         <button
           type="button"
+          className="ct-dock-btn"
+          aria-label="Reducir máximo de paneles simultáneos"
           onClick={() => setMaxWindows(Math.max(1, maxWindows - 1))}
           style={btnStyle}
         >–</button>

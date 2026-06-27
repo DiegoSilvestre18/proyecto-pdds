@@ -9,12 +9,16 @@ import DataManagementDashboard from './pages/DataManagementDashboard.jsx'
 import RoleSelection from './pages/RoleSelection.jsx'
 import ProtectedRoute from './components/common/ProtectedRoute.jsx'
 import { SelectionBridgeProvider } from './hooks/useSelectionBridge.jsx'
+import { ToastProvider } from './hooks/useToast.jsx'
+import ErrorBoundary from './components/common/ErrorBoundary.jsx'
 
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <BrowserRouter>
-      <SelectionBridgeProvider>
-        <Routes>
+    <ErrorBoundary label="aplicación">
+      <BrowserRouter>
+        <ToastProvider>
+          <SelectionBridgeProvider>
+            <Routes>
           <Route path="/" element={<RoleSelection />} />
           
           {/* Rutas protegidas para Empleado Registrador */}
@@ -55,8 +59,10 @@ createRoot(document.getElementById('root')).render(
 
           {/* Fallback genérico */}
           <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
-      </SelectionBridgeProvider>
-    </BrowserRouter>
+            </Routes>
+          </SelectionBridgeProvider>
+        </ToastProvider>
+      </BrowserRouter>
+    </ErrorBoundary>
   </StrictMode>,
 )
