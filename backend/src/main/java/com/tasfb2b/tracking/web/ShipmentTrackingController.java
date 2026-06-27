@@ -29,10 +29,10 @@ public class ShipmentTrackingController {
         return tracker != null ? tracker.getByShipment(codigo) : List.of();
     }
 
-    @GetMapping("/{sessionId}/flight/{flightId}")
-    public List<ShipmentState> getByFlight(@PathVariable String sessionId,@PathVariable Long flightId) {
+    @GetMapping("/{sessionId}/flight-instance/{instanceKey}")
+    public List<ShipmentState> getByFlightInstance(@PathVariable String sessionId, @PathVariable String instanceKey) {
         ShipmentTracker tracker = trackerRegistry.get(sessionId);
-        return tracker != null ? tracker.getByFlight(flightId) : List.of();
+        return tracker != null ? tracker.getByFlightInstance(instanceKey) : List.of();
     }
 
     @GetMapping("/{sessionId}/airport/{icao}")

@@ -60,7 +60,8 @@ public class EventEngine {
                     r.getLot(),
                     flights.get(0), // vuelo de referencia para ICAO destino, origen
                     load,
-                    bagIds
+                    bagIds,
+                    null
             ));
 
             // Aseguramos secuencialidad: el próximo vuelo no puede salir antes de que aterrice el anterior o de que el lote esté listo.
@@ -70,13 +71,15 @@ public class EventEngine {
 
                 // departure anclado a partir del sequenceTime
                 long depTime = v.calcularSiguienteSalida(sequenceTime);
+                String instanceKey = v.getId() + "-" + depTime;
                 events.add(new Event(
                         depTime,
                         EventType.FLIGHT_DEPARTURE,
                         r.getLot(),
                         v,
                         load,
-                        bagIds
+                        bagIds,
+                        instanceKey
                 ));
 
                 // llegada del vuelo
@@ -96,7 +99,8 @@ public class EventEngine {
                         r.getLot(),
                         v,
                         load,
-                        bagIds
+                        bagIds,
+                        instanceKey
                 ));
                 
                 // Actualizamos el sequenceTime para el siguiente tramo (si lo hay)
@@ -123,7 +127,8 @@ public class EventEngine {
                         r.getLot(),
                         lastFlight,
                         load,
-                        bagIds
+                        bagIds,
+                        null
                 ));
 
                 // BAGGAGE_PICKUP — instante aleatorio (semilla fija) dentro de [arrivalTime, deadline]
@@ -133,7 +138,7 @@ public class EventEngine {
                 long windowMs = Math.max(1L, deadline - arrivalTime);
                 long pickupTime = arrivalTime + (long) (rng.nextDouble() * windowMs);
 
-                events.add(new Event(pickupTime, EventType.BAGGAGE_PICKUP, r.getLot(), lastFlight, load, bagIds));
+                events.add(new Event(pickupTime, EventType.BAGGAGE_PICKUP, r.getLot(), lastFlight, load, bagIds, null));
             }
         }
 
@@ -146,5 +151,76 @@ public class EventEngine {
         long localArrival = arrivalEpochMs + offsetMs;
         long localRelease = localArrival + 24L * 60 * 60 * 1000;
         return localRelease - offsetMs;
+    }
+
+    /**
+     * Construye la cadena de eventos para UNA ruta, usando solo el subconjunto
+     * de bagIds indicado — no necesariamente todos los de la ruta.
+     * Usado para programar eventos de forma incremental, evitando duplicar
+     * o reescribir el historial de maletas ya programadas en ciclos anteriores.
+     */
+    public List<Event> buildEventsForRoute(Route r, List<String> bagIdsSubset, long dayStartEpochMs) {
+
+        List<Event> events = new ArrayList<>();
+        List<Vuelo> flights = r.getFlights();
+
+        if (flights == null || flights.isEmpty() || bagIdsSubset.isEmpty()) return events;
+
+        int load = bagIdsSubset.size();
+
+        // LOT_ARRIVAL no pertenece a ningún tramo de vuelo concreto
+        events.add(new Event(
+                r.getLot().getReadyTime(),
+                EventType.LOT_ARRIVAL,
+                r.getLot(),
+                flights.get(0),
+                load,
+                bagIdsSubset,
+                null
+        ));
+
+        long sequenceTime = r.getLot().getReadyTime();
+
+        for (Vuelo v : flights) {
+
+            long depTime = v.calcularSiguienteSalida(sequenceTime);
+            String instanceKey = v.getId() + "-" + depTime; //acá sacamos el nuevo id de vuelo
+
+            events.add(new Event(depTime, EventType.FLIGHT_DEPARTURE, r.getLot(), v, load, bagIdsSubset, instanceKey));
+
+            long duration = v.getDuracionMs();
+            if (bloqueoService != null && bloqueoService.tieneDemoraTransito(
+                    v.getOrigen().getIcaoCode(),
+                    v.getDestino().getIcaoCode(),
+                    Instant.ofEpochMilli(depTime))) {
+                duration *= 2;
+            }
+
+            long arrTime = depTime + duration;
+            // misma instanceKey para la llegada de ESTE mismo tramo — clave para que handleArrival
+            // limpie exactamente lo que handleDeparture insertó
+            events.add(new Event(arrTime, EventType.FLIGHT_ARRIVAL, r.getLot(), v, load, bagIdsSubset, instanceKey));
+
+            sequenceTime = arrTime;
+        }
+
+        if (r.getArrivalTime() > 0) {
+
+            long arrivalTime = r.getArrivalTime();
+            Vuelo lastFlight = flights.get(flights.size() - 1);
+
+            long localReleaseTime = computeLocalReleaseTime(arrivalTime, lastFlight.getDestino().getGmtOffset());
+            events.add(new Event(localReleaseTime, EventType.STORAGE_RELEASE, r.getLot(), lastFlight, load, bagIdsSubset,null));
+
+            long deadline = r.getLot().getDeadline();
+            long seed = (r.getLot().getKey() + "-" + lastFlight.getId()).hashCode();
+            Random rng = new Random(seed);
+            long windowMs = Math.max(1L, deadline - arrivalTime);
+            long pickupTime = arrivalTime + (long) (rng.nextDouble() * windowMs);
+
+            events.add(new Event(pickupTime, EventType.BAGGAGE_PICKUP, r.getLot(), lastFlight, load, bagIdsSubset,null));
+        }
+
+        return events;
     }
 }

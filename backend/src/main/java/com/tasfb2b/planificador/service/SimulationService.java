@@ -193,7 +193,10 @@ public class SimulationService {
                 long totalFlightLegs = 0;
                 long totalRoutesWithFlights = 0;
                 Set<Long> processedCancelledFlightIds = new HashSet<>();
-
+                // Maletas cuyo vuelo asignado YA despegó (currentSimTime cruzó su departureTime).
+//              A partir de ahí son físicamente irreversibles. Antes de despegar, su asignación
+//              es provisional y ALNS puede reasignarlas libremente cada ciclo.
+                Set<String> bagIdsComprometidos = new HashSet<>();
                 int day = 0;
                 while (day < dias) {
                         LocalDate fechaDia = fechaInicio.plusDays(day);
@@ -272,6 +275,15 @@ public class SimulationService {
                                                         r.setStatus("cancelled");
                                                         SuperLot replanLot = elevateToMaxPriority(r, currentSimTime);
                                                         replanLot.setTotalMaletas(r.getCapacidadAsignada());
+
+                                                        Set<String> bagIdsAfectados = new HashSet<>(replanLot.getBagIds());
+                                                        bagIdsAfectados.forEach(bagIdsComprometidos::remove); // se liberan para replanificar
+
+                                                        globalEventQueue.removeIf(e ->
+                                                                e.getTime() > currentSimTime
+                                                                        && e.getBagIds() != null
+                                                                        && e.getBagIds().stream().anyMatch(bagIdsAfectados::contains)
+                                                        );
                                                         r.setCapacidadAsignada(0);
                                                         planifiablePool.put(replanLot.getId(), replanLot);
                                                 }
@@ -296,9 +308,48 @@ public class SimulationService {
                                     if (r.isAtendido() && !r.getFlights().isEmpty() && r.getDepartureTime() <= currentSimTime) planifiablePool.remove(r.getLot().getId());
                                 }
 
-                                globalEventQueue.removeIf(e -> e.getTime() > currentSimTime);
-                                globalEventQueue.addAll(eventEngine.buildEvents(sol.getRoutes(), dayStartEpochMs));
-                                
+                                // solo se comprometen maletas cuyo vuelo YA despegó en este instante simulado
+                                for (Route r : sol.getRoutes()) {
+
+                                        if (r.isAtendido() && countedAssignedLotKeysToday.add(r.getLot().getKey())) {
+                                                malatetasAtendidasDia += r.getCapacidadAsignada();
+                                        }
+
+                                        if (!r.isAtendido() || r.getFlights() == null || r.getFlights().isEmpty()) continue;
+
+                                        log.info("Route lot={} depTime={} currentSimTime={} atendido={} bagIds={}",
+                                                r.getLot().getId(), r.getDepartureTime(), currentSimTime,
+                                                r.isAtendido(), r.getBagIds() != null ? r.getBagIds().size() : -1);
+                                        List<String> bagIds = r.getBagIds();
+                                        if (bagIds == null || bagIds.isEmpty()) continue;
+
+                                        // Reclamar solo las que no estaban ya comprometidas (idempotente entre ciclos)
+                                        List<String> nuevasComprometidas = new ArrayList<>();
+                                        for (String bagId : bagIds) {
+                                                if (bagIdsComprometidos.add(bagId)) nuevasComprometidas.add(bagId);
+                                        }
+                                        if (!nuevasComprometidas.isEmpty()) {
+                                                globalEventQueue.addAll(eventEngine.buildEventsForRoute(r, nuevasComprometidas, dayStartEpochMs));
+                                        }
+
+                                        // Gestión del pool: solo retirar el lote si TODAS sus maletas ya despegaron.
+                                        // Si quedó un remanente (capacidad insuficiente para todo el lote en este vuelo),
+                                        // ese remanente vuelve al pool para que ALNS siga intentando ubicarlo.
+                                        SuperLot lot = r.getLot();
+                                        List<String> pendientes = lot.getBagIds().stream()
+                                                .filter(b -> !bagIdsComprometidos.contains(b))
+                                                .toList();
+
+                                        if (pendientes.isEmpty()) {
+                                                planifiablePool.remove(lot.getId());
+                                        } else {
+                                                SuperLot remanente = new SuperLot(lot.getId(), lot.getOrigenIcao(), lot.getDestinoIcao(),
+                                                        pendientes.size(), lot.getReadyTime(), lot.getSla(),
+                                                        lot.isIntercontinental(), lot.getPriority(), pendientes);
+                                                planifiablePool.put(remanente.getId(), remanente);
+                                        }
+                                        log.info("globalEventQueue size tras ciclo: {}", globalEventQueue.size());
+                                }
                                 inTransitRoutes.addAll(sol.getRoutes().stream().filter(r -> r.getCapacidadAsignada() > 0).collect(Collectors.toList()));
                                 inTransitRoutes = inTransitRoutes.stream().collect(Collectors.toMap(r -> r.getLot().getId(), r -> r, (a, b) -> b)).values()
                                                 .stream().filter(r -> r.getArrivalTime() > currentSimTime).collect(Collectors.toList());

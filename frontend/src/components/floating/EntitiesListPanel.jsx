@@ -58,7 +58,7 @@ function useBagTracking(sessionId, kind, id) {
     setError(null);
 
     const url = kind === 'flight'
-        ? `/api/shipments/${sessionId}/flight/${id}`
+        ? `/api/shipments/${sessionId}/flight-instance/${id}`
         : `/api/shipments/${sessionId}/airport/${id}`;
 
     fetch(url, { signal: controller.signal })
@@ -474,6 +474,12 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
     return (activeAircraft || []).find(ut => ut.id === expandedUt) || null;
   }, [expandedUt, activeAircraft]);
 
+  const selectedFlightInstanceKey = useMemo(() => {
+    if (!selectedFlightDetail?.id) return null;
+    // ut.id viene como "vuelo-{vueloId}-{depEpoch}" — quitamos solo el prefijo "vuelo-"
+    return selectedFlightDetail.id.toString().replace("vuelo-", "");
+  }, [selectedFlightDetail]);
+
   // ── ID numérico real del vuelo (lo que espera el backend) ──────────────
   const selectedFlightNumericId = useMemo(() => {
     if (!selectedFlightDetail?.id) return null;
@@ -481,7 +487,7 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
   }, [selectedFlightDetail]);
 
   const { bags: flightBags, loading: flightBagsLoading, error: flightBagsError } =
-      useBagTracking(sessionId, expandedUt ? 'flight' : null, selectedFlightNumericId);
+      useBagTracking(sessionId, expandedUt ? 'flight' : null, selectedFlightInstanceKey);
 
   const { bags: warehouseBags, loading: warehouseBagsLoading, error: warehouseBagsError } =
       useBagTracking(sessionId, expandedWh ? 'airport' : null, expandedWh);
