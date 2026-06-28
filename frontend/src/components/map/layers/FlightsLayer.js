@@ -45,7 +45,8 @@ export const createFlightsLayer = ({
     const nextPosition = interpolateCoordinates(from, to, nextProgress);
     const bearing = getVisualBearing(position, nextPosition);
 
-    const baseOpacity = passesFilter ? (hasAnySelection ? (isSelected ? 255 : isWarehouseFlight ? 200 : 50) : 255) : 20;
+    const isAircraftSelected = selectedAircraftId != null;
+    const baseOpacity = passesFilter ? (isAircraftSelected ? (isSelected ? 255 : 50) : 255) : 20;
     const color = isCancelled 
       ? [239, 68, 68, baseOpacity] 
       : isRescued 

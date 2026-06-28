@@ -111,7 +111,7 @@ export const createAirportsLayers = ({
       getPosition: d => d.coordinates,
       getText: d => `${d.icao}\n${d.city}\n${d.stockBags}/${d.maxCap}`,
       getSize: d => 10,
-      getColor: d => d.isDimmed ? [150, 150, 150, 100] : [255, 255, 255, 255],
+      getColor: d => d.isDimmed ? [150, 150, 150, 100] : [6, 24, 40, 255],
       getAngle: 0,
       getTextAnchor: d => d.alignment[0],
       getAlignmentBaseline: d => d.alignment[1],
@@ -120,7 +120,7 @@ export const createAirportsLayers = ({
       fontWeight: 'bold',
       lineHeight: 1.2,
       outlineWidth: 2,
-      outlineColor: [6, 24, 40, 255],
+      outlineColor: [255, 255, 255, 255],
       characterSet: UNICODE_CHARACTERS,
       updateTriggers: {
         getText: [activeMetrics],
