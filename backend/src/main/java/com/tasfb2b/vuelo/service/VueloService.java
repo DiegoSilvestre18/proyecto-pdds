@@ -148,6 +148,53 @@ public class VueloService {
                         v.getArrivalMinute()
                 ))
                 .limit(100)
-                .toList();
+                .collect(Collectors.toList());
+    }
+
+    public String uploadMasivoEnVivo(org.springframework.web.multipart.MultipartFile file) {
+        try (BufferedReader reader = new BufferedReader(new java.io.InputStreamReader(file.getInputStream()))) {
+            List<Vuelo> vuelos = new ArrayList<>();
+            String linea;
+            int agregados = 0;
+
+            Map<String, Aeropuerto> aeropuertoCache = aeropuertoRepo.findAll()
+                    .stream()
+                    .collect(Collectors.toMap(Aeropuerto::getIcaoCode, a -> a));
+
+            while ((linea = reader.readLine()) != null) {
+                if (linea.trim().isEmpty()) continue;
+                
+                ParsedVuelo parsed = VueloParser.parse(linea);
+                Aeropuerto origen = aeropuertoCache.get(parsed.origenIcao());
+                Aeropuerto destino = aeropuertoCache.get(parsed.destinoIcao());
+
+                if (origen == null || destino == null) continue;
+
+                int depUtc = (parsed.departureMinute() - (origen.getGmtOffset() * 60) + 1440) % 1440;
+                int arrUtc = (parsed.arrivalMinute() - (destino.getGmtOffset() * 60) + 1440) % 1440;
+                boolean intercontinental = !origen.getContinent().equals(destino.getContinent());
+
+                Vuelo vuelo = Vuelo.builder()
+                        .origen(origen)
+                        .destino(destino)
+                        .capacidadTotal(parsed.capacidad())
+                        .departureMinute(depUtc)
+                        .arrivalMinute(arrUtc)
+                        .intercontinental(intercontinental)
+                        .cancelled(false)
+                        .build();
+
+                vueloRepo.save(vuelo);
+                
+                try {
+                    simulationService.inyectarVueloEnVivo(vuelo);
+                } catch(Exception ignored) {}
+                
+                agregados++;
+            }
+            return "Se insertaron " + agregados + " vuelos masivamente en vivo.";
+        } catch (Exception e) {
+            throw new RuntimeException("Error procesando archivo de vuelos: " + e.getMessage());
+        }
     }
 }
