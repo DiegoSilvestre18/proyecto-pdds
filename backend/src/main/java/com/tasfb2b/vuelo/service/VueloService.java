@@ -147,7 +147,7 @@ public class VueloService {
                         v.getDepartureMinute(),
                         v.getArrivalMinute()
                 ))
-                .limit(100)
+                .limit(5000)
                 .collect(Collectors.toList());
     }
 
