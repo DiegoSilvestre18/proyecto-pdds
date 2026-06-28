@@ -24,4 +24,14 @@ public class VueloController {
     public List<VueloResponse> buscar(@RequestParam(required = false) String query) {
         return service.buscar(query);
     }
+
+    @PostMapping("/upload")
+    public org.springframework.http.ResponseEntity<String> uploadMasivo(@RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        try {
+            String result = service.uploadMasivoEnVivo(file);
+            return org.springframework.http.ResponseEntity.ok(result);
+        } catch (Exception e) {
+            return org.springframework.http.ResponseEntity.badRequest().body("Error: " + e.getMessage());
+        }
+    }
 }

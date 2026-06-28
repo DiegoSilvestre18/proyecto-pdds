@@ -14,6 +14,7 @@ const FlightManagement = ({ flights, setFlights }) => {
         departureTime: '',
         arrivalTime: ''
     });
+    const [selectedFile, setSelectedFile] = useState(null);
     const fetchFlights = async () => {
         try {
             const res = await apiFetch('/api/v1/vuelos/search');
@@ -36,9 +37,35 @@ const FlightManagement = ({ flights, setFlights }) => {
             });
         }
     };
-    const handleUpload = (e) => {
+    const handleUpload = async (e) => {
         e.preventDefault();
-        setStatus({ type: 'success', message: 'Archivo de vuelos cargado temporalmente.' });
+        if (!selectedFile) {
+            setStatus({ type: 'error', message: 'Seleccione un archivo TXT primero.' });
+            return;
+        }
+
+        const formData = new FormData();
+        formData.append('file', selectedFile);
+
+        try {
+            setStatus({ type: 'success', message: 'Cargando archivo...' });
+            const res = await apiFetch('/api/v1/vuelos/upload', {
+                method: 'POST',
+                body: formData
+            });
+
+            if (res.ok) {
+                const text = await res.text();
+                setStatus({ type: 'success', message: text });
+                setSelectedFile(null);
+                await fetchFlights();
+            } else {
+                const errorText = await res.text();
+                setStatus({ type: 'error', message: errorText || 'Error al procesar archivo.' });
+            }
+        } catch (error) {
+            setStatus({ type: 'error', message: 'Error de conexión.' });
+        }
     };
     const timeToMinutes = (time) => {
         const [h, m] = time.split(':').map(Number);
@@ -231,7 +258,12 @@ const FlightManagement = ({ flights, setFlights }) => {
                 <div style={{ background: 'rgba(15, 23, 42, 0.8)', border: '1px dashed rgba(148, 163, 184, 0.3)', padding: '1.5rem', borderRadius: '12px', marginBottom: '1.5rem' }}>
                     <h3 style={{ margin: '0 0 0.5rem 0', color: '#e2e8f0', fontSize: '14px' }}>Carga Masiva de Planes de Vuelo (.TXT)</h3>
                     <p style={{ margin: '0 0 1rem 0', fontSize: '11px', color: '#64748b' }}>Formato esperado: ORIG-DEST-HO:MO-HD-MD ####</p>
-                    <input type="file" accept=".txt" style={{ width: '100%', color: '#94a3b8', fontSize: '12px', marginBottom: '1rem' }} />
+                    <input 
+                        type="file" 
+                        accept=".txt" 
+                        onChange={(e) => setSelectedFile(e.target.files[0])}
+                        style={{ width: '100%', color: '#94a3b8', fontSize: '12px', marginBottom: '1rem' }} 
+                    />
                     
                     <button type="button" onClick={handleUpload} style={btnStylePrimary}>
                         Procesar Archivo de Vuelos
