@@ -64,7 +64,7 @@ class SimulationReplanParallelTest {
     @Mock SimulationWsPublisher wsPublisher;
     @Mock com.tasfb2b.planificador.strategy.NetworkAdapter networkAdapter;
     @Mock com.tasfb2b.bloqueo.service.BloqueoService bloqueoService;
-
+    @Mock com.tasfb2b.tracking.service.ShipmentTrackerRegistry trackerRegistry;
     /**
      * Construye un SimulationService con los mocks y un executor configurable.
      * Usa el constructor generado por Lombok con el orden de declaración de campos.
@@ -86,7 +86,8 @@ class SimulationReplanParallelTest {
                 wsPublisher,
                 collapseHelper,
                 networkAdapter,
-                bloqueoService);
+                bloqueoService,
+                trackerRegistry);
     }
 
     /**

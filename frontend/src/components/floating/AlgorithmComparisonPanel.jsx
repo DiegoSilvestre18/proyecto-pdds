@@ -1,4 +1,7 @@
+import { useState } from 'react'
 import { apiFetch } from '../../hooks/api'
+import { useToast } from '../../hooks/useToast'
+import { Spinner } from '../common/Skeleton'
 
 /**
  * Panel de desempeño de ALNS.
@@ -9,6 +12,9 @@ import { apiFetch } from '../../hooks/api'
  * @param {Object|null} comparisonData - datos reales de desempeño
  */
 function AlgorithmComparisonPanel({ isVisible, onHide, sessionId = null, comparisonData = null }) {
+  const toast = useToast()
+  const [exporting, setExporting] = useState(false)
+
   if (!isVisible) {
     return null
   }
@@ -20,19 +26,21 @@ function AlgorithmComparisonPanel({ isVisible, onHide, sessionId = null, compari
    */
   const handleExport = async () => {
     if (!sessionId) {
-      alert('La simulación aún no se ha ejecutado. No hay datos para exportar.')
+      toast.warning('La simulación aún no se ha ejecutado. No hay datos para exportar.')
       return
     }
+    if (exporting) return
 
+    setExporting(true)
     try {
       const res = await apiFetch(`/api/v1/simulation/export/${sessionId}`)
 
       if (res.status === 409) {
-        alert('La simulación aún está en curso. Espere a que finalice.')
+        toast.info('La simulación aún está en curso. Espere a que finalice.')
         return
       }
       if (!res.ok) {
-        alert('No se encontró la sesión. Inicia una simulación primero.')
+        toast.error('No se encontró la sesión. Inicia una simulación primero.')
         return
       }
 
@@ -45,6 +53,9 @@ function AlgorithmComparisonPanel({ isVisible, onHide, sessionId = null, compari
       URL.revokeObjectURL(url)
     } catch (err) {
       console.error('[Tasf.B2B] Error al descargar CSV:', err)
+      toast.error('Error de red al descargar el CSV. Intente de nuevo.')
+    } finally {
+      setExporting(false)
     }
   }
 
@@ -120,9 +131,16 @@ function AlgorithmComparisonPanel({ isVisible, onHide, sessionId = null, compari
           type="button"
           className="ct-comparison-export"
           onClick={handleExport}
-          style={{ opacity: sessionId ? 1 : 0.5, cursor: sessionId ? 'pointer' : 'not-allowed' }}
+          disabled={exporting}
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+            opacity: !sessionId || exporting ? 0.5 : 1,
+            cursor: sessionId && !exporting ? 'pointer' : 'not-allowed',
+          }}
         >
-          📥 {sessionId ? 'Exportar CSV real' : 'Exportar CSV'}
+          {exporting
+            ? (<><Spinner size={14} label="Exportando…" /> Exportando…</>)
+            : `📥 ${sessionId ? 'Exportar CSV real' : 'Exportar CSV'}`}
         </button>
       </div>
     </aside>

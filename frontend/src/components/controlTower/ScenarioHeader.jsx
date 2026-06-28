@@ -33,8 +33,8 @@ const ScenarioHeader = ({
 
       <div className="ct-header-actions">
 
-        <div className={`ct-session ${isCollapseScenario ? "ct-session--danger" : ""}`}>
-          {isCollapseScenario ? "⚠ Modo Colapso" : "Sesión Activa"}
+        <div className={`ct-session ${isCollapseScenario ? "ct-session--danger" : ""}`} role="status">
+          {isCollapseScenario ? "⚠ Modo Colapso" : "● Sesión Activa"}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: "24px" }}>
           {realClock && realClock !== "--:--" && (

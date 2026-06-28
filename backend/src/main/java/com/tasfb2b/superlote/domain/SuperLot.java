@@ -1,11 +1,12 @@
 package com.tasfb2b.superlote.domain;
 
-import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.ArrayList;
+import java.util.List;
+
 @Data
-@AllArgsConstructor
 @NoArgsConstructor
 public class SuperLot {
 
@@ -17,6 +18,47 @@ public class SuperLot {
     private long sla;
     private boolean intercontinental;
     private int priority;
+    /** Códigos de envío individuales que componen este lote, con su carga real. */
+    private List<String> bagIds = new ArrayList<>();
+
+    /**
+     * Constructor LEGACY — para mantener compatibilidad con todo el código existente
+     * que construye SuperLot sin lista de shipments (queda vacía).
+     */
+    public SuperLot(int id, String origenIcao, String destinoIcao, int totalMaletas,
+                    long readyTime, long sla, boolean intercontinental, int priority) {
+        this(id, origenIcao, destinoIcao, totalMaletas, readyTime, sla,
+                intercontinental, priority, new ArrayList<>());
+    }
+
+    /** Constructor NUEVO: para usar códigos de envíos */
+    public SuperLot(int id, String origenIcao, String destinoIcao, int totalMaletas,
+                    long readyTime, long sla, boolean intercontinental, int priority,
+                    List<String> bagIds) {
+        this.id = id;
+        this.origenIcao = origenIcao;
+        this.destinoIcao = destinoIcao;
+        this.totalMaletas = totalMaletas;
+        this.readyTime = readyTime;
+        this.sla = sla;
+        this.intercontinental = intercontinental;
+        this.priority = priority;
+        this.bagIds = (bagIds != null) ? bagIds : new ArrayList<>();
+    }
+
+    /** Copia con readyTime distinto, preservando bagIds. Útil para perturbaciones (regret). */
+    public SuperLot withReadyTime(long newReadyTime) {
+        return new SuperLot(id, origenIcao, destinoIcao, totalMaletas,
+                newReadyTime, sla, intercontinental, priority, bagIds);
+    }
+
+    /** Códigos de envío distintos contenidos en este lote para trabajar con maletas . */
+    public List<String> getCodigosPedido() {
+        return bagIds.stream()
+                .map(b -> b.substring(0, b.lastIndexOf('-')))
+                .distinct()
+                .toList();
+    }
 
     public long getDeadline() {
         return readyTime + sla;
@@ -49,6 +91,5 @@ public class SuperLot {
             throw new IllegalArgumentException("SLA inválido");
         }
     }
-
 
 }

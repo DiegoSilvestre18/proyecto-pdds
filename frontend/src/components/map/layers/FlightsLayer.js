@@ -8,8 +8,8 @@ export const createFlightsLayer = ({
   selectedAircraftId,
   highlightedId,
   flightPassesFilter,
-  showEmptyFlights,
-  showTestFlights,
+  showFlightsWithoutShipments,
+  showFlightsWithShipments,
   hasAnySelection,
   selectedAirportCode
 }) => {
@@ -19,8 +19,8 @@ export const createFlightsLayer = ({
 
   activeAircraft.forEach(plane => {
     const isEmpty = !plane.ocupacionReal || plane.ocupacionReal === 0;
-    if (isEmpty && !showEmptyFlights) return;
-    if (!isEmpty && !showTestFlights) return;
+    if (isEmpty && !showFlightsWithoutShipments) return;
+    if (!isEmpty && !showFlightsWithShipments) return;
     
     const from = airportByIcao[plane.from] || AIRPORT_BY_ICAO[plane.from];
     const to = airportByIcao[plane.to] || AIRPORT_BY_ICAO[plane.to];

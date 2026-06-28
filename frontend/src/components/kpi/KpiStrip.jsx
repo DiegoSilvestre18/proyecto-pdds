@@ -15,7 +15,14 @@ const KpiStrip = React.memo(({ isCollapsed, kpiCards }) => {
             <strong className="ct-kpi-value">{card.value}</strong>
             <p className="ct-kpi-subtitle">{card.subtitle}</p>
             {typeof card.progress === 'number' && (
-              <div className="ct-kpi-progress" role="presentation" aria-hidden="true">
+              <div
+                className="ct-kpi-progress"
+                role="progressbar"
+                aria-valuenow={Math.round(card.progress)}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-label={`${card.title}: ${Math.round(card.progress)}%`}
+              >
                 <span style={{ width: `${card.progress}%` }} />
               </div>
             )}

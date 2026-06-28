@@ -51,6 +51,7 @@ public class EventEngine {
             if (flights == null || flights.isEmpty()) continue;
 
             int load = r.getCapacidadAsignada();
+            List<String> bagIds = r.getBagIds() != null ? r.getBagIds() : List.of();
 
             // ── LLEGADA DEL LOTE AL ORIGEN ──
             events.add(new Event(
@@ -58,7 +59,8 @@ public class EventEngine {
                     EventType.LOT_ARRIVAL,
                     r.getLot(),
                     flights.get(0), // vuelo de referencia para ICAO destino, origen
-                    load
+                    load,
+                    bagIds
             ));
 
             // Aseguramos secuencialidad: el próximo vuelo no puede salir antes de que aterrice el anterior o de que el lote esté listo.
@@ -73,7 +75,8 @@ public class EventEngine {
                         EventType.FLIGHT_DEPARTURE,
                         r.getLot(),
                         v,
-                        load
+                        load,
+                        bagIds
                 ));
 
                 // llegada del vuelo
@@ -92,7 +95,8 @@ public class EventEngine {
                         EventType.FLIGHT_ARRIVAL,
                         r.getLot(),
                         v,
-                        load
+                        load,
+                        bagIds
                 ));
                 
                 // Actualizamos el sequenceTime para el siguiente tramo (si lo hay)
@@ -118,8 +122,18 @@ public class EventEngine {
                         EventType.STORAGE_RELEASE,
                         r.getLot(),
                         lastFlight,
-                        load
+                        load,
+                        bagIds
                 ));
+
+                // BAGGAGE_PICKUP — instante aleatorio (semilla fija) dentro de [arrivalTime, deadline]
+                long deadline = r.getLot().getDeadline();
+                long seed = (r.getLot().getKey() + "-" + lastFlight.getId()).hashCode();
+                Random rng = new Random(seed);
+                long windowMs = Math.max(1L, deadline - arrivalTime);
+                long pickupTime = arrivalTime + (long) (rng.nextDouble() * windowMs);
+
+                events.add(new Event(pickupTime, EventType.BAGGAGE_PICKUP, r.getLot(), lastFlight, load, bagIds));
             }
         }
 

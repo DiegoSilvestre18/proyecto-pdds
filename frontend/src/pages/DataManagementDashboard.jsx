@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useToast } from '../hooks/useToast';
 import WarehouseManagement from '../components/management/WarehouseManagement';
 import FlightManagement from '../components/management/FlightManagement';
 import ShipmentManagement from '../components/management/ShipmentManagement';
@@ -8,6 +9,7 @@ const DataManagementDashboard = () => {
     const [activeTab, setActiveTab] = useState('envios');
     const navigate = useNavigate();
     const [flights, setFlights] = useState([]);
+    const toast = useToast();
 
     const handleLogout = () => {
         sessionStorage.removeItem('userRole');
@@ -17,7 +19,7 @@ const DataManagementDashboard = () => {
     const handleIntegration = () => {
         // Aquí se dispara la petición al Backend H2 para consolidar las adiciones
         console.log("Iniciando integración de datos extra (sin navegar al mapa)...");
-        alert("Datos integrados exitosamente.");
+        toast.success("Datos integrados exitosamente.");
     };
 
     return (
