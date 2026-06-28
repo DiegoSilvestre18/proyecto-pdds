@@ -16,70 +16,83 @@ OFFSETS = {
     "OAKB": +4, "OOMS": +4, "OYSN": +3, "OPKC": +5, "UBBB": +2, "OJAI": +3
 }
 
+def utc_to_local(dt_utc, icao):
+    """Convierte un datetime UTC a hora local del aeropuerto dado su offset."""
+    return dt_utc + datetime.timedelta(hours=OFFSETS[icao])
+
 def generar_datos_vivo():
     print("=== Generador VIVO: Aviones y Maletas Sincronizados ===")
-    ahora = datetime.datetime.now()
-    
-    # Listas para guardar las líneas a escribir
+
+    # Base de tiempo: UTC puro, sin importar la zona horaria del servidor
+    ahora_utc = datetime.datetime.utcnow()
+    print(f"Hora UTC actual: {ahora_utc.strftime('%Y-%m-%d %H:%M')} UTC")
+
     vuelos_extra = []
     envios_por_origen = {"EHAM": [], "SGAS": [], "UBBB": []}
-    
-    # Generamos 30 pares perfectos (1 avión = 1 maleta)
+
     for i in range(30):
         origen = AEROPUERTOS_ORIGEN[i % len(AEROPUERTOS_ORIGEN)]
         destinos_validos = [a for a in AEROPUERTOS_TODOS if a != origen]
         destino = random.choice(destinos_validos)
-        
-        # El avión despega en (i + 2) minutos como pediste
-        despegue_real = ahora + datetime.timedelta(minutes=i + 2)
-        # La maleta llega al aeropuerto 1 minuto antes del despegue
-        llegada_maleta_real = despegue_real - datetime.timedelta(minutes=1)
-        
-        # Aplicamos el GMT offset del ORIGEN al despegue
-        despegue_ajustado = despegue_real + datetime.timedelta(hours=OFFSETS[origen])
-        llegada_maleta_ajustada = llegada_maleta_real + datetime.timedelta(hours=OFFSETS[origen])
-        
-        # VUELO
-        # La llegada real a su destino es 2-3 mins despues para que sea súper rápido
-        llegada_vuelo_real = despegue_real + datetime.timedelta(minutes=random.randint(2, 3))
-        # Pero el archivo TXT requiere la HORA LOCAL del DESTINO, asi que le sumamos el offset del destino
-        llegada_vuelo_ajustada = llegada_vuelo_real + datetime.timedelta(hours=OFFSETS[destino])
-        
-        str_despegue = despegue_ajustado.strftime("%H:%M")
-        str_llegada = llegada_vuelo_ajustada.strftime("%H:%M")
+
+        # ── Tiempo en UTC puro ────────────────────────────────────────────────
+        # Despegue UTC: dentro de (i + 2) minutos desde ahora (en UTC)
+        despegue_utc = ahora_utc + datetime.timedelta(minutes=i + 2)
+
+        # Duración del vuelo: aleatoria entre 2 y 3 minutos (datos de prueba rápidos)
+        duracion_min = random.randint(2, 3)
+        llegada_utc = despegue_utc + datetime.timedelta(minutes=duracion_min)
+
+        # La maleta llega al aeropuerto origen 1 minuto antes del despegue (UTC)
+        llegada_maleta_utc = despegue_utc - datetime.timedelta(minutes=1)
+
+        # ── Convertir a hora local para el TXT ───────────────────────────────
+        # planes_vuelo.txt usa: hora local del ORIGEN para salida,
+        #                       hora local del DESTINO para llegada
+        despegue_local_origen  = utc_to_local(despegue_utc, origen)
+        llegada_local_destino  = utc_to_local(llegada_utc, destino)
+
+        str_despegue = despegue_local_origen.strftime("%H:%M")
+        str_llegada  = llegada_local_destino.strftime("%H:%M")
+
         vuelos_extra.append(f"{origen}-{destino}-{str_despegue}-{str_llegada}-999\n")
-        
-        # MALETA
-        fecha_maleta = llegada_maleta_ajustada.strftime("%Y%m%d")
-        hora_maleta = llegada_maleta_ajustada.strftime("%H")
-        min_maleta = llegada_maleta_ajustada.strftime("%M")
-        id_envio = f"{origen}{(i+1):05d}"
-        cantidad = f"{random.randint(10, 30):03d}" # 10 a 30 maletas para que se note
-        id_cliente = f"{random.randint(1, 9999999):07d}"
-        linea_envio = f"{id_envio}-{fecha_maleta}-{hora_maleta}-{min_maleta}-{destino}-{cantidad}-{id_cliente}\n"
+        print(f"  Vuelo {i+1:02d}: {origen}→{destino} | UTC {despegue_utc.strftime('%H:%M')}→{llegada_utc.strftime('%H:%M')} | TXT local {str_despegue}→{str_llegada}")
+
+        # ── Envío (maleta) ────────────────────────────────────────────────────
+        # Los archivos _envios usan hora local del ORIGEN
+        llegada_maleta_local = utc_to_local(llegada_maleta_utc, origen)
+        fecha_maleta = llegada_maleta_local.strftime("%Y%m%d")
+        hora_maleta  = llegada_maleta_local.strftime("%H")
+        min_maleta   = llegada_maleta_local.strftime("%M")
+        id_envio     = f"{origen}{(i+1):05d}"
+        cantidad     = f"{random.randint(10, 30):03d}"
+        id_cliente   = f"{random.randint(1, 9999999):07d}"
+        linea_envio  = f"{id_envio}-{fecha_maleta}-{hora_maleta}-{min_maleta}-{destino}-{cantidad}-{id_cliente}\n"
         envios_por_origen[origen].append(linea_envio)
 
-    # Escribir Vuelos
+    # ── Escribir Vuelos ───────────────────────────────────────────────────────
     ruta_vuelos = os.path.join("backend", "data", "planes_vuelo.txt")
     if os.path.exists(ruta_vuelos):
         with open(ruta_vuelos, "r") as f:
             lineas_vuelos = f.readlines()
+        # Eliminar vuelos de prueba anteriores (los que tienen capacidad 999)
         lineas_limpias = [l for l in lineas_vuelos if not l.strip().endswith("-999")]
         with open(ruta_vuelos, "w") as f:
             f.writelines(lineas_limpias)
             f.writelines(vuelos_extra)
-        print("OK: 30 Vuelos extra inyectados en planes_vuelo.txt")
+        print(f"\nOK: 30 Vuelos extra inyectados en planes_vuelo.txt")
 
-    # Escribir Maletas
-    fecha_hoy = ahora.strftime("%Y%m%d")
+    # ── Escribir Maletas ──────────────────────────────────────────────────────
+    # El nombre del archivo usa la fecha UTC actual (igual que el backend espera)
+    fecha_hoy_utc = ahora_utc.strftime("%Y%m%d")
     for origen, lineas in envios_por_origen.items():
-        # Usamos la fecha real actual para el nombre del archivo (para que lo subas facil)
-        ruta_envios = f"_envios_{origen}_{fecha_hoy}.txt"
+        ruta_envios = f"_envios_{origen}_{fecha_hoy_utc}.txt"
         with open(ruta_envios, "w") as f:
             f.writelines(lineas)
-        print(f"OK: Archivo de envíos {ruta_envios} generado con {len(lineas)} maletas.")
+        print(f"OK: {ruta_envios} → {len(lineas)} maletas generadas")
 
-    print("\n¡Listo! Sube los 3 TXT en la UI y reinicia el backend.")
+    print(f"\nFecha UTC usada para los archivos de envíos: {fecha_hoy_utc}")
+    print("¡Listo! Sube los 3 TXT en la UI y reinicia el backend.")
 
 if __name__ == "__main__":
     generar_datos_vivo()
