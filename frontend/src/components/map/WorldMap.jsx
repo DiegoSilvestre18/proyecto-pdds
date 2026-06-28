@@ -4,7 +4,7 @@ import Map from "react-map-gl/maplibre";
 import 'maplibre-gl/dist/maplibre-gl.css';
 
 import { useSelectionBridge } from "../../hooks/useSelectionBridge";
-import { AIRPORT_BY_ICAO } from "../../data/airportsData";
+import { AIRPORT_BY_ICAO, interpolateCoordinates } from "../../data/airportsData";
 
 import { createAirportsLayers } from "./layers/AirportsLayer";
 import { createFlightsLayer } from "./layers/FlightsLayer";
@@ -140,14 +140,9 @@ const WorldMap = ({
   });
 
   // Sync incoming props to internal view state
-  useEffect(() => {
-    setViewState(prev => ({
-      ...prev,
-      longitude: center[0],
-      latitude: center[1],
-      zoom: zoom
-    }));
-  }, [center, zoom]);
+  // REMOVED: this was overwriting transitions and causing glitches.
+  // We only rely on initial viewState and internal updates now,
+  // except if we want to handle external viewport commands (like mapCommand).
 
   const handleViewStateChange = useCallback(({ viewState }) => {
     setViewState(viewState);
@@ -189,6 +184,58 @@ const WorldMap = ({
   useEffect(() => {
     return () => clearTimeout(highlightTimerRef.current);
   }, []);
+
+  const lastSelectedAircraftRef = useRef(null);
+
+  // Tracking del avión seleccionado
+  useEffect(() => {
+    if (selectedAircraftId) {
+      const plane = activeAircraft.find(p => p.id === selectedAircraftId);
+      if (plane) {
+        const from = airportByIcao[plane.from] || AIRPORT_BY_ICAO[plane.from];
+        const to = airportByIcao[plane.to] || AIRPORT_BY_ICAO[plane.to];
+        if (from && to) {
+          const progress = plane.progress ?? 0;
+          const pos = interpolateCoordinates(from, to, progress);
+          const isNewSelection = lastSelectedAircraftRef.current !== selectedAircraftId;
+          lastSelectedAircraftRef.current = selectedAircraftId;
+          
+          setViewState(prev => ({
+            ...prev,
+            longitude: pos[0],
+            latitude: pos[1],
+            zoom: isNewSelection ? 8 : prev.zoom,
+            transitionDuration: isNewSelection ? 1000 : 0
+          }));
+        }
+      }
+    } else {
+      lastSelectedAircraftRef.current = null;
+    }
+  }, [activeAircraft, selectedAircraftId, airportByIcao]);
+
+  const lastSelectedAirportRef = useRef(null);
+
+  // Zoom al aeropuerto seleccionado
+  useEffect(() => {
+    if (selectedAirportCode) {
+      if (lastSelectedAirportRef.current !== selectedAirportCode) {
+        lastSelectedAirportRef.current = selectedAirportCode;
+        const ap = airportByIcao[selectedAirportCode] || AIRPORT_BY_ICAO[selectedAirportCode];
+        if (ap && ap.coordinates) {
+          setViewState(prev => ({
+            ...prev,
+            longitude: ap.coordinates[0],
+            latitude: ap.coordinates[1],
+            zoom: 10,
+            transitionDuration: 1500 // Slower, smoother zoom
+          }));
+        }
+      }
+    } else {
+      lastSelectedAirportRef.current = null;
+    }
+  }, [selectedAirportCode, airportByIcao]);
 
   const airportPassesFilter = useCallback((airportIcao) => {
     if (activeFilters.continent) {
@@ -310,7 +357,7 @@ const WorldMap = ({
     <div 
       className="ct-world-map" 
       aria-label="Mapa de operaciones global" 
-      style={{ position: "relative", width: "100%", height: "100%", background: "#061828" }}
+      style={{ position: "relative", width: "100%", height: "100%", background: "#e5e3df" }}
     >
       <div className="ct-map-filter">
         <button
@@ -336,7 +383,21 @@ const WorldMap = ({
       </div>
 
       <LegendButton />
-      <MapZoomControls zoom={viewState.zoom} center={[viewState.longitude, viewState.latitude]} onMoveEnd={onMoveEnd} />
+      <MapZoomControls 
+        zoom={viewState.zoom} 
+        center={[viewState.longitude, viewState.latitude]} 
+        onMoveEnd={(pos) => {
+          setViewState(prev => ({
+            ...prev,
+            zoom: pos.zoom,
+            longitude: pos.coordinates[0],
+            latitude: pos.coordinates[1],
+            transitionDuration: 500
+          }));
+          onMoveEnd(pos);
+        }}
+        onBackgroundClick={onBackgroundClick}
+      />
 
 
       {trackedRoute && (
@@ -380,7 +441,7 @@ const WorldMap = ({
         getCursor={({ isHovering }) => isHovering ? 'pointer' : 'grab'}
       >
         <Map
-          mapStyle="https://basemaps.cartocdn.com/gl/dark-matter-nolabels-gl-style/style.json"
+          mapStyle="https://basemaps.cartocdn.com/gl/voyager-nolabels-gl-style/style.json"
           reuseMaps
           preventStyleDiffing
         />

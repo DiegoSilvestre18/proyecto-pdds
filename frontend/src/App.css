@@ -336,15 +336,6 @@
     radial-gradient(circle at 50% 48%, rgba(6, 14, 24, 0.12), rgba(5, 12, 21, 0.56));
 }
 
-.ct-grid-overlay {
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(163, 214, 255, 0.16) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(163, 214, 255, 0.16) 1px, transparent 1px);
-  background-size: 58px 58px;
-  opacity: 0.5;
-}
 
 .ct-aircraft-layer,
 .ct-airport-layer {
@@ -2277,12 +2268,6 @@
     radial-gradient(circle at 50% 48%, rgba(60, 10, 10, 0.18), rgba(40, 5, 8, 0.52));
 }
 
-.ct-grid-overlay--collapse {
-  background-image:
-    linear-gradient(rgba(255, 80, 80, 0.12) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 80, 80, 0.12) 1px, transparent 1px);
-  opacity: 0.6;
-}
 
 /* Saturated airport node */
 .ct-airport-node--saturated {
@@ -2874,17 +2859,6 @@
 
 /* ── Grid overlay sobre el SVG (eje de referencia visual) ───────────────── */
 
-.ct-world-map::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background-image:
-    linear-gradient(rgba(163, 214, 255, 0.07) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(163, 214, 255, 0.07) 1px, transparent 1px);
-  background-size: 60px 60px;
-  pointer-events: none;
-  z-index: 1;
-}
 
 /* ── Overlay de colapso sobre el mapa ───────────────────────────────────── */
 
@@ -2892,11 +2866,6 @@
   background: #10060c;
 }
 
-.ct-world-map.ct-world-map--collapse::after {
-  background-image:
-    linear-gradient(rgba(255, 80, 80, 0.08) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 80, 80, 0.08) 1px, transparent 1px);
-}
 
 /* ── Responsivo ─────────────────────────────────────────────────────────── */
 
