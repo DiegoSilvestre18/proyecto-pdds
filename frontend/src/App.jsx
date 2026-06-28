@@ -15,6 +15,7 @@ import FlightCancellationPanel from "./components/scenarios/FlightCancellationPa
 import ReportsPanel from "./components/floating/ReportsPanel";
 import EntitiesListPanel from "./components/floating/EntitiesListPanel";
 import ShipmentsPanel from "./components/floating/ShipmentsPanel";
+import UpcomingFlightsPanel from "./components/floating/UpcomingFlightsPanel";
 
 import DayToDayConfig from "./components/scenarios/DayToDayConfig";
 import PeriodSimConfig from "./components/scenarios/PeriodSimConfig";
@@ -35,6 +36,7 @@ const PANEL_LABELS = {
   comparison: "Comparativa de Envíos",
   shipmentDetail: "Detalle de Envío",
   shipments: "Gestión de Envíos",
+  upcoming: "Vuelos Próximos",
   reports: "Reportes y Exportación",
   airportConfig: "Configuración de Almacenes",
   entities: "Monitoreo de Vuelos y Almacenes",
@@ -255,6 +257,11 @@ const App = () => {
       {isWindowOpen("comparison") && (
         <DraggableWindow title="Comparativa de Envíos" onClose={() => handleToggleWindow("comparison")} initialPosition={{x: 110, y: 240}} isActive={openWindowsQueue[openWindowsQueue.length-1] === "comparison"} onFocus={() => handleFocusWindow("comparison")}>
           <AlgorithmComparisonPanel isVisible={true} onHide={() => handleToggleWindow("comparison")} sessionId={sessionId} comparisonData={comparisonData} />
+        </DraggableWindow>
+      )}
+      {isWindowOpen("upcoming") && (
+        <DraggableWindow title="Vuelos Próximos" onClose={() => handleToggleWindow("upcoming")} initialPosition={{x: 140, y: 150}} defaultSize={{width: 500, height: 400}} isActive={openWindowsQueue[openWindowsQueue.length-1] === "upcoming"} onFocus={() => handleFocusWindow("upcoming")}>
+          <UpcomingFlightsPanel currentEpochTime={liveStatus?.interpolatedTime || currentEpochTime} />
         </DraggableWindow>
       )}
       <div className="ct-panel-corner-stack">

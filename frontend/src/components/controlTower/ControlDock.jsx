@@ -4,6 +4,7 @@ const NAV_ITEMS = [
   { key: 'scenario',       icon: '⚙',  label: 'Escenario',      isScenario: true },
   { key: 'telemetry',      icon: '📡', label: 'Telemetría' },
   { key: 'entities',       icon: '✈️', label: 'Vuelos y Almacenes' },
+  { key: 'upcoming',       icon: '⏳', label: 'Vuelos Próximos' },
   { key: 'occupancy',      icon: '🏆', label: 'Top Aeropuertos' },
   { key: 'pendingShipments', icon: '📦', label: 'Envíos Pendientes' },
   { key: 'transitInventory', icon: '🎒', label: 'Inventario' },
