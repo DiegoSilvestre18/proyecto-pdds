@@ -476,8 +476,9 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
 
   const selectedFlightInstanceKey = useMemo(() => {
     if (!selectedFlightDetail?.id) return null;
-    // ut.id viene como "vuelo-{vueloId}-{depEpoch}" — quitamos solo el prefijo "vuelo-"
-    return selectedFlightDetail.id.toString().replace("vuelo-", "");
+    const key = selectedFlightDetail.id.toString().replace("vuelo-", "");
+    console.log("[CLICK] ut.id=", selectedFlightDetail.id, "→ key enviada al backend:", key);
+    return key;
   }, [selectedFlightDetail]);
 
   // ── ID numérico real del vuelo (lo que espera el backend) ──────────────

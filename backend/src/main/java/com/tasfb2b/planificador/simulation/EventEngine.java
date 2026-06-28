@@ -6,6 +6,7 @@ import com.tasfb2b.planificador.domain.Route;
 import com.tasfb2b.vuelo.domain.Vuelo;
 import com.tasfb2b.bloqueo.service.BloqueoService;
 import org.springframework.stereotype.Component;
+import com.tasfb2b.superlote.domain.SuperLot;
 
 import java.time.Instant;
 import java.util.*;
@@ -154,6 +155,29 @@ public class EventEngine {
     }
 
     /**
+     * Genera el evento LOT_ARRIVAL para un subconjunto de maletas, de forma
+     * INDEPENDIENTE de cualquier ruta o vuelo asignado. Representa que la maleta
+     * ya está físicamente esperando en el almacén de origen — esto es verdad
+     * desde el momento en que el envío se agrupa en un SuperLot, sin importar
+     * si ALNS ya le encontró vuelo o no.
+     */
+    public List<Event> buildLotArrivalEvents(SuperLot lot, List<String> bagIdsSubset) {
+        List<Event> events = new ArrayList<>();
+        if (bagIdsSubset.isEmpty()) return events;
+
+        events.add(new Event(
+                lot.getReadyTime(),
+                EventType.LOT_ARRIVAL,
+                lot,
+                null,                 // ya no se necesita vuelo de referencia
+                bagIdsSubset.size(),
+                bagIdsSubset,
+                null
+        ));
+        return events;
+    }
+
+    /**
      * Construye la cadena de eventos para UNA ruta, usando solo el subconjunto
      * de bagIds indicado — no necesariamente todos los de la ruta.
      * Usado para programar eventos de forma incremental, evitando duplicar
@@ -167,18 +191,6 @@ public class EventEngine {
         if (flights == null || flights.isEmpty() || bagIdsSubset.isEmpty()) return events;
 
         int load = bagIdsSubset.size();
-
-        // LOT_ARRIVAL no pertenece a ningún tramo de vuelo concreto
-        events.add(new Event(
-                r.getLot().getReadyTime(),
-                EventType.LOT_ARRIVAL,
-                r.getLot(),
-                flights.get(0),
-                load,
-                bagIdsSubset,
-                null
-        ));
-
         long sequenceTime = r.getLot().getReadyTime();
 
         for (Vuelo v : flights) {

@@ -197,6 +197,7 @@ public class SimulationService {
 //              A partir de ahí son físicamente irreversibles. Antes de despegar, su asignación
 //              es provisional y ALNS puede reasignarlas libremente cada ciclo.
                 Set<String> bagIdsComprometidos = new HashSet<>();
+                Set<String> bagIdsConLotArrivalEmitido = new HashSet<>();
                 int day = 0;
                 while (day < dias) {
                         LocalDate fechaDia = fechaInicio.plusDays(day);
@@ -294,6 +295,15 @@ public class SimulationService {
                                 for (SuperLot lot : nuevosEnHorizonte) {
                                     planifiablePool.put(lot.getId(), lot);
                                     if (countedArrivalLotKeysToday.add(lot.getKey())) totalMaletasDia += lot.getTotalMaletas();
+
+                                    //Tracking la maleta ya esperá en almacén de origen, independiente de si ALNS asignó ruta
+                                    List<String> bagsNuevos = new ArrayList<>();
+                                    for (String bagId : lot.getBagIds()) {
+                                         if (bagIdsConLotArrivalEmitido.add(bagId)) bagsNuevos.add(bagId);
+                                    }
+                                    if (!bagsNuevos.isEmpty()) {
+                                        globalEventQueue.addAll(eventEngine.buildLotArrivalEvents(lot, bagsNuevos));
+                                    }
                                 }
 
                                 long tPlanStart = System.currentTimeMillis();
@@ -303,11 +313,6 @@ public class SimulationService {
                                 masterPlan = sol.getRoutes();
                                 session.setCurrentPlanId(sol.getPlanId());
 
-                                for (Route r : sol.getRoutes()) {
-                                    if (r.isAtendido() && countedAssignedLotKeysToday.add(r.getLot().getKey())) malatetasAtendidasDia += r.getCapacidadAsignada();
-                                    if (r.isAtendido() && !r.getFlights().isEmpty() && r.getDepartureTime() <= currentSimTime) planifiablePool.remove(r.getLot().getId());
-                                }
-
                                 // solo se comprometen maletas cuyo vuelo YA despegó en este instante simulado
                                 for (Route r : sol.getRoutes()) {
 
@@ -316,10 +321,8 @@ public class SimulationService {
                                         }
 
                                         if (!r.isAtendido() || r.getFlights() == null || r.getFlights().isEmpty()) continue;
+                                        if (r.getDepartureTime() < 0 || r.getDepartureTime() > currentSimTime) continue;
 
-                                        log.info("Route lot={} depTime={} currentSimTime={} atendido={} bagIds={}",
-                                                r.getLot().getId(), r.getDepartureTime(), currentSimTime,
-                                                r.isAtendido(), r.getBagIds() != null ? r.getBagIds().size() : -1);
                                         List<String> bagIds = r.getBagIds();
                                         if (bagIds == null || bagIds.isEmpty()) continue;
 
@@ -444,12 +447,20 @@ public class SimulationService {
                         long dep = v.getDepartureEpoch(currentDayStartEpoch);
                         long arr = v.getArrivalEpoch(currentDayStartEpoch);
                         if (currentSimTime >= dep && currentSimTime < arr) {
+                                System.out.println(String.format(
+                                        "[FISICO-HOY] vueloId=%d dep=%d key=%s currentDayStartEpoch=%d",
+                                        v.getId(), dep, v.getId() + "-" + dep, currentDayStartEpoch
+                                ));
                                 vuelosFisicos.put(v.getId() + "-" + dep, createAvionMap(v, dep, arr, currentSimTime, "normal"));
                         }
                         // Cruce de medianoche (Vuelo que despegó ayer pero aterriza hoy)
                         long prevDep = v.getDepartureEpoch(currentDayStartEpoch - 86400000L);
                         long prevArr = v.getArrivalEpoch(currentDayStartEpoch - 86400000L);
                         if (currentSimTime >= prevDep && currentSimTime < prevArr) {
+                                System.out.println(String.format(
+                                        "[FISICO-AYER] vueloId=%d dep=%d key=%s",
+                                        v.getId(), prevDep, v.getId() + "-" + prevDep
+                                ));
                                 vuelosFisicos.put(v.getId() + "-" + prevDep, createAvionMap(v, prevDep, prevArr, currentSimTime, "normal"));
                         }
                 }

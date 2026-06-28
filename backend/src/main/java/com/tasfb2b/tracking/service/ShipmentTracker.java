@@ -116,7 +116,7 @@ public class ShipmentTracker {
     }
 
     private void handleLotArrival(Event event) {
-        String icao = event.getVuelo().getOrigen().getIcaoCode();
+        String icao = event.getLot().getOrigenIcao();
 
         for (String bagId : event.getBagIds()) {
             ShipmentState s = getOrCreate(bagId);
