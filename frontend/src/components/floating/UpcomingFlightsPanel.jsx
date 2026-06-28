@@ -16,10 +16,10 @@ const UpcomingFlightsPanel = ({ currentEpochTime = 0 }) => {
             
             const data = await res.json();
             
-            // Calculamos el minuto actual del día UTC (0-1439)
-            // Ya que currentEpochTime viene en minutos totales o epoch dependiendo del escenario.
-            // Si currentEpochTime > 1440, le sacamos el módulo 1440.
-            const currentMinuteOfDay = Math.floor(currentEpochTime) % 1440;
+            // currentEpochTime viene en milisegundos absolutos (Epoch) desde el backend.
+            // Para obtener el minuto actual del día en UTC:
+            const date = new Date(currentEpochTime);
+            const currentMinuteOfDay = date.getUTCHours() * 60 + date.getUTCMinutes();
             
             // Filtramos vuelos que NO han sido cancelados y que salen en el futuro.
             // Para lidiar con el final del día, mostramos los que salen entre currentMinuteOfDay y currentMinuteOfDay + 300 (5 horas aprox)
@@ -30,7 +30,7 @@ const UpcomingFlightsPanel = ({ currentEpochTime = 0 }) => {
                     let diff = v.departureMinute - currentMinuteOfDay;
                     if (diff < 0) diff += 1440;
                     
-                    const isRescheduled = diff < 120;
+                    const isRescheduled = diff < 60;
                     return {
                         ...v,
                         originalDiff: diff,
@@ -87,7 +87,7 @@ const UpcomingFlightsPanel = ({ currentEpochTime = 0 }) => {
             </div>
 
             <div style={timeInfoStyle}>
-                Hora Actual (UTC Simulador): <strong>{formatTime(currentEpochTime % 1440)}</strong>
+                Hora Actual (UTC Simulador): <strong>{formatTime(new Date(currentEpochTime).getUTCHours() * 60 + new Date(currentEpochTime).getUTCMinutes())}</strong>
             </div>
 
             {loading && <div style={messageStyle}>Cargando próximos vuelos...</div>}
@@ -114,34 +114,33 @@ const UpcomingFlightsPanel = ({ currentEpochTime = 0 }) => {
                         })
                         .slice(0, 50)
                         .map((flight) => {
-                        let diffMin = flight.departureMinute - (Math.floor(currentEpochTime) % 1440);
+                        const simDate = new Date(currentEpochTime);
+                        const simMinuteOfDay = simDate.getUTCHours() * 60 + simDate.getUTCMinutes();
+                        let diffMin = flight.departureMinute - simMinuteOfDay;
                         if (diffMin < 0) diffMin += 1440;
 
                         return (
                             <div key={flight.id} style={flightCardStyle}>
-                                <div style={flightRouteStyle}>
-                                    <span style={airportBadgeStyle}>{flight.origenIcao}</span>
-                                    <span style={{color: '#94a3b8', fontSize: '10px'}}>✈️</span>
-                                    <span style={airportBadgeStyle}>{flight.destinoIcao}</span>
-                                </div>
-                                <div style={flightDetailsStyle}>
-                                    <div style={{display: 'flex', gap: '1rem'}}>
-                                        <div style={timeBlockStyle}>
-                                            <span style={labelStyle}>SALIDA (UTC)</span>
-                                            <span style={valueStyle}>{formatTime(flight.departureMinute)}</span>
-                                        </div>
-                                        <div style={timeBlockStyle}>
-                                            <span style={labelStyle}>LLEGADA (UTC)</span>
-                                            <span style={valueStyle}>{formatTime(flight.arrivalMinute)}</span>
-                                        </div>
+                                <div style={{display: 'flex', alignItems: 'center', gap: '0.75rem'}}>
+                                    <div style={flightRouteStyle}>
+                                        <span style={{color: '#64748b', fontSize: '10px', marginRight: '4px', fontWeight: 'bold'}}>#{flight.id}</span>
+                                        <span style={airportBadgeStyle}>{flight.origenIcao}</span>
+                                        <span style={{color: '#94a3b8', fontSize: '10px'}}>✈️</span>
+                                        <span style={airportBadgeStyle}>{flight.destinoIcao}</span>
                                     </div>
-                                    <div style={{display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px'}}>
-                                        {flight.isRescheduled && (
-                                            <span style={rescheduledBadgeStyle}>REAGENDADO (+24H)</span>
-                                        )}
-                                        <div style={flight.isRescheduled ? countdownRescheduledStyle : countdownStyle}>
-                                            En {Math.floor(flight.actualWaitMin / 60)}h {Math.floor(flight.actualWaitMin % 60)}m
-                                        </div>
+                                    <div style={{display: 'flex', gap: '0.5rem', alignItems: 'center'}}>
+                                        <span style={valueStyle}>{formatTime(flight.departureMinute)}</span>
+                                        <span style={{color: '#64748b', fontSize: '10px'}}>➝</span>
+                                        <span style={valueStyle}>{formatTime(flight.arrivalMinute)}</span>
+                                        <span style={labelStyle}>UTC</span>
+                                    </div>
+                                </div>
+                                <div style={{display: 'flex', alignItems: 'center', gap: '0.5rem'}}>
+                                    {flight.isRescheduled && (
+                                        <span style={rescheduledBadgeStyle}>REAGENDADO</span>
+                                    )}
+                                    <div style={flight.isRescheduled ? countdownRescheduledStyle : countdownStyle}>
+                                        En {Math.floor(flight.actualWaitMin / 60)}h {Math.floor(flight.actualWaitMin % 60)}m
                                     </div>
                                 </div>
                             </div>
@@ -237,51 +236,35 @@ const listContainerStyle = {
 const flightCardStyle = {
     backgroundColor: 'rgba(30, 41, 59, 0.8)',
     border: '1px solid rgba(148, 163, 184, 0.1)',
-    borderRadius: '8px',
-    padding: '0.75rem',
+    borderRadius: '6px',
+    padding: '0.4rem 0.5rem',
     display: 'flex',
-    flexDirection: 'column',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     gap: '0.5rem'
 };
 
 const flightRouteStyle = {
     display: 'flex',
     alignItems: 'center',
-    gap: '0.5rem'
+    gap: '0.25rem'
 };
 
 const airportBadgeStyle = {
-    backgroundColor: 'rgba(15, 23, 42, 0.6)',
-    border: '1px solid rgba(255, 255, 255, 0.1)',
-    padding: '2px 6px',
-    borderRadius: '4px',
-    fontSize: '13px',
+    backgroundColor: 'transparent',
+    fontSize: '12px',
     fontWeight: 'bold',
     color: '#e2e8f0'
 };
 
-const flightDetailsStyle = {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    background: 'rgba(0, 0, 0, 0.2)',
-    padding: '0.5rem',
-    borderRadius: '6px'
-};
-
-const timeBlockStyle = {
-    display: 'flex',
-    flexDirection: 'column'
-};
-
 const labelStyle = {
-    fontSize: '10px',
+    fontSize: '9px',
     color: '#64748b',
     fontWeight: 'bold'
 };
 
 const valueStyle = {
-    fontSize: '13px',
+    fontSize: '12px',
     color: '#f8fafc',
     fontFamily: 'monospace'
 };

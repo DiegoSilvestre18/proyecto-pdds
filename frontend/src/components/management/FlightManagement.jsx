@@ -4,6 +4,7 @@ import { apiFetch } from '../../hooks/api';
 
 const FlightManagement = ({ flights, setFlights }) => {
     const [status, setStatus] = useState({ type: '', message: '' });
+    const [sessionLogs, setSessionLogs] = useState([]);
 
     const [entryMode, setEntryMode] = useState('manual');
 
@@ -61,8 +62,10 @@ const FlightManagement = ({ flights, setFlights }) => {
             });
 
             if (res.ok) {
-                const text = await res.text();
-                setStatus({ type: 'success', message: text });
+                const data = await res.json();
+                setStatus({ type: 'success', message: `Se insertaron ${data.length} vuelos masivamente en vivo.` });
+                // Añadir al log (con marca isTxt para saber de donde viene si queremos)
+                setSessionLogs(prev => [...data.map(v => ({...v, source: 'TXT'})), ...prev]);
                 setSelectedFile(null);
                 await fetchFlights();
             } else {
@@ -125,10 +128,12 @@ const FlightManagement = ({ flights, setFlights }) => {
             );
 
             if (response.ok) {
+                const newFlight = await response.json();
                 setStatus({
                     type: 'success',
                     message: 'Vuelo creado correctamente.'
                 });
+                setSessionLogs(prev => [{...newFlight, source: 'Manual'}, ...prev]);
 
                 setFlightData({
                     origenIcao: '',
@@ -167,6 +172,10 @@ const FlightManagement = ({ flights, setFlights }) => {
                 <button type="button" onClick={() => setEntryMode('txt')} style={toggleBtnStyle(entryMode === 'txt', 'txt')}>Masivo por TXT</button>
                 <button type="button" onClick={() => setEntryMode('list')} style={toggleBtnStyle(entryMode === 'list', 'list')}>Listado General</button>
             </div>
+            
+            <div style={{ display: 'flex', gap: '1.5rem', flex: 1, minHeight: 0 }}>
+                {/* Lado Izquierdo: Formularios */}
+                <div style={{ flex: 1, overflowY: 'auto', paddingRight: '0.5rem' }}>
 
             {entryMode === 'manual' && (
                 <div style={{ background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(56,189,248,0.2)', padding: '1.5rem', borderRadius: '12px', marginBottom: '1.5rem' }}>
@@ -283,6 +292,45 @@ const FlightManagement = ({ flights, setFlights }) => {
                     {status.message}
                 </div>
             )}
+            </div> {/* Cierra columna izquierda */}
+
+            {/* Columna Derecha: LOG DE SESIÓN */}
+            {entryMode !== 'list' && (
+                <div style={{ width: '300px', background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', display: 'flex', flexDirection: 'column' }}>
+                    <div style={{ padding: '1rem', borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+                        <h3 style={{ margin: 0, color: '#e2e8f0', fontSize: '14px' }}>Log de Registro (Sesión)</h3>
+                    </div>
+                    <div style={{ flex: 1, overflowY: 'auto', padding: '1rem', display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                        {sessionLogs.length === 0 ? (
+                            <p style={{ color: '#64748b', fontSize: '12px', textAlign: 'center' }}>No hay vuelos registrados en esta sesión.</p>
+                        ) : (
+                            sessionLogs.map((log, idx) => {
+                                const origen = AIRPORTS.find(a => a.icao === log.origenIcao);
+                                const gmt = origen ? origen.gmtOffset : 0;
+                                let localMin = (log.departureMinute + (gmt * 60)) % 1440;
+                                if (localMin < 0) localMin += 1440;
+                                
+                                const formatHM = m => `${Math.floor(m / 60).toString().padStart(2, '0')}:${(m % 60).toString().padStart(2, '0')}`;
+
+                                return (
+                                    <div key={idx} style={{ background: 'rgba(30, 41, 59, 0.8)', padding: '0.75rem', borderRadius: '8px', borderLeft: `3px solid ${log.source === 'TXT' ? '#10b981' : '#38bdf8'}`, fontSize: '12px' }}>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                                            <span style={{ fontWeight: 'bold', color: '#e2e8f0' }}>ID: {log.id}</span>
+                                            <span style={{ color: '#94a3b8' }}>{log.origenIcao} ✈️ {log.destinoIcao}</span>
+                                        </div>
+                                        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', marginTop: '0.5rem' }}>
+                                            <div style={{ color: '#94a3b8' }}>Local: <strong style={{ color: '#fff' }}>{formatHM(localMin)}</strong></div>
+                                            <div style={{ color: '#94a3b8' }}>UTC: <strong style={{ color: '#fff' }}>{formatHM(log.departureMinute)}</strong></div>
+                                        </div>
+                                    </div>
+                                );
+                            })
+                        )}
+                    </div>
+                </div>
+            )}
+            
+            </div> {/* Cierra layout flex principal */}
 
             {entryMode === 'list' && (
                 <div style={{ background: 'rgba(15, 23, 42, 0.6)', border: '1px solid rgba(255,255,255,0.1)', padding: '1.5rem', borderRadius: '12px' }}>

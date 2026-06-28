@@ -26,10 +26,9 @@ public class VueloController {
     }
 
     @PostMapping("/upload")
-    public org.springframework.http.ResponseEntity<String> uploadMasivo(@RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+    public org.springframework.http.ResponseEntity<?> uploadMasivo(@RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
         try {
-            String result = service.uploadMasivoEnVivo(file);
-            return org.springframework.http.ResponseEntity.ok(result);
+            return org.springframework.http.ResponseEntity.ok(service.uploadMasivoEnVivo(file));
         } catch (Exception e) {
             return org.springframework.http.ResponseEntity.badRequest().body("Error: " + e.getMessage());
         }

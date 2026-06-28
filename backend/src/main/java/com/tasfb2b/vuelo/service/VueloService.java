@@ -151,9 +151,9 @@ public class VueloService {
                 .collect(Collectors.toList());
     }
 
-    public String uploadMasivoEnVivo(org.springframework.web.multipart.MultipartFile file) {
+    public List<VueloResponse> uploadMasivoEnVivo(org.springframework.web.multipart.MultipartFile file) {
         try (BufferedReader reader = new BufferedReader(new java.io.InputStreamReader(file.getInputStream()))) {
-            List<Vuelo> vuelos = new ArrayList<>();
+            List<VueloResponse> responses = new ArrayList<>();
             String linea;
             int agregados = 0;
 
@@ -184,7 +184,17 @@ public class VueloService {
                         .cancelled(false)
                         .build();
 
-                vueloRepo.save(vuelo);
+                vuelo = vueloRepo.save(vuelo);
+                
+                responses.add(new VueloResponse(
+                        vuelo.getId(),
+                        origen.getIcaoCode(),
+                        destino.getIcaoCode(),
+                        vuelo.getCapacidadTotal(),
+                        vuelo.getCancelled(),
+                        vuelo.getDepartureMinute(),
+                        vuelo.getArrivalMinute()
+                ));
                 
                 try {
                     simulationService.inyectarVueloEnVivo(vuelo);
@@ -192,7 +202,7 @@ public class VueloService {
                 
                 agregados++;
             }
-            return "Se insertaron " + agregados + " vuelos masivamente en vivo.";
+            return responses;
         } catch (Exception e) {
             throw new RuntimeException("Error procesando archivo de vuelos: " + e.getMessage());
         }
