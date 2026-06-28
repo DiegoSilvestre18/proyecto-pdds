@@ -56,7 +56,7 @@ def generar_datos_vivo():
         str_llegada  = llegada_local_destino.strftime("%H:%M")
 
         vuelos_extra.append(f"{origen}-{destino}-{str_despegue}-{str_llegada}-999\n")
-        print(f"  Vuelo {i+1:02d}: {origen}→{destino} | UTC {despegue_utc.strftime('%H:%M')}→{llegada_utc.strftime('%H:%M')} | TXT local {str_despegue}→{str_llegada}")
+        print(f"  Vuelo {i+1:02d}: {origen}->{destino} | UTC {despegue_utc.strftime('%H:%M')}->{llegada_utc.strftime('%H:%M')} | TXT local {str_despegue}->{str_llegada}")
 
         # ── Envío (maleta) ────────────────────────────────────────────────────
         # Los archivos _envios usan hora local del ORIGEN
@@ -89,7 +89,7 @@ def generar_datos_vivo():
         ruta_envios = f"_envios_{origen}_{fecha_hoy_utc}.txt"
         with open(ruta_envios, "w") as f:
             f.writelines(lineas)
-        print(f"OK: {ruta_envios} → {len(lineas)} maletas generadas")
+        print(f"OK: {ruta_envios} -> {len(lineas)} maletas generadas")
 
     print(f"\nFecha UTC usada para los archivos de envíos: {fecha_hoy_utc}")
     print("¡Listo! Sube los 3 TXT en la UI y reinicia el backend.")
