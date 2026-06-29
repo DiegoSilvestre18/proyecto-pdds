@@ -195,24 +195,23 @@ const WorldMap = ({
         const from = airportByIcao[plane.from] || AIRPORT_BY_ICAO[plane.from];
         const to = airportByIcao[plane.to] || AIRPORT_BY_ICAO[plane.to];
         if (from && to) {
-          const progress = plane.progress ?? 0;
-          const pos = interpolateCoordinates(from, to, progress);
-          const isNewSelection = lastSelectedAircraftRef.current !== selectedAircraftId;
-          lastSelectedAircraftRef.current = selectedAircraftId;
-          
-          setViewState(prev => ({
-            ...prev,
-            longitude: pos[0],
-            latitude: pos[1],
-            zoom: isNewSelection ? 8 : prev.zoom,
-            transitionDuration: isNewSelection ? 1000 : 0
-          }));
+          const pos = interpolateCoordinates(from, to, plane.progress ?? 0);
+          if (lastSelectedAircraftRef.current !== selectedAircraftId) {
+            lastSelectedAircraftRef.current = selectedAircraftId;
+            setViewState(prev => ({
+              ...prev,
+              longitude: pos[0],
+              latitude: pos[1],
+              zoom: 4,
+              transitionDuration: 1000
+            }));
+          }
         }
       }
     } else {
       lastSelectedAircraftRef.current = null;
     }
-  }, [activeAircraft, selectedAircraftId, airportByIcao]);
+  }, [selectedAircraftId, airportByIcao]);
 
   const lastSelectedAirportRef = useRef(null);
 
@@ -227,7 +226,7 @@ const WorldMap = ({
             ...prev,
             longitude: ap.coordinates[0],
             latitude: ap.coordinates[1],
-            zoom: 10,
+            zoom: 3,
             transitionDuration: 1500 // Slower, smoother zoom
           }));
         }
@@ -268,6 +267,17 @@ const WorldMap = ({
   }, [activeFilters.flightStatus, activeFilters.continent, activeFilters.semaphoreLevel, activeMetrics, airportByIcao]);
 
   const hasAnySelection = selectedAircraftId != null || (selectedAirportCode != null && selectedAirportCode !== "");
+  const relatedAirportCodes = useMemo(() => {
+    if (!selectedAirportCode) return new Set()
+    const codes = new Set()
+    activeAircraft.forEach(plane => {
+      const isEmpty = !plane.ocupacionReal || plane.ocupacionReal === 0
+      if (isEmpty) return
+      if (plane.to === selectedAirportCode) codes.add(plane.from)
+      if (plane.from === selectedAirportCode) codes.add(plane.to)
+    })
+    return codes
+  }, [selectedAirportCode, activeAircraft])
 
   const layers = useMemo(() => {
     const layerDefs = [];
@@ -295,7 +305,8 @@ const WorldMap = ({
       focusedEntity,
       highlightedId,
       airportPassesFilter,
-      hasAnySelection
+      hasAnySelection,
+      relatedAirportCodes
     }));
 
     // 3. Flights (Top)
@@ -317,7 +328,7 @@ const WorldMap = ({
     selectedAirportCode, selectedAircraftId, focusedEntity, highlightedId,
     showFlightsWithoutShipments, showFlightsWithShipments, hasAnySelection,
     selectedFromAirport, selectedToAirport, trackedRoute, exceptionHighlight,
-    airportPassesFilter, flightPassesFilter, airportByIcao
+    airportPassesFilter, flightPassesFilter, airportByIcao, relatedAirportCodes
   ]);
 
   const onLayerClick = useCallback((info, event) => {

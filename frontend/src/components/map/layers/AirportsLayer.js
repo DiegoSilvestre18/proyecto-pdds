@@ -16,6 +16,7 @@ export const createAirportsLayers = ({
   highlightedId,
   airportPassesFilter,
   hasAnySelection,
+  relatedAirportCodes,
 }) => {
 
   const data = airports.map(airport => {
@@ -28,7 +29,7 @@ export const createAirportsLayers = ({
     const isSelected = isAirportSelected || (focusedEntity?.type === 'airport' && focusedEntity?.id === airport.icao);
     const isHighlighted = highlightedId === airport.icao;
     const passesFilter = airportPassesFilter(airport.icao);
-    const isDimmed = hasAnySelection && !isSelected;
+    const isDimmed = hasAnySelection && !isSelected && !relatedAirportCodes?.has(airport.icao);
 
     const offset = nearbyOffsets[airport.icao];
     // Icon is 30px centered at coordinate (±15px). Ring radius ~18px. Text clears ring.
@@ -81,7 +82,7 @@ export const createAirportsLayers = ({
       getSize: 30,
       getColor: d => getAirportLevelRgb(d.level, d.isDimmed ? 80 : 255),
       updateTriggers: {
-        getColor: [activeMetrics, hasAnySelection],
+        getColor: [activeMetrics, hasAnySelection, relatedAirportCodes],
       }
     }),
     
@@ -124,7 +125,7 @@ export const createAirportsLayers = ({
       characterSet: UNICODE_CHARACTERS,
       updateTriggers: {
         getText: [activeMetrics],
-        getColor: [hasAnySelection, selectedAirportCode]
+        getColor: [hasAnySelection, selectedAirportCode, relatedAirportCodes]
       }
     })
   ];
