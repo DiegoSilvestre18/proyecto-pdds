@@ -25,17 +25,23 @@ const UpcomingFlightsPanel = ({ currentEpochTime = 0 }) => {
             // Para lidiar con el final del día, mostramos los que salen entre currentMinuteOfDay y currentMinuteOfDay + 300 (5 horas aprox)
             // o simplemente los más próximos en general.
             let processed = data
-                .filter(v => !v.cancelled)
+                .filter(v => !v.cancelled || v.reagendado)
                 .map(v => {
-                    let diff = v.departureMinute - currentMinuteOfDay;
-                    if (diff < 0) diff += 1440;
+                    const isRescheduled = v.reagendado;
                     
-                    const isRescheduled = diff < 60;
+                    let diff = v.departureMinute - currentMinuteOfDay;
+                    const crossedBoundary = diff < 0;
+                    if (crossedBoundary) diff += 1440;
+                    
+                    // Si el vuelo fue reagendado, le sumamos 1440 SOLO si no ha cruzado su hora natural hoy.
+                    // Si ya cruzó su hora natural hoy, diff ya contiene las 24h hacia mañana.
+                    const extraDay = (isRescheduled && !crossedBoundary) ? 1440 : 0;
+                    
                     return {
                         ...v,
                         originalDiff: diff,
                         isRescheduled,
-                        actualWaitMin: isRescheduled ? diff + 1440 : diff
+                        actualWaitMin: diff + extraDay
                     };
                 });
 

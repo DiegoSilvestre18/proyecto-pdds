@@ -45,6 +45,13 @@ public class VueloService {
         int depUtc = (request.departureMinute() - (origen.getGmtOffset() * 60) + 1440) % 1440;
         int arrUtc = (request.arrivalMinute() - (destino.getGmtOffset() * 60) + 1440) % 1440;
 
+        java.time.ZonedDateTime now = java.time.ZonedDateTime.now(java.time.ZoneOffset.UTC);
+        int currentMin = now.getHour() * 60 + now.getMinute();
+        int diff = depUtc - currentMin;
+        if (diff < 0) diff += 1440;
+        
+        boolean cancelledAndReagendado = diff < 60;
+
         Vuelo vuelo = Vuelo.builder()
                 .origen(origen)
                 .destino(destino)
@@ -52,7 +59,8 @@ public class VueloService {
                 .departureMinute(depUtc)
                 .arrivalMinute(arrUtc)
                 .intercontinental(intercontinental)
-                .cancelled(false)
+                .cancelled(cancelledAndReagendado)
+                .reagendado(cancelledAndReagendado)
                 .build();
 
         vueloRepo.save(vuelo);
@@ -63,10 +71,13 @@ public class VueloService {
 
         return new VueloResponse(
                 vuelo.getId(),
-                origen.getIcaoCode(),
-                destino.getIcaoCode(),
+                vuelo.getOrigen().getIcaoCode(),
+                vuelo.getDestino().getIcaoCode(),
                 vuelo.getCapacidadTotal(),
-                vuelo.getCancelled()
+                vuelo.getCancelled(),
+                vuelo.getReagendado(),
+                vuelo.getDepartureMinute(),
+                vuelo.getArrivalMinute()
         );
     }
 
@@ -144,6 +155,7 @@ public class VueloService {
                         v.getDestino().getIcaoCode(),
                         v.getCapacidadTotal(),
                         v.getCancelled(),
+                        v.getReagendado(),
                         v.getDepartureMinute(),
                         v.getArrivalMinute()
                 ))
@@ -174,6 +186,13 @@ public class VueloService {
                 int arrUtc = (parsed.arrivalMinute() - (destino.getGmtOffset() * 60) + 1440) % 1440;
                 boolean intercontinental = !origen.getContinent().equals(destino.getContinent());
 
+                java.time.ZonedDateTime now = java.time.ZonedDateTime.now(java.time.ZoneOffset.UTC);
+                int currentMin = now.getHour() * 60 + now.getMinute();
+                int diff = depUtc - currentMin;
+                if (diff < 0) diff += 1440;
+                
+                boolean cancelledAndReagendado = diff < 60;
+
                 Vuelo vuelo = Vuelo.builder()
                         .origen(origen)
                         .destino(destino)
@@ -181,7 +200,8 @@ public class VueloService {
                         .departureMinute(depUtc)
                         .arrivalMinute(arrUtc)
                         .intercontinental(intercontinental)
-                        .cancelled(false)
+                        .cancelled(cancelledAndReagendado)
+                        .reagendado(cancelledAndReagendado)
                         .build();
 
                 vuelo = vueloRepo.save(vuelo);
@@ -192,6 +212,7 @@ public class VueloService {
                         destino.getIcaoCode(),
                         vuelo.getCapacidadTotal(),
                         vuelo.getCancelled(),
+                        vuelo.getReagendado(),
                         vuelo.getDepartureMinute(),
                         vuelo.getArrivalMinute()
                 ));
