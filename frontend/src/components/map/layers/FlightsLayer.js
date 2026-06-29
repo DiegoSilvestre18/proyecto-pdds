@@ -8,8 +8,8 @@ export const createFlightsLayer = ({
   selectedAircraftId,
   highlightedId,
   flightPassesFilter,
-  showEmptyFlights,
-  showTestFlights,
+  showFlightsWithoutShipments,
+  showFlightsWithShipments,
   hasAnySelection,
   selectedAirportCode
 }) => {
@@ -19,8 +19,8 @@ export const createFlightsLayer = ({
 
   activeAircraft.forEach(plane => {
     const isEmpty = !plane.ocupacionReal || plane.ocupacionReal === 0;
-    if (isEmpty && !showEmptyFlights) return;
-    if (!isEmpty && !showTestFlights) return;
+    if (isEmpty && !showFlightsWithoutShipments) return;
+    if (!isEmpty && !showFlightsWithShipments) return;
     
     const from = airportByIcao[plane.from] || AIRPORT_BY_ICAO[plane.from];
     const to = airportByIcao[plane.to] || AIRPORT_BY_ICAO[plane.to];
@@ -45,12 +45,15 @@ export const createFlightsLayer = ({
     const nextPosition = interpolateCoordinates(from, to, nextProgress);
     const bearing = getVisualBearing(position, nextPosition);
 
-    const baseOpacity = passesFilter ? (hasAnySelection ? (isSelected ? 255 : isWarehouseFlight ? 200 : 50) : 255) : 20;
-    const color = isCancelled 
-      ? [239, 68, 68, baseOpacity] 
-      : isRescued 
-        ? [59, 130, 246, baseOpacity] 
-        : getStrokeColorRgb(plane.status, plane.ocupacionReal, plane.capacidadMax, baseOpacity);
+    const isAircraftSelected = selectedAircraftId != null;
+    const baseOpacity = passesFilter ? (isAircraftSelected ? (isSelected ? 255 : 80) : 255) : 20;
+    const color = isSelected && isAircraftSelected
+      ? [129, 140, 248, baseOpacity]
+      : isCancelled 
+        ? [239, 68, 68, baseOpacity] 
+        : isRescued 
+          ? [59, 130, 246, baseOpacity] 
+          : getStrokeColorRgb(plane.status, plane.ocupacionReal, plane.capacidadMax, baseOpacity);
 
     const baseProps = { ...plane, position, color, isSelected, isHighlighted };
 

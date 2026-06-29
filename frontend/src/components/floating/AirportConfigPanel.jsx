@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
+import { SkeletonList, EmptyState } from '../common/Skeleton';
 
-const CONTINENTES = ['AMERICA', 'EUROPE', 'ASIA'];
+const CONTINENTES = ['AMERICA', 'EUROPE', 'ASIA', 'AFRICA', 'OCEANIA'];
 
 const fieldStyle = {
   background: 'rgba(255,255,255,0.06)',
@@ -29,12 +30,20 @@ const AirportConfigPanel = () => {
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState(null);
   const [search, setSearch] = useState('');
+  const [status, setStatus] = useState('loading'); // 'loading' | 'error' | 'ready'
 
   const load = useCallback(async () => {
+    setStatus('loading');
     try {
       const res = await fetch('/api/v1/aeropuertos');
-      if (res.ok) setAirports(await res.json());
-    } catch { /* noop */ }
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      setAirports(await res.json());
+      setStatus('ready');
+    } catch (e) {
+      // Antes el catch era silencioso: el panel quedaba vacío sin explicación.
+      console.error('[AirportConfig] Error cargando aeropuertos:', e);
+      setStatus('error');
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -50,6 +59,31 @@ const AirportConfigPanel = () => {
 
   const handleSave = async () => {
     if (!editing) return;
+
+    // Validación numérica: parseInt/parseFloat devuelven NaN con entrada vacía o
+    // inválida; antes esos NaN llegaban al backend. Validamos rangos también.
+    const storageCapacity = parseInt(editing.storageCapacity, 10);
+    const gmtOffset = parseInt(editing.gmtOffset, 10);
+    const latitude = parseFloat(editing.latitude);
+    const longitude = parseFloat(editing.longitude);
+
+    if (Number.isNaN(storageCapacity) || storageCapacity < 0) {
+      setMsg({ type: 'err', text: '❌ Capacidad de almacén inválida (debe ser un número ≥ 0)' });
+      return;
+    }
+    if (Number.isNaN(gmtOffset) || gmtOffset < -12 || gmtOffset > 14) {
+      setMsg({ type: 'err', text: '❌ GMT Offset inválido (debe estar entre -12 y +14)' });
+      return;
+    }
+    if (Number.isNaN(latitude) || latitude < -90 || latitude > 90) {
+      setMsg({ type: 'err', text: '❌ Latitud inválida (debe estar entre -90 y 90)' });
+      return;
+    }
+    if (Number.isNaN(longitude) || longitude < -180 || longitude > 180) {
+      setMsg({ type: 'err', text: '❌ Longitud inválida (debe estar entre -180 y 180)' });
+      return;
+    }
+
     setSaving(true);
     setMsg(null);
     try {
@@ -58,10 +92,10 @@ const AirportConfigPanel = () => {
         city: editing.city,
         country: editing.country,
         continent: editing.continent,
-        storageCapacity: parseInt(editing.storageCapacity, 10),
-        gmtOffset: parseInt(editing.gmtOffset, 10),
-        latitude: parseFloat(editing.latitude),
-        longitude: parseFloat(editing.longitude),
+        storageCapacity,
+        gmtOffset,
+        latitude,
+        longitude,
       };
       const res = await fetch(`/api/v1/aeropuertos/${editing.id}`, {
         method: 'PUT',
@@ -113,7 +147,22 @@ const AirportConfigPanel = () => {
             style={{ ...fieldStyle, marginBottom: '10px' }}
           />
           <div style={{ maxHeight: '320px', overflowY: 'auto' }}>
-            {filtered.map(ap => (
+            {status === 'loading' && (
+              <SkeletonList rows={6} rowHeight={48} label="Cargando almacenes…" />
+            )}
+            {status === 'error' && (
+              <div style={{ textAlign: 'center', padding: '24px 16px' }}>
+                <div style={{ fontSize: '26px', marginBottom: '8px' }} aria-hidden="true">⚠️</div>
+                <div style={{ color: '#fca5a5', fontSize: '12px', fontWeight: 600 }}>No se pudieron cargar los almacenes</div>
+                <div style={{ color: '#64748b', fontSize: '11px', margin: '4px 0 12px' }}>Verifica la conexión con el servidor.</div>
+                <button onClick={load}
+                  style={{ padding: '6px 14px', borderRadius: '6px', border: '1px solid rgba(96,165,250,0.4)',
+                    background: 'rgba(96,165,250,0.12)', color: '#93c5fd', fontSize: '12px', cursor: 'pointer' }}>
+                  ↻ Reintentar
+                </button>
+              </div>
+            )}
+            {status === 'ready' && filtered.map(ap => (
               <div key={ap.id}
                 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center',
                   padding: '8px 10px', borderRadius: '6px', marginBottom: '4px',
@@ -132,10 +181,12 @@ const AirportConfigPanel = () => {
                 </button>
               </div>
             ))}
-            {filtered.length === 0 && (
-              <div style={{ textAlign: 'center', color: '#475569', padding: '20px', fontSize: '12px' }}>
-                Sin resultados
-              </div>
+            {status === 'ready' && filtered.length === 0 && (
+              <EmptyState
+                icon="🔍"
+                title={search ? 'Sin resultados' : 'No hay almacenes registrados'}
+                hint={search ? 'Prueba con otro término de búsqueda.' : null}
+              />
             )}
           </div>
         </>

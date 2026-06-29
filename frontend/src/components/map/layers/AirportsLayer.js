@@ -16,6 +16,7 @@ export const createAirportsLayers = ({
   highlightedId,
   airportPassesFilter,
   hasAnySelection,
+  relatedAirportCodes,
 }) => {
 
   const data = airports.map(airport => {
@@ -28,7 +29,7 @@ export const createAirportsLayers = ({
     const isSelected = isAirportSelected || (focusedEntity?.type === 'airport' && focusedEntity?.id === airport.icao);
     const isHighlighted = highlightedId === airport.icao;
     const passesFilter = airportPassesFilter(airport.icao);
-    const isDimmed = hasAnySelection && !isSelected;
+    const isDimmed = hasAnySelection && !isSelected && !relatedAirportCodes?.has(airport.icao);
 
     const offset = nearbyOffsets[airport.icao];
     // Icon is 30px centered at coordinate (±15px). Ring radius ~18px. Text clears ring.
@@ -67,7 +68,7 @@ export const createAirportsLayers = ({
       id: 'airports-layer',
       data: visibleData,
       pickable: true,
-      billboard: false,
+      billboard: true,
       getPosition: d => d.coordinates,
       getIcon: d => ({
         url: '/tower-icon.svg',
@@ -81,7 +82,7 @@ export const createAirportsLayers = ({
       getSize: 30,
       getColor: d => getAirportLevelRgb(d.level, d.isDimmed ? 80 : 255),
       updateTriggers: {
-        getColor: [activeMetrics, hasAnySelection],
+        getColor: [activeMetrics, hasAnySelection, relatedAirportCodes],
       }
     }),
     
@@ -111,7 +112,7 @@ export const createAirportsLayers = ({
       getPosition: d => d.coordinates,
       getText: d => `${d.icao}\n${d.city}\n${d.stockBags}/${d.maxCap}`,
       getSize: d => 10,
-      getColor: d => d.isDimmed ? [150, 150, 150, 100] : [255, 255, 255, 255],
+      getColor: d => d.isDimmed ? [150, 150, 150, 100] : [6, 24, 40, 255],
       getAngle: 0,
       getTextAnchor: d => d.alignment[0],
       getAlignmentBaseline: d => d.alignment[1],
@@ -120,11 +121,11 @@ export const createAirportsLayers = ({
       fontWeight: 'bold',
       lineHeight: 1.2,
       outlineWidth: 2,
-      outlineColor: [6, 24, 40, 255],
+      outlineColor: [255, 255, 255, 255],
       characterSet: UNICODE_CHARACTERS,
       updateTriggers: {
         getText: [activeMetrics],
-        getColor: [hasAnySelection, selectedAirportCode]
+        getColor: [hasAnySelection, selectedAirportCode, relatedAirportCodes]
       }
     })
   ];

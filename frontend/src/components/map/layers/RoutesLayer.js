@@ -41,10 +41,14 @@ export const createRoutesLayers = ({
     const isGreenPlane = colorRgb[0] === 16 && colorRgb[1] === 185 && colorRgb[2] === 129; 
 
     const isSelected = selectedAircraftId === plane.id;
-    const isWarehouseFlight = selectedAirportCode && (plane.from === selectedAirportCode || plane.to === selectedAirportCode);
-    const opacity = hasAnySelection ? (isSelected ? 255 : isWarehouseFlight ? 200 : 50) : 220;
-    const trailColor = [colorRgb[0], colorRgb[1], colorRgb[2], opacity];
-    const remainingColor = [colorRgb[0], colorRgb[1], colorRgb[2], Math.max(30, opacity - 100)];
+    const isAircraftSelected = selectedAircraftId != null;
+    const opacity = isAircraftSelected ? (isSelected ? 255 : 80) : 220;
+    const trailColor = isSelected
+      ? [129, 140, 248, opacity]
+      : [colorRgb[0], colorRgb[1], colorRgb[2], opacity];
+    const remainingColor = isSelected
+      ? [129, 140, 248, Math.max(30, opacity - 100)]
+      : [colorRgb[0], colorRgb[1], colorRgb[2], Math.max(30, opacity - 100)];
 
     if (progress > 0.02) {
       trailLines.push({

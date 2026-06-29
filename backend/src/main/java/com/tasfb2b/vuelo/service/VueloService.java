@@ -45,6 +45,13 @@ public class VueloService {
         int depUtc = (request.departureMinute() - (origen.getGmtOffset() * 60) + 1440) % 1440;
         int arrUtc = (request.arrivalMinute() - (destino.getGmtOffset() * 60) + 1440) % 1440;
 
+        java.time.ZonedDateTime now = java.time.ZonedDateTime.now(java.time.ZoneOffset.UTC);
+        int currentMin = now.getHour() * 60 + now.getMinute();
+        int diff = depUtc - currentMin;
+        if (diff < 0) diff += 1440;
+        
+        boolean cancelledAndReagendado = diff < 60;
+
         Vuelo vuelo = Vuelo.builder()
                 .origen(origen)
                 .destino(destino)
@@ -52,7 +59,8 @@ public class VueloService {
                 .departureMinute(depUtc)
                 .arrivalMinute(arrUtc)
                 .intercontinental(intercontinental)
-                .cancelled(false)
+                .cancelled(cancelledAndReagendado)
+                .reagendado(cancelledAndReagendado)
                 .build();
 
         vueloRepo.save(vuelo);
@@ -63,10 +71,13 @@ public class VueloService {
 
         return new VueloResponse(
                 vuelo.getId(),
-                origen.getIcaoCode(),
-                destino.getIcaoCode(),
+                vuelo.getOrigen().getIcaoCode(),
+                vuelo.getDestino().getIcaoCode(),
                 vuelo.getCapacidadTotal(),
-                vuelo.getCancelled()
+                vuelo.getCancelled(),
+                vuelo.getReagendado(),
+                vuelo.getDepartureMinute(),
+                vuelo.getArrivalMinute()
         );
     }
 
@@ -144,10 +155,77 @@ public class VueloService {
                         v.getDestino().getIcaoCode(),
                         v.getCapacidadTotal(),
                         v.getCancelled(),
+                        v.getReagendado(),
                         v.getDepartureMinute(),
                         v.getArrivalMinute()
                 ))
-                .limit(100)
-                .toList();
+                .limit(5000)
+                .collect(Collectors.toList());
+    }
+
+    public List<VueloResponse> uploadMasivoEnVivo(org.springframework.web.multipart.MultipartFile file) {
+        try (BufferedReader reader = new BufferedReader(new java.io.InputStreamReader(file.getInputStream()))) {
+            List<VueloResponse> responses = new ArrayList<>();
+            String linea;
+            int agregados = 0;
+
+            Map<String, Aeropuerto> aeropuertoCache = aeropuertoRepo.findAll()
+                    .stream()
+                    .collect(Collectors.toMap(Aeropuerto::getIcaoCode, a -> a));
+
+            while ((linea = reader.readLine()) != null) {
+                if (linea.trim().isEmpty()) continue;
+                
+                ParsedVuelo parsed = VueloParser.parse(linea);
+                Aeropuerto origen = aeropuertoCache.get(parsed.origenIcao());
+                Aeropuerto destino = aeropuertoCache.get(parsed.destinoIcao());
+
+                if (origen == null || destino == null) continue;
+
+                int depUtc = (parsed.departureMinute() - (origen.getGmtOffset() * 60) + 1440) % 1440;
+                int arrUtc = (parsed.arrivalMinute() - (destino.getGmtOffset() * 60) + 1440) % 1440;
+                boolean intercontinental = !origen.getContinent().equals(destino.getContinent());
+
+                java.time.ZonedDateTime now = java.time.ZonedDateTime.now(java.time.ZoneOffset.UTC);
+                int currentMin = now.getHour() * 60 + now.getMinute();
+                int diff = depUtc - currentMin;
+                if (diff < 0) diff += 1440;
+                
+                boolean cancelledAndReagendado = diff < 60;
+
+                Vuelo vuelo = Vuelo.builder()
+                        .origen(origen)
+                        .destino(destino)
+                        .capacidadTotal(parsed.capacidad())
+                        .departureMinute(depUtc)
+                        .arrivalMinute(arrUtc)
+                        .intercontinental(intercontinental)
+                        .cancelled(cancelledAndReagendado)
+                        .reagendado(cancelledAndReagendado)
+                        .build();
+
+                vuelo = vueloRepo.save(vuelo);
+                
+                responses.add(new VueloResponse(
+                        vuelo.getId(),
+                        origen.getIcaoCode(),
+                        destino.getIcaoCode(),
+                        vuelo.getCapacidadTotal(),
+                        vuelo.getCancelled(),
+                        vuelo.getReagendado(),
+                        vuelo.getDepartureMinute(),
+                        vuelo.getArrivalMinute()
+                ));
+                
+                try {
+                    simulationService.inyectarVueloEnVivo(vuelo);
+                } catch(Exception ignored) {}
+                
+                agregados++;
+            }
+            return responses;
+        } catch (Exception e) {
+            throw new RuntimeException("Error procesando archivo de vuelos: " + e.getMessage());
+        }
     }
 }

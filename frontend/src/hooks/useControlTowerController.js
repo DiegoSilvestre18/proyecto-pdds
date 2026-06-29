@@ -2,13 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { apiFetch } from "./api";
 import { createStompClient } from "./ws";
 import {
-  AIRPORT_NODES,
   SCENARIO_TABS,
 } from "../data/controlTowerData";
-import { AIRPORT_BY_ICAO, buildAirportMetrics, AIRPORTS } from "../data/airportsData";
+import { buildAirportMetrics } from "../data/airportsData";
+import { useAirports } from "./useAirports";
 
 const PANEL_VISIBILITY_DEFAULT = {
-  telemetry: true,
+  telemetry: false,
   legend: true,
   occupancy: true,
   transitInventory: false,
@@ -35,6 +35,7 @@ const readStoredKpiCollapsed = () => {
 };
 
 export const useControlTowerController = () => {
+  const { airports: globalAirports, airportByIcao } = useAirports();
   const [activeTab, setActiveTab] = useState("vivo");
   const isCollapseScenario = activeTab === "colapso";
   const isSimScenario = activeTab === "periodo" || activeTab === "colapso";
@@ -747,7 +748,7 @@ const envelope = JSON.parse(msg.body);
     return () => client.deactivate()
   }, [sessionId])
 
-  const airportByCode = AIRPORT_BY_ICAO;
+  const airportByCode = airportByIcao;
 
   /**
    * Métricas de aeropuerto: si hay datos live del backend (airportLoads),
@@ -755,7 +756,7 @@ const envelope = JSON.parse(msg.body);
    */
   const activeMetrics = useMemo(() => {
     if (airportLoads && Object.keys(airportLoads).length > 0) {
-      return buildAirportMetrics(AIRPORTS, airportLoads);
+      return buildAirportMetrics(globalAirports, airportLoads);
     }
     return {};
   }, [airportLoads]);
@@ -766,7 +767,7 @@ const envelope = JSON.parse(msg.body);
       .sort(([, a], [, b]) => (b.occupancy || 0) - (a.occupancy || 0))
       .slice(0, 8)
       .map(([icao, data]) => ({
-        city: AIRPORT_BY_ICAO[icao]?.city ?? icao,
+        city: airportByIcao[icao]?.city ?? icao,
         capacity: `${Number(data.occupancy || 0).toFixed(1)}%`,
         icao,
       }));
@@ -950,8 +951,8 @@ if (selected && !finalSelection.some((p) => p.id === selected.id)) {
     if (selectedAircraftId && !selectedAircraft) setSelectedAircraftId(null)
   }, [selectedAircraftId, selectedAircraft])
 
-  const selectedFromAirport = selectedAircraft ? (AIRPORT_BY_ICAO[selectedAircraft.from] ?? null) : null;
-  const selectedToAirport = selectedAircraft ? (AIRPORT_BY_ICAO[selectedAircraft.to] ?? null) : null;
+  const selectedFromAirport = selectedAircraft ? (airportByIcao[selectedAircraft.from] ?? null) : null;
+  const selectedToAirport = selectedAircraft ? (airportByIcao[selectedAircraft.to] ?? null) : null;
 
   const globalOccupancyCalculated = useMemo(() => {
     const loads = Object.values(airportLoads);
@@ -1167,7 +1168,7 @@ activeAircraft,
     activeMetrics,
     activeTab,
     airportByCode,
-    airportNodes: AIRPORT_NODES,
+    airportNodes: globalAirports,
     comparisonData,
     elapsedOperationTime,
     currentEpochTime,

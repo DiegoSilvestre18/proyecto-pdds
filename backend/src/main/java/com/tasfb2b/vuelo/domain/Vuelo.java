@@ -56,6 +56,10 @@ public class Vuelo {
     @Column(nullable = false)
     private Boolean cancelled;
 
+    @Column(nullable = false)
+    @Builder.Default
+    private Boolean reagendado = false;
+
     @Version
     private Long version;
 
