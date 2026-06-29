@@ -106,15 +106,23 @@ public class RouteBuilder {
         route.setCapacidadAsignada(asignado);
         route.setDeadline(lot.getDeadline());
 
+        List<Long> legDeps = new ArrayList<>();
+        List<Long> legArrs = new ArrayList<>();
         long timeAccum = lot.getReadyTime();
+
         for (Vuelo v : flights) {
             long dep = v.calcularSiguienteSalida(timeAccum);
             long duration = v.getDuracionMs();
             if (bloqueoService != null && bloqueoService.tieneDemoraTransito(v.getOrigen().getIcaoCode(), v.getDestino().getIcaoCode(), Instant.ofEpochMilli(dep))) {
                 duration *= 2;
             }
-            timeAccum = dep + duration;
+            long arr = dep + duration;
+            legDeps.add(dep);
+            legArrs.add(arr);
+            timeAccum = arr;
         }
+        route.setLegDepartures(legDeps);
+        route.setLegArrivals(legArrs);
         route.setArrivalTime(timeAccum);
 
         return route;
@@ -159,6 +167,8 @@ public class RouteBuilder {
         backup.setCapacidadAsignada(Math.min(lot.getTotalMaletas(), capacidadBackup));
         backup.setDeadline(lot.getDeadline());
 
+        List<Long> legDeps = new ArrayList<>();
+        List<Long> legArrs = new ArrayList<>();
         long timeAccum = lot.getReadyTime();
         for (Vuelo v : flights) {
             long dep = v.calcularSiguienteSalida(timeAccum);
@@ -166,8 +176,13 @@ public class RouteBuilder {
             if (bloqueoService != null && bloqueoService.tieneDemoraTransito(v.getOrigen().getIcaoCode(), v.getDestino().getIcaoCode(), Instant.ofEpochMilli(dep))) {
                 duration *= 2;
             }
-            timeAccum = dep + duration;
+            long arr = dep + duration;
+            legDeps.add(dep);
+            legArrs.add(arr);
+            timeAccum = arr;
         }
+        backup.setLegDepartures(legDeps);
+        backup.setLegArrivals(legArrs);
         backup.setArrivalTime(timeAccum);
         return backup;
     }

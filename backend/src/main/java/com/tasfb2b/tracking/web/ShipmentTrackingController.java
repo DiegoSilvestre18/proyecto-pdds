@@ -3,6 +3,7 @@ package com.tasfb2b.tracking.web;
 import com.tasfb2b.tracking.service.ShipmentTracker;
 import com.tasfb2b.tracking.domain.ShipmentState;
 import com.tasfb2b.tracking.service.ShipmentTrackerRegistry;
+import com.tasfb2b.planificador.simulation.EventEngine;
 
 import org.springframework.web.bind.annotation.*;
 import lombok.RequiredArgsConstructor;
@@ -29,10 +30,18 @@ public class ShipmentTrackingController {
         return tracker != null ? tracker.getByShipment(codigo) : List.of();
     }
 
-    @GetMapping("/{sessionId}/flight/{flightId}")
-    public List<ShipmentState> getByFlight(@PathVariable String sessionId,@PathVariable Long flightId) {
+    @GetMapping("/{sessionId}/flight-instance/{instanceKey}")
+    public List<ShipmentState> getByFlightInstance(@PathVariable String sessionId, @PathVariable String instanceKey) {
         ShipmentTracker tracker = trackerRegistry.get(sessionId);
-        return tracker != null ? tracker.getByFlight(flightId) : List.of();
+        List<ShipmentState> result = tracker != null ? tracker.getByFlightInstance(instanceKey) : List.of();
+
+        if (instanceKey.startsWith(EventEngine.DEBUG_VUELO_ID + "-")) {
+            System.out.println(String.format(
+                    "[CONTROLLER] sessionId=%s instanceKey=%s resultados=%d",
+                    sessionId, instanceKey, result.size()
+            ));
+        }
+        return result;
     }
 
     @GetMapping("/{sessionId}/airport/{icao}")

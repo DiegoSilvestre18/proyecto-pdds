@@ -23,6 +23,8 @@ public class Route {
     private int capacidadAsignada;
     private long arrivalTime;
     private long deadline;
+    private List<Long> legDepartures = new ArrayList<>();
+    private List<Long> legArrivals = new ArrayList<>();
 
     @Builder.Default
     private String status = "normal";
@@ -150,6 +152,8 @@ public class Route {
         this.demandaTotal = 0;
         this.capacidadAsignada = 0;
         this.bagIds = new ArrayList<>();
+        this.legDepartures = new ArrayList<>();
+        this.legArrivals = new ArrayList<>();
         this.arrivalTime = 0;
         this.deadline = 0;
         this.status = "normal";

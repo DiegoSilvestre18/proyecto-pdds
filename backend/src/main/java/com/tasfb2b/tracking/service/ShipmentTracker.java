@@ -3,7 +3,7 @@ package com.tasfb2b.tracking.service;
 import com.tasfb2b.tracking.domain.ShipmentState;
 import com.tasfb2b.tracking.domain.ShipmentStatus;
 import com.tasfb2b.planificador.domain.Event;
-
+import com.tasfb2b.planificador.simulation.EventEngine;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -15,8 +15,8 @@ public class ShipmentTracker {
     // estado global de envíos
     private final Map<String, ShipmentState> bags = new ConcurrentHashMap<>();
 
-    // índice: vuelo -> envíos
-    private final Map<Long, Set<String>> byFlight = new ConcurrentHashMap<>();
+    //  índice: instancia de vuelo ("vueloId-departureEpoch") -> bagIds
+    private final Map<String, Set<String>> byFlightInstance = new ConcurrentHashMap<>();
 
     // índice: aeropuerto -> envíos
     private final Map<String, Set<String>> byAirport = new ConcurrentHashMap<>();
@@ -46,8 +46,8 @@ public class ShipmentTracker {
         return bags.values();
     }
 
-    public List<ShipmentState> getByFlight(Long flightId) {
-        return byFlight.getOrDefault(flightId, Set.of())
+    public List<ShipmentState> getByFlightInstance(String instanceKey) {
+        return byFlightInstance.getOrDefault(instanceKey, Set.of())
                 .stream().map(bags::get).filter(Objects::nonNull).toList();
     }
 
@@ -67,21 +67,41 @@ public class ShipmentTracker {
     }
 
     private void handleDeparture(Event event) {
-        Long flightId = event.getVuelo().getId();
+        String instanceKey = event.getFlightInstanceKey();
+        if (event.getVuelo().getId() == EventEngine.DEBUG_VUELO_ID) {
+            System.out.println(String.format(
+                    "[TRACKER-DEP] instanceKey=%s bagIdsRecibidos=%d", instanceKey, event.getBagIds().size()
+            ));
+        }
         for (String bagId : event.getBagIds()) {
             ShipmentState s = getOrCreate(bagId);
             removeFromAirportIndex(bagId, s.getAeropuertoActual());
 
             s.setEstado(ShipmentStatus.EN_VUELO);
-            s.setVueloActual(flightId);
+            s.setVueloActual(event.getVuelo().getId());
+            s.setVueloInstanceActual(instanceKey);
             s.setAeropuertoActual(null);
 
-            byFlight.computeIfAbsent(flightId, k -> ConcurrentHashMap.newKeySet()).add(bagId);
+            byFlightInstance.computeIfAbsent(instanceKey, k -> ConcurrentHashMap.newKeySet()).add(bagId);
+        }
+
+        if (event.getVuelo().getId() == EventEngine.DEBUG_VUELO_ID) {
+            System.out.println(String.format(
+                    "[TRACKER-DEP-AFTER] instanceKey=%s setSizeAhora=%d",
+                    instanceKey, byFlightInstance.getOrDefault(instanceKey, Set.of()).size()
+            ));
         }
     }
 
     private void handleArrival(Event event) {
-        Long flightId = event.getVuelo().getId();
+        String instanceKey = event.getFlightInstanceKey();
+        if (event.getVuelo().getId() == EventEngine.DEBUG_VUELO_ID) {
+            System.out.println(String.format(
+                    "[TRACKER-ARR] instanceKey=%s bagIdsRecibidos=%d setSizeAntes=%d",
+                    instanceKey, event.getBagIds().size(),
+                    byFlightInstance.getOrDefault(instanceKey, Set.of()).size()
+            ));
+        }
         String icao = event.getVuelo().getDestino().getIcaoCode();
 
         for (String bagId : event.getBagIds()) {
@@ -90,11 +110,12 @@ public class ShipmentTracker {
             s.setEstado(ShipmentStatus.EN_ALMACEN_DESTINO);
             s.setAeropuertoActual(icao);
             s.setVueloActual(null);
+            s.setVueloInstanceActual(null);
 
-            Set<String> set = byFlight.get(flightId);
+            Set<String> set = byFlightInstance.get(instanceKey);
             if (set != null) {
                 set.remove(bagId);
-                if (set.isEmpty()) byFlight.remove(flightId);
+                if (set.isEmpty()) byFlightInstance.remove(instanceKey);
             }
 
             byAirport.computeIfAbsent(icao, k -> ConcurrentHashMap.newKeySet()).add(bagId);
@@ -109,11 +130,12 @@ public class ShipmentTracker {
             s.setEstado(ShipmentStatus.ENTREGADO);
             s.setAeropuertoActual(null);
             s.setVueloActual(null);
+            s.setVueloInstanceActual(null);
         }
     }
 
     private void handleLotArrival(Event event) {
-        String icao = event.getVuelo().getOrigen().getIcaoCode();
+        String icao = event.getLot().getOrigenIcao();
 
         for (String bagId : event.getBagIds()) {
             ShipmentState s = getOrCreate(bagId);
@@ -121,12 +143,16 @@ public class ShipmentTracker {
             s.setEstado(ShipmentStatus.EN_ALMACEN_ORIGEN);
             s.setAeropuertoActual(icao);
 
-            Long oldFlight = s.getVueloActual();
-            if (oldFlight != null) {
-                Set<String> set = byFlight.get(oldFlight);
-                if (set != null) set.remove(bagId);
+            String oldInstanceKey = s.getVueloInstanceActual();
+            if (oldInstanceKey != null) {
+                Set<String> set = byFlightInstance.get(oldInstanceKey);
+                if (set != null) {
+                    set.remove(bagId);
+                    if (set.isEmpty()) byFlightInstance.remove(oldInstanceKey);
+                }
             }
             s.setVueloActual(null);
+            s.setVueloInstanceActual(null);
 
             byAirport.computeIfAbsent(icao, k -> ConcurrentHashMap.newKeySet()).add(bagId);
         }

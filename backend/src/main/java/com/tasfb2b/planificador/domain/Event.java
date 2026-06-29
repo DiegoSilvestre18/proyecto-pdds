@@ -22,4 +22,7 @@ public class Event {
 
     // Maletas específicas afectadas por este evento
     private List<String> bagIds;
+
+    //Para diferenciar vuelos: "{vueloId}-{departureEpochDeEsteTramo}".
+    private String flightInstanceKey;
 }

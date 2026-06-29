@@ -43,6 +43,9 @@ public interface EnvioRepository extends JpaRepository<Envio, Long> {
 
     @Query("""
     SELECT
+        e.id                    AS id,
+        e.codigoPedido          AS codigoPedido,
+        e.clienteId             AS clienteId,
         e.origen.icaoCode       AS origenIcao,
         e.destino.icaoCode      AS destinoIcao,
         e.cantidadMaletas       AS cantidadMaletas,
@@ -55,9 +58,11 @@ public interface EnvioRepository extends JpaRepository<Envio, Long> {
 """)
     Stream<EnvioResumen> streamResumenes();
 
-    /** Igual que streamResumenes pero filtrado por fecha — para el loop diario */
     @Query("""
     SELECT
+        e.id                    AS id,
+        e.codigoPedido          AS codigoPedido,
+        e.clienteId             AS clienteId,
         e.origen.icaoCode       AS origenIcao,
         e.destino.icaoCode      AS destinoIcao,
         e.cantidadMaletas       AS cantidadMaletas,
@@ -69,10 +74,13 @@ public interface EnvioRepository extends JpaRepository<Envio, Long> {
     FROM Envio e
     WHERE e.fecha = :fecha
 """)
-    Stream<EnvioResumen> streamResumenesPorFecha(@org.springframework.data.repository.query.Param("fecha") java.time.LocalDate fecha);
+    Stream<EnvioResumen> streamResumenesPorFecha(@Param("fecha") java.time.LocalDate fecha);
 
     @Query("""
     SELECT
+        e.id                    AS id,
+        e.codigoPedido          AS codigoPedido,
+        e.clienteId             AS clienteId,
         e.origen.icaoCode       AS origenIcao,
         e.destino.icaoCode      AS destinoIcao,
         e.cantidadMaletas       AS cantidadMaletas,
@@ -85,8 +93,8 @@ public interface EnvioRepository extends JpaRepository<Envio, Long> {
     WHERE e.fecha >= :inicio AND e.fecha <= :fin
 """)
     Stream<EnvioResumen> streamResumenesPorRangoFechas(
-        @org.springframework.data.repository.query.Param("inicio") java.time.LocalDate inicio,
-        @org.springframework.data.repository.query.Param("fin") java.time.LocalDate fin
+            @Param("inicio") java.time.LocalDate inicio,
+            @Param("fin") java.time.LocalDate fin
     );
 
     /** Total real de maletas por día dentro de un rango (para el reporte de demanda) */
