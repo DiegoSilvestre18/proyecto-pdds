@@ -32,6 +32,26 @@ public class VueloService {
     @org.springframework.context.annotation.Lazy
     private com.tasfb2b.planificador.service.SimulationService simulationService;
 
+    @org.springframework.beans.factory.annotation.Autowired
+    @org.springframework.context.annotation.Lazy
+    private com.tasfb2b.planificador.service.SimulationProgressHolder progressHolder;
+
+    private int getCurrentMinute() {
+        if (progressHolder != null) {
+            List<String> sessions = progressHolder.getAllSessionIds();
+            if (!sessions.isEmpty()) {
+                var state = progressHolder.get(sessions.get(0));
+                if (state != null && state.getCurrentEpochTime() != null) {
+                    java.time.ZonedDateTime simTime = java.time.Instant.ofEpochMilli(state.getCurrentEpochTime())
+                            .atZone(java.time.ZoneOffset.UTC);
+                    return simTime.getHour() * 60 + simTime.getMinute();
+                }
+            }
+        }
+        java.time.ZonedDateTime now = java.time.ZonedDateTime.now(java.time.ZoneOffset.UTC);
+        return now.getHour() * 60 + now.getMinute();
+    }
+
     public VueloResponse crear(VueloRequest request) {
         Map<String, Aeropuerto> aeropuertoCache = aeropuertoRepo.findAll()
                 .stream()
@@ -45,8 +65,7 @@ public class VueloService {
         int depUtc = (request.departureMinute() - (origen.getGmtOffset() * 60) + 1440) % 1440;
         int arrUtc = (request.arrivalMinute() - (destino.getGmtOffset() * 60) + 1440) % 1440;
 
-        java.time.ZonedDateTime now = java.time.ZonedDateTime.now(java.time.ZoneOffset.UTC);
-        int currentMin = now.getHour() * 60 + now.getMinute();
+        int currentMin = getCurrentMinute();
         int diff = depUtc - currentMin;
         if (diff < 0) diff += 1440;
         
@@ -186,8 +205,7 @@ public class VueloService {
                 int arrUtc = (parsed.arrivalMinute() - (destino.getGmtOffset() * 60) + 1440) % 1440;
                 boolean intercontinental = !origen.getContinent().equals(destino.getContinent());
 
-                java.time.ZonedDateTime now = java.time.ZonedDateTime.now(java.time.ZoneOffset.UTC);
-                int currentMin = now.getHour() * 60 + now.getMinute();
+                int currentMin = getCurrentMinute();
                 int diff = depUtc - currentMin;
                 if (diff < 0) diff += 1440;
                 
