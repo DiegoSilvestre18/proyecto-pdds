@@ -26,7 +26,7 @@ import java.util.*;
  */
 @Component
 public class EventEngine {
-
+    public static final long DEBUG_VUELO_ID = 178L;
     private final BloqueoService bloqueoService;
 
     public EventEngine(BloqueoService bloqueoService) {
@@ -187,37 +187,32 @@ public class EventEngine {
 
         List<Event> events = new ArrayList<>();
         List<Vuelo> flights = r.getFlights();
+        List<Long> legDeps = r.getLegDepartures();
+        List<Long> legArrs = r.getLegArrivals();
 
         if (flights == null || flights.isEmpty() || bagIdsSubset.isEmpty()) return events;
+        if (legDeps == null || legArrs == null || legDeps.size() != flights.size()) return events; // seguridad
 
         int load = bagIdsSubset.size();
-        long sequenceTime = r.getLot().getReadyTime();
 
-        for (Vuelo v : flights) {
-
-            long depTime = v.calcularSiguienteSalida(sequenceTime);
+        for (int i = 0; i < flights.size(); i++) {
+            Vuelo v = flights.get(i);
+            long depTime = legDeps.get(i);
+            long arrTime = legArrs.get(i);
             String instanceKey = v.getId() + "-" + depTime; //acá sacamos el nuevo id de vuelo
 
-            events.add(new Event(depTime, EventType.FLIGHT_DEPARTURE, r.getLot(), v, load, bagIdsSubset, instanceKey));
-
-            long duration = v.getDuracionMs();
-            if (bloqueoService != null && bloqueoService.tieneDemoraTransito(
-                    v.getOrigen().getIcaoCode(),
-                    v.getDestino().getIcaoCode(),
-                    Instant.ofEpochMilli(depTime))) {
-                duration *= 2;
+            if (v.getId() == DEBUG_VUELO_ID) {
+                System.out.println(String.format(
+                        "[EVENT-ENGINE] instanceKey=%s bagIdsSubset=%d arrTime=%d depTime=%d",
+                        instanceKey, bagIdsSubset.size(), arrTime, depTime
+                ));
             }
 
-            long arrTime = depTime + duration;
-            // misma instanceKey para la llegada de ESTE mismo tramo — clave para que handleArrival
-            // limpie exactamente lo que handleDeparture insertó
+            events.add(new Event(depTime, EventType.FLIGHT_DEPARTURE, r.getLot(), v, load, bagIdsSubset, instanceKey));
             events.add(new Event(arrTime, EventType.FLIGHT_ARRIVAL, r.getLot(), v, load, bagIdsSubset, instanceKey));
-
-            sequenceTime = arrTime;
         }
 
         if (r.getArrivalTime() > 0) {
-
             long arrivalTime = r.getArrivalTime();
             Vuelo lastFlight = flights.get(flights.size() - 1);
 

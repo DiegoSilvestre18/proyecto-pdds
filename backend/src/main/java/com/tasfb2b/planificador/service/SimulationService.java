@@ -28,6 +28,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
+import com.tasfb2b.planificador.simulation.EventEngine;
 
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -292,17 +293,37 @@ public class SimulationService {
                                 }
 
                                 List<SuperLot> nuevosEnHorizonte = superLotService.agruparEnviosPorVentana(currentSimTime, currentSimTime + ((long)planningHorizon * 60_000L));
+
+                                // Snapshot de TODOS los bagIds que el pool ya conoce, para no reinsertar duplicados
+                                // que la ventana deslizante de agruparEnviosPorVentana vuelve a traer cada ciclo.
+                                Set<String> bagIdsYaEnPool = planifiablePool.values().stream()
+                                        .flatMap(l -> l.getBagIds().stream())
+                                        .collect(Collectors.toSet());
+
                                 for (SuperLot lot : nuevosEnHorizonte) {
-                                    planifiablePool.put(lot.getId(), lot);
-                                    if (countedArrivalLotKeysToday.add(lot.getKey())) totalMaletasDia += lot.getTotalMaletas();
+                                        // se filtra SOLO nuevos se descartan los que ya están y comprometidos
+                                    List<String> bagIdsRealmenteNuevos = lot.getBagIds().stream()
+                                                .filter(b -> !bagIdsYaEnPool.contains(b))
+                                                .filter(b -> !bagIdsComprometidos.contains(b))
+                                                .toList();
+                                    if (bagIdsRealmenteNuevos.isEmpty()) continue; //NO hay nuevos SKIP
+
+                                    SuperLot lotFiltrado = (bagIdsRealmenteNuevos.size() == lot.getBagIds().size())
+                                                ? lot
+                                                : new SuperLot(lot.getId(), lot.getOrigenIcao(), lot.getDestinoIcao(),
+                                                bagIdsRealmenteNuevos.size(), lot.getReadyTime(), lot.getSla(),
+                                                lot.isIntercontinental(), lot.getPriority(), bagIdsRealmenteNuevos);
+
+                                    planifiablePool.put(lotFiltrado.getId(), lotFiltrado);
+                                    if (countedArrivalLotKeysToday.add(lot.getKey())) totalMaletasDia += lotFiltrado.getTotalMaletas();
 
                                     //Tracking la maleta ya esperá en almacén de origen, independiente de si ALNS asignó ruta
-                                    List<String> bagsNuevos = new ArrayList<>();
-                                    for (String bagId : lot.getBagIds()) {
-                                         if (bagIdsConLotArrivalEmitido.add(bagId)) bagsNuevos.add(bagId);
+                                    List<String> bagsNuevosParaTracking = new ArrayList<>();
+                                    for (String bagId : lotFiltrado.getBagIds()) {
+                                         if (bagIdsConLotArrivalEmitido.add(bagId)) bagsNuevosParaTracking.add(bagId);
                                     }
-                                    if (!bagsNuevos.isEmpty()) {
-                                        globalEventQueue.addAll(eventEngine.buildLotArrivalEvents(lot, bagsNuevos));
+                                    if (!bagsNuevosParaTracking.isEmpty()) {
+                                        globalEventQueue.addAll(eventEngine.buildLotArrivalEvents(lotFiltrado, bagsNuevosParaTracking));
                                     }
                                 }
 
@@ -315,44 +336,12 @@ public class SimulationService {
 
                                 // solo se comprometen maletas cuyo vuelo YA despegó en este instante simulado
                                 for (Route r : sol.getRoutes()) {
-
                                         if (r.isAtendido() && countedAssignedLotKeysToday.add(r.getLot().getKey())) {
                                                 malatetasAtendidasDia += r.getCapacidadAsignada();
                                         }
-
-                                        if (!r.isAtendido() || r.getFlights() == null || r.getFlights().isEmpty()) continue;
-                                        if (r.getDepartureTime() < 0 || r.getDepartureTime() > currentSimTime) continue;
-
-                                        List<String> bagIds = r.getBagIds();
-                                        if (bagIds == null || bagIds.isEmpty()) continue;
-
-                                        // Reclamar solo las que no estaban ya comprometidas (idempotente entre ciclos)
-                                        List<String> nuevasComprometidas = new ArrayList<>();
-                                        for (String bagId : bagIds) {
-                                                if (bagIdsComprometidos.add(bagId)) nuevasComprometidas.add(bagId);
-                                        }
-                                        if (!nuevasComprometidas.isEmpty()) {
-                                                globalEventQueue.addAll(eventEngine.buildEventsForRoute(r, nuevasComprometidas, dayStartEpochMs));
-                                        }
-
-                                        // Gestión del pool: solo retirar el lote si TODAS sus maletas ya despegaron.
-                                        // Si quedó un remanente (capacidad insuficiente para todo el lote en este vuelo),
-                                        // ese remanente vuelve al pool para que ALNS siga intentando ubicarlo.
-                                        SuperLot lot = r.getLot();
-                                        List<String> pendientes = lot.getBagIds().stream()
-                                                .filter(b -> !bagIdsComprometidos.contains(b))
-                                                .toList();
-
-                                        if (pendientes.isEmpty()) {
-                                                planifiablePool.remove(lot.getId());
-                                        } else {
-                                                SuperLot remanente = new SuperLot(lot.getId(), lot.getOrigenIcao(), lot.getDestinoIcao(),
-                                                        pendientes.size(), lot.getReadyTime(), lot.getSla(),
-                                                        lot.isIntercontinental(), lot.getPriority(), pendientes);
-                                                planifiablePool.put(remanente.getId(), remanente);
-                                        }
-                                        log.info("globalEventQueue size tras ciclo: {}", globalEventQueue.size());
                                 }
+
+
                                 inTransitRoutes.addAll(sol.getRoutes().stream().filter(r -> r.getCapacidadAsignada() > 0).collect(Collectors.toList()));
                                 inTransitRoutes = inTransitRoutes.stream().collect(Collectors.toMap(r -> r.getLot().getId(), r -> r, (a, b) -> b)).values()
                                                 .stream().filter(r -> r.getArrivalTime() > currentSimTime).collect(Collectors.toList());
@@ -367,6 +356,52 @@ public class SimulationService {
                                 for (int step = 0; step < microSteps; step++) {
                                         long tMicroStart = System.nanoTime();
                                         long microEnd = currentSimTime + ((step + 1) * stepDurationMs);
+
+                                        for (Route r : sol.getRoutes()) {
+
+                                                if (!r.isAtendido() || r.getFlights() == null || r.getFlights().isEmpty()) continue;
+                                                if (r.getDepartureTime() < 0 || r.getDepartureTime() > microEnd) continue; // todavía no despega
+
+                                                List<String> bagIds = r.getBagIds();
+                                                if (bagIds == null || bagIds.isEmpty()) continue;
+
+                                                List<String> nuevasComprometidas = new ArrayList<>();
+                                                for (String bagId : bagIds) {
+                                                        if (bagIdsComprometidos.add(bagId)) nuevasComprometidas.add(bagId);
+                                                }
+                                                if (!nuevasComprometidas.isEmpty()) {
+                                                        if (r.getFlights().stream().anyMatch(v -> v.getId() == EventEngine.DEBUG_VUELO_ID)) {
+                                                                System.out.println(String.format(
+                                                                        "[COMMIT] microEnd=%d lotId=%d depTime=%d nuevasComprometidas=%d totalBagsRuta=%d",
+                                                                        microEnd, r.getLot().getId(), r.getDepartureTime(),
+                                                                        nuevasComprometidas.size(), bagIds.size()
+                                                                ));
+                                                        }
+                                                        globalEventQueue.addAll(eventEngine.buildEventsForRoute(r, nuevasComprometidas, dayStartEpochMs));
+                                                }
+                                        }
+
+                                        //Gestión de pool: Ahora vamos a iterar sobre las keys del pool
+                                        List<Integer> keysSnapshot = new ArrayList<>(planifiablePool.keySet());
+                                        for (Integer key : keysSnapshot){
+                                                SuperLot original = planifiablePool.get(key);
+                                                if (original == null) continue; //en caso de ser removida por otro hilo
+
+                                                List<String> pendientes = original.getBagIds().stream()
+                                                        .filter(b -> !bagIdsComprometidos.contains(b))
+                                                        .toList();
+                                                if (pendientes.isEmpty()) {
+                                                        planifiablePool.remove(key);
+                                                }else if (pendientes.size() != original.getBagIds().size()){
+                                                        SuperLot actualizado = new SuperLot(
+                                                                original.getId(), original.getOrigenIcao(), original.getDestinoIcao(),
+                                                                pendientes.size(), original.getReadyTime(), original.getSla(),
+                                                                original.isIntercontinental(), original.getPriority(), pendientes
+                                                        );
+                                                        planifiablePool.put(key, actualizado);
+                                                }
+                                        }
+
                                         while (!globalEventQueue.isEmpty() && globalEventQueue.peek().getTime() <= microEnd) {
                                                 Event event = globalEventQueue.poll();
                                                 globalState.apply(event, airportMap);
@@ -447,20 +482,25 @@ public class SimulationService {
                         long dep = v.getDepartureEpoch(currentDayStartEpoch);
                         long arr = v.getArrivalEpoch(currentDayStartEpoch);
                         if (currentSimTime >= dep && currentSimTime < arr) {
+                                /*
                                 System.out.println(String.format(
                                         "[FISICO-HOY] vueloId=%d dep=%d key=%s currentDayStartEpoch=%d",
                                         v.getId(), dep, v.getId() + "-" + dep, currentDayStartEpoch
                                 ));
+                                */
                                 vuelosFisicos.put(v.getId() + "-" + dep, createAvionMap(v, dep, arr, currentSimTime, "normal"));
                         }
                         // Cruce de medianoche (Vuelo que despegó ayer pero aterriza hoy)
                         long prevDep = v.getDepartureEpoch(currentDayStartEpoch - 86400000L);
                         long prevArr = v.getArrivalEpoch(currentDayStartEpoch - 86400000L);
                         if (currentSimTime >= prevDep && currentSimTime < prevArr) {
+                                /*
                                 System.out.println(String.format(
                                         "[FISICO-AYER] vueloId=%d dep=%d key=%s",
                                         v.getId(), prevDep, v.getId() + "-" + prevDep
                                 ));
+                                */
+
                                 vuelosFisicos.put(v.getId() + "-" + prevDep, createAvionMap(v, prevDep, prevArr, currentSimTime, "normal"));
                         }
                 }
@@ -468,30 +508,28 @@ public class SimulationService {
                 // 2. Capa de Carga: Superponer ocupación real sobre los vuelos base (Deduplicación Estricta)
                 for (Route r : activeRoutesList) {
                         if (r.getFlights() == null) continue;
-                        for (Vuelo v : r.getFlights()) {
-                                // Buscamos en las dos ventanas posibles (Hoy o Ayer) para encontrar el avión físico
-                                long d = v.getDepartureEpoch(currentDayStartEpoch);
-                                long a = v.getArrivalEpoch(currentDayStartEpoch);
-                                String key = v.getId() + "-" + d;
-                                
-                                if (!(currentSimTime >= d && currentSimTime < a)) {
-                                    // Probamos ventana de ayer
-                                    d = v.getDepartureEpoch(currentDayStartEpoch - 86400000L);
-                                    a = v.getArrivalEpoch(currentDayStartEpoch - 86400000L);
-                                    key = v.getId() + "-" + d;
-                                }
 
-                                if (currentSimTime >= d && currentSimTime < a) {
-                                        Map<String, Object> existing = vuelosFisicos.get(key);
-                                        if (existing == null) {
-                                            // Caso borde: El vuelo no estaba en el catálogo, lo inyectamos
-                                            existing = createAvionMap(v, d, a, currentSimTime, r.getStatus());
-                                            vuelosFisicos.put(key, existing);
-                                        }
-                                        existing.put("ocupacionReal", (int)existing.get("ocupacionReal") + r.getCapacidadAsignada());
-                                        if (isHigherPriority(r.getStatus(), (String)existing.get("status"))) {
-                                            existing.put("status", r.getStatus());
-                                        }
+                        List<Long> legDeps = r.getLegDepartures();
+                        List<Long> legArrs = r.getLegArrivals();
+                        if (legDeps == null || legArrs == null || legDeps.size() != r.getFlights().size()) continue;
+
+                        for (int i = 0; i < r.getFlights().size(); i++) {
+                                Vuelo v = r.getFlights().get(i);
+                                long d = legDeps.get(i);
+                                long a = legArrs.get(i);
+
+                                if (currentSimTime < d || currentSimTime >= a) continue; // este tramo no está activo ahora
+
+                                String key = v.getId() + "-" + d;   // ← MISMA key que usa EventEngine/ShipmentTracker, siempre
+
+                                Map<String, Object> existing = vuelosFisicos.get(key);
+                                if (existing == null) {
+                                        existing = createAvionMap(v, d, a, currentSimTime, r.getStatus());
+                                        vuelosFisicos.put(key, existing);
+                                }
+                                existing.put("ocupacionReal", (int) existing.get("ocupacionReal") + r.getCapacidadAsignada());
+                                if (isHigherPriority(r.getStatus(), (String) existing.get("status"))) {
+                                        existing.put("status", r.getStatus());
                                 }
                         }
                 }

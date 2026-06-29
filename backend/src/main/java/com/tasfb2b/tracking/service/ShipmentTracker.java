@@ -3,7 +3,7 @@ package com.tasfb2b.tracking.service;
 import com.tasfb2b.tracking.domain.ShipmentState;
 import com.tasfb2b.tracking.domain.ShipmentStatus;
 import com.tasfb2b.planificador.domain.Event;
-
+import com.tasfb2b.planificador.simulation.EventEngine;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -68,6 +68,11 @@ public class ShipmentTracker {
 
     private void handleDeparture(Event event) {
         String instanceKey = event.getFlightInstanceKey();
+        if (event.getVuelo().getId() == EventEngine.DEBUG_VUELO_ID) {
+            System.out.println(String.format(
+                    "[TRACKER-DEP] instanceKey=%s bagIdsRecibidos=%d", instanceKey, event.getBagIds().size()
+            ));
+        }
         for (String bagId : event.getBagIds()) {
             ShipmentState s = getOrCreate(bagId);
             removeFromAirportIndex(bagId, s.getAeropuertoActual());
@@ -79,10 +84,24 @@ public class ShipmentTracker {
 
             byFlightInstance.computeIfAbsent(instanceKey, k -> ConcurrentHashMap.newKeySet()).add(bagId);
         }
+
+        if (event.getVuelo().getId() == EventEngine.DEBUG_VUELO_ID) {
+            System.out.println(String.format(
+                    "[TRACKER-DEP-AFTER] instanceKey=%s setSizeAhora=%d",
+                    instanceKey, byFlightInstance.getOrDefault(instanceKey, Set.of()).size()
+            ));
+        }
     }
 
     private void handleArrival(Event event) {
         String instanceKey = event.getFlightInstanceKey();
+        if (event.getVuelo().getId() == EventEngine.DEBUG_VUELO_ID) {
+            System.out.println(String.format(
+                    "[TRACKER-ARR] instanceKey=%s bagIdsRecibidos=%d setSizeAntes=%d",
+                    instanceKey, event.getBagIds().size(),
+                    byFlightInstance.getOrDefault(instanceKey, Set.of()).size()
+            ));
+        }
         String icao = event.getVuelo().getDestino().getIcaoCode();
 
         for (String bagId : event.getBagIds()) {
