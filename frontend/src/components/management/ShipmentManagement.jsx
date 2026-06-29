@@ -1,16 +1,28 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { AIRPORTS } from '../../data/airportsData';
+import { useAirports } from '../../hooks/useAirports';
 import { apiFetch } from '../../hooks/api';
 
 const ShipmentManagement = () => {
     const [globalOrigenIcao, setGlobalOrigenIcao] = useState('');
-    const [trayShipments, setTrayShipments] = useState([]);
+    const [trayShipments, setTrayShipments] = useState(() => {
+        try {
+            const saved = localStorage.getItem('shipmentTray');
+            return saved ? JSON.parse(saved) : [];
+        } catch (e) {
+            return [];
+        }
+    });
+
+    useEffect(() => {
+        localStorage.setItem('shipmentTray', JSON.stringify(trayShipments));
+    }, [trayShipments]);
     const [selectedFile, setSelectedFile] = useState(null);
     const [entryMode, setEntryMode] = useState('manual');
     const [shipmentsList, setShipmentsList] = useState([]);
     const [currentPage, setCurrentPage] = useState(0);
     const [totalPages, setTotalPages] = useState(0);
     const [loading, setLoading] = useState(false);
+    const { refreshAirports, airports } = useAirports();
     const [status, setStatus] = useState({ type: '', message: '' });
 
     const fetchShipments = async (page = 0) => {
@@ -188,7 +200,7 @@ const ShipmentManagement = () => {
                         <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '11px', color: '#94a3b8', fontWeight: 'bold' }}>AEROPUERTO DE ORIGEN (OBLIGATORIO PARA CUALQUIER CARGA)</label>
                         <select value={globalOrigenIcao} onChange={(e) => setGlobalOrigenIcao(e.target.value)} style={inputStyle}>
                             <option value="">-- Seleccione un aeropuerto de origen --</option>
-                            {[...AIRPORTS].sort((a, b) => a.city.localeCompare(b.city)).map(a => (
+                            {[...airports].sort((a, b) => a.city.localeCompare(b.city)).map(a => (
                                 <option key={`orig-global-${a.icao}`} value={a.icao}>{a.city} ({a.icao})</option>
                             ))}
                         </select>
@@ -224,7 +236,7 @@ const ShipmentManagement = () => {
                                     <label style={labelStyle}>DESTINO (dest)</label>
                                     <select name="destinoIcao" value={formData.destinoIcao} onChange={handleInputChange} required style={inputStyle}>
                                         <option value="">Seleccione destino...</option>
-                                        {[...AIRPORTS].sort((a, b) => a.city.localeCompare(b.city)).map(a => (
+                                        {[...airports].sort((a, b) => a.city.localeCompare(b.city)).map(a => (
                                             <option key={`dest-${a.icao}`} value={a.icao}>{a.city} ({a.icao})</option>
                                         ))}
                                     </select>
@@ -272,7 +284,7 @@ const ShipmentManagement = () => {
                             
                             <div style={{ padding: '1rem', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                                 <div>
-                                    <h4 style={{ margin: 0, color: '#f8fafc' }}>Bandeja Temporal</h4>
+                                    <h4 style={{ margin: 0, color: '#f8fafc' }}>Envíos recién agregados</h4>
                                     <span style={{ fontSize: '11px', color: '#64748b' }}>{trayShipments.length} envíos preparados</span>
                                 </div>
                                 {trayShipments.length > 0 && (

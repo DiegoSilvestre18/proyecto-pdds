@@ -1,12 +1,14 @@
 import React, { useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AIRPORTS } from '../data/airportsData';
+import { useAirports } from '../hooks/useAirports';
 import { apiFetch } from '../hooks/api';
 
 const ShipmentRegistrationPage = ({ hideBackButton = false }) => {
     const navigate = useNavigate();
     const [globalOrigenIcao, setGlobalOrigenIcao] = useState('');
     const [trayShipments, setTrayShipments] = useState([]);
+    const [uploadProgress, setUploadProgress] = useState(0);
+    const { airports } = useAirports();
     const [selectedFile, setSelectedFile] = useState(null);
 
     // Manual form state
@@ -199,7 +201,7 @@ const ShipmentRegistrationPage = ({ hideBackButton = false }) => {
                     <p style={{ margin: '0 0 1rem 0', color: '#94a3b8', fontSize: '13px' }}>Todos los envíos manuales y archivos TXT cargados a continuación se asignarán a este aeropuerto.</p>
                     <select value={globalOrigenIcao} onChange={(e) => setGlobalOrigenIcao(e.target.value)} style={{ width: '100%', padding: '1rem', borderRadius: '6px', background: 'rgba(15, 23, 42, 0.9)', border: '1px solid #38bdf8', color: 'white', fontSize: '16px', outline: 'none' }}>
                         <option value="">-- Seleccione un aeropuerto --</option>
-                        {[...AIRPORTS].sort((a, b) => a.city.localeCompare(b.city)).map(a => (
+                        {[...airports].sort((a, b) => a.city.localeCompare(b.city)).map(a => (
                             <option key={`orig-global-${a.icao}`} value={a.icao}>{a.city} ({a.icao})</option>
                         ))}
                     </select>
@@ -235,7 +237,7 @@ const ShipmentRegistrationPage = ({ hideBackButton = false }) => {
                                         <span style={{ color: '#38bdf8' }} title="Hora equivalente en el reloj del mapa de la matriz">
                                             Mapa: {
                                             (() => {
-                                                const airport = AIRPORTS.find(a => a.icao === globalOrigenIcao);
+                                                const airport = airports.find(a => a.icao === globalOrigenIcao);
                                                 if (!airport) return '--:--';
                                                 const [h, m] = formData.hora.split(':').map(Number);
 
@@ -258,7 +260,7 @@ const ShipmentRegistrationPage = ({ hideBackButton = false }) => {
                                 <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '11px', color: '#94a3b8' }}>AEROPUERTO DESTINO</label>
                                 <select name="destinoIcao" value={formData.destinoIcao} onChange={handleInputChange} required style={{ width: '100%', padding: '0.6rem 0.8rem', borderRadius: '6px', background: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', boxSizing: 'border-box', fontSize: '13px', outline: 'none' }}>
                                     <option value="">Seleccione destino...</option>
-                                    {[...AIRPORTS].sort((a, b) => a.city.localeCompare(b.city)).map(a => (
+                                    {[...airports].sort((a, b) => a.city.localeCompare(b.city)).map(a => (
                                         <option key={`dest-${a.icao}`} value={a.icao}>{a.city} ({a.icao})</option>
                                     ))}
                                 </select>

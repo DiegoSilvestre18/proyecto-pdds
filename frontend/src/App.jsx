@@ -23,7 +23,7 @@ import CollapseSimConfig from "./components/scenarios/CollapseSimConfig";
 import DraggableWindow from "./components/common/DraggableWindow";
 import AirportConfigPanel from "./components/floating/AirportConfigPanel";
 import PendingShipmentsPanel from "./components/scenarios/PendingShipmentsPanel";
-import { AIRPORTS } from "./data/airportsData";
+import { useAirports } from "./hooks/useAirports";
 import { useControlTowerController } from "./hooks/useControlTowerController";
 import "./App.css";
 
@@ -94,6 +94,8 @@ const App = () => {
     trackedRouteData,
     masterPlan,
   } = useControlTowerController();
+  
+  const { airports: globalAirports } = useAirports();
 
   // ── Paso 4: Sincronizar Track & Trace con el SelectionBridge ──
   const { setTrackedRoute, clearFocusedEntity } = useSelectionBridge();
@@ -336,7 +338,7 @@ const App = () => {
           >
           <EntitiesListPanel 
             activeAircraft={activeAircraft} 
-            airports={AIRPORTS} 
+            airports={globalAirports} 
             airportMetrics={activeMetrics} 
             onSelectFlight={setSelectedAircraftId}
             onAirportSelect={(code) => {

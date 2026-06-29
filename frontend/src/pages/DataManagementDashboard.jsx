@@ -16,12 +16,6 @@ const DataManagementDashboard = () => {
         navigate('/');
     };
 
-    const handleIntegration = () => {
-        // Aquí se dispara la petición al Backend H2 para consolidar las adiciones
-        console.log("Iniciando integración de datos extra (sin navegar al mapa)...");
-        toast.success("Datos integrados exitosamente.");
-    };
-
     return (
         <div className="control-tower" style={{ height: '100vh', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
             
@@ -52,23 +46,6 @@ const DataManagementDashboard = () => {
                         Salir / Volver al Inicio
                     </button>
                     
-                    <button 
-                        onClick={handleIntegration}
-                        style={{
-                            padding: '8px 16px',
-                            background: '#38bdf8',
-                            color: '#0f172a',
-                            border: 'none',
-                            borderRadius: '6px',
-                            cursor: 'pointer',
-                            fontWeight: 'bold',
-                            fontSize: '14px',
-                            boxShadow: '0 2px 10px rgba(56, 189, 248, 0.3)',
-                            transition: 'all 0.2s'
-                        }}
-                    >
-                        + Integrar Datos Extra
-                    </button>
                 </div>
             </header>
 

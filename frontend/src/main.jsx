@@ -10,6 +10,7 @@ import RoleSelection from './pages/RoleSelection.jsx'
 import ProtectedRoute from './components/common/ProtectedRoute.jsx'
 import { SelectionBridgeProvider } from './hooks/useSelectionBridge.jsx'
 import { ToastProvider } from './hooks/useToast.jsx'
+import { AirportProvider } from './hooks/useAirports.jsx'
 import ErrorBoundary from './components/common/ErrorBoundary.jsx'
 
 createRoot(document.getElementById('root')).render(
@@ -18,6 +19,7 @@ createRoot(document.getElementById('root')).render(
       <BrowserRouter>
         <ToastProvider>
           <SelectionBridgeProvider>
+            <AirportProvider>
             <Routes>
           <Route path="/" element={<RoleSelection />} />
           
@@ -60,6 +62,7 @@ createRoot(document.getElementById('root')).render(
           {/* Fallback genérico */}
           <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
+            </AirportProvider>
           </SelectionBridgeProvider>
         </ToastProvider>
       </BrowserRouter>
