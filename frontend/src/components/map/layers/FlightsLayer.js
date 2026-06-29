@@ -46,12 +46,14 @@ export const createFlightsLayer = ({
     const bearing = getVisualBearing(position, nextPosition);
 
     const isAircraftSelected = selectedAircraftId != null;
-    const baseOpacity = passesFilter ? (isAircraftSelected ? (isSelected ? 255 : 50) : 255) : 20;
-    const color = isCancelled 
-      ? [239, 68, 68, baseOpacity] 
-      : isRescued 
-        ? [59, 130, 246, baseOpacity] 
-        : getStrokeColorRgb(plane.status, plane.ocupacionReal, plane.capacidadMax, baseOpacity);
+    const baseOpacity = passesFilter ? (isAircraftSelected ? (isSelected ? 255 : 80) : 255) : 20;
+    const color = isSelected && isAircraftSelected
+      ? [129, 140, 248, baseOpacity]
+      : isCancelled 
+        ? [239, 68, 68, baseOpacity] 
+        : isRescued 
+          ? [59, 130, 246, baseOpacity] 
+          : getStrokeColorRgb(plane.status, plane.ocupacionReal, plane.capacidadMax, baseOpacity);
 
     const baseProps = { ...plane, position, color, isSelected, isHighlighted };
 
