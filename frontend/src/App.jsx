@@ -288,8 +288,8 @@ const App = () => {
                     y: 120
                 }}
                 defaultSize={{
-                    width: 700,
-                    height: 400
+                    width: 400,
+                    height: 280
                 }}
                 isActive={
                     openWindowsQueue[
@@ -363,8 +363,8 @@ const App = () => {
               <button onClick={() => setDismissedInitOverlay(true)} aria-label="Cerrar mensaje de inicialización" style={{ position: 'absolute', top: 8, right: 12, background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '16px' }}>✕</button>
               <div style={{ width: '40px', height: '40px', border: '4px solid rgba(56, 189, 248, 0.2)', borderTop: '4px solid #38bdf8', borderRadius: '50%', animation: 'ct-spin 1s linear infinite' }}></div>
               <div>
-                <div style={{ fontWeight: 'bold', fontSize: '16px', color: '#38bdf8', letterSpacing: '1px', marginBottom: '6px' }}>INICIALIZANDO SIMULACIÓN</div>
-                <div style={{ fontSize: '13px', color: '#94a3b8', maxWidth: '280px', lineHeight: '1.4' }}>Cargando datos de archivos y ejecutando primera planificación...</div>
+                <div style={{ fontWeight: 'bold', fontSize: '16px', color: activeTab === 'vivo' ? '#10b981' : '#38bdf8', letterSpacing: '1px', marginBottom: '6px' }}>{activeTab === 'vivo' ? 'INICIANDO OPERACIÓN' : 'INICIALIZANDO SIMULACIÓN'}</div>
+                <div style={{ fontSize: '13px', color: '#94a3b8', maxWidth: '280px', lineHeight: '1.4' }}>{activeTab === 'vivo' ? 'Estableciendo conexión con el servidor y preparando datos de operación...' : 'Cargando datos de archivos y ejecutando primera planificación...'}</div>
               </div>
             </div>
           )}

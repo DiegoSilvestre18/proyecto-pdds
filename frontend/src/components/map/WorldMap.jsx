@@ -3,8 +3,28 @@ import DeckGL from "@deck.gl/react";
 import Map from "react-map-gl/maplibre";
 import 'maplibre-gl/dist/maplibre-gl.css';
 
+import { WebMercatorViewport } from "@deck.gl/core";
 import { useSelectionBridge } from "../../hooks/useSelectionBridge";
-import { AIRPORT_BY_ICAO, interpolateCoordinates } from "../../data/airportsData";
+import { AIRPORTS, AIRPORT_BY_ICAO, interpolateCoordinates } from "../../data/airportsData";
+
+function getFitViewState(width = 1200, height = 800) {
+  const bounds = AIRPORTS.reduce((acc, ap) => {
+    const [lng, lat] = ap.coordinates
+    return {
+      minLng: Math.min(acc.minLng, lng),
+      maxLng: Math.max(acc.maxLng, lng),
+      minLat: Math.min(acc.minLat, lat),
+      maxLat: Math.max(acc.maxLat, lat),
+    }
+  }, { minLng: Infinity, maxLng: -Infinity, minLat: Infinity, maxLat: -Infinity })
+  const padding = Math.min(width, height) * 0.12
+  const viewport = new WebMercatorViewport({ width, height })
+  const { longitude, latitude, zoom } = viewport.fitBounds(
+    [[bounds.minLng, bounds.minLat], [bounds.maxLng, bounds.maxLat]],
+    { padding }
+  )
+  return { longitude, latitude, zoom }
+}
 
 import { createAirportsLayers } from "./layers/AirportsLayer";
 import { createFlightsLayer } from "./layers/FlightsLayer";
@@ -56,7 +76,7 @@ const LegendButton = () => {
   );
 };
 
-const MapZoomControls = ({ zoom, center, onMoveEnd, onBackgroundClick }) => (
+const MapZoomControls = ({ zoom, center, onMoveEnd, onBackgroundClick, onResetView }) => (
     <div className="map-zoom-controls" style={{ zIndex: 200, position: 'absolute' }}>
       <input
           type="range"
@@ -75,10 +95,7 @@ const MapZoomControls = ({ zoom, center, onMoveEnd, onBackgroundClick }) => (
           title="Centrar vista"
           onClick={() => {
               onBackgroundClick?.()
-              onMoveEnd({
-                zoom: 2,
-                coordinates: [15, 22] // Europe/Africa center
-              })
+              onResetView?.()
           }}
       >
         ◎
@@ -101,8 +118,6 @@ const WorldMap = ({
   selectedAircraftId = null,
   onAircraftSelect = () => {},
   showCityLabels = true,
-  zoom = 2,
-  center = [15, 22],
   onMoveEnd = () => {},
   currentEpochTime = 0,
   systemClock = "--:--:--",
@@ -129,20 +144,21 @@ const WorldMap = ({
 
   const [highlightedId, setHighlightedId] = useState(null);
   const highlightTimerRef = useRef(null);
+  const containerRef = useRef(null);
 
-  // Translate react-simple-maps props to deck.gl viewState
-  const [viewState, setViewState] = useState({
-    longitude: center[0],
-    latitude: center[1],
-    zoom: zoom,
+  const [viewState, setViewState] = useState(() => ({
+    ...getFitViewState(),
     pitch: 0,
     bearing: 0
-  });
+  }));
 
-  // Sync incoming props to internal view state
-  // REMOVED: this was overwriting transitions and causing glitches.
-  // We only rely on initial viewState and internal updates now,
-  // except if we want to handle external viewport commands (like mapCommand).
+  useEffect(() => {
+    if (!containerRef.current) return
+    const { clientWidth, clientHeight } = containerRef.current
+    if (clientWidth > 0 && clientHeight > 0) {
+      setViewState(prev => ({ ...prev, ...getFitViewState(clientWidth, clientHeight) }))
+    }
+  }, [])
 
   const handleViewStateChange = useCallback(({ viewState }) => {
     setViewState(viewState);
@@ -366,6 +382,7 @@ const WorldMap = ({
 
   return (
     <div 
+      ref={containerRef}
       className="ct-world-map" 
       aria-label="Mapa de operaciones global" 
       style={{ position: "relative", width: "100%", height: "100%", background: "#e5e3df" }}
@@ -408,6 +425,13 @@ const WorldMap = ({
           onMoveEnd(pos);
         }}
         onBackgroundClick={onBackgroundClick}
+        onResetView={() => {
+          const w = containerRef.current?.clientWidth || 1200
+          const h = containerRef.current?.clientHeight || 800
+          const fitted = getFitViewState(w, h)
+          setViewState(prev => ({ ...prev, ...fitted, transitionDuration: 800 }))
+          onMoveEnd({ zoom: fitted.zoom, coordinates: [fitted.longitude, fitted.latitude] })
+        }}
       />
 
 

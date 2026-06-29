@@ -68,7 +68,7 @@ export const createAirportsLayers = ({
       id: 'airports-layer',
       data: visibleData,
       pickable: true,
-      billboard: false,
+      billboard: true,
       getPosition: d => d.coordinates,
       getIcon: d => ({
         url: '/tower-icon.svg',
