@@ -12,5 +12,7 @@ public record EnvioResponse(
         String destinoIcao,
         Integer cantidadMaletas,
         LocalDate fecha,
-        LocalTime hora
+        LocalTime hora,
+        String estado,
+        Long vueloAsignado
 ) {}

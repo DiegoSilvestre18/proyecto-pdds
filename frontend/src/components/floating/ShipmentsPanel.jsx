@@ -142,6 +142,22 @@ const ShipmentsPanel = () => {
                             <span style={{ fontSize: '10px', color: '#64748b', marginLeft: 'auto', whiteSpace: 'nowrap' }}>
                                 {shipment.cantidadMaletas} maletas
                             </span>
+                            
+                            <span style={{ 
+                                fontSize: '10px', 
+                                padding: '2px 6px', 
+                                borderRadius: '4px',
+                                background: shipment.estado === 'EN_VUELO' ? 'rgba(52,211,153,0.1)' : 'rgba(245,158,11,0.1)',
+                                color: shipment.estado === 'EN_VUELO' ? '#34d399' : '#f59e0b',
+                                whiteSpace: 'nowrap',
+                                minWidth: '110px',
+                                textAlign: 'center'
+                            }}>
+                                {shipment.estado === 'EN_VUELO' ? `✈️ En Vuelo (#${shipment.vueloAsignado})` : 
+                                 shipment.estado === 'EN_ALMACEN_ORIGEN' ? '🏢 En Origen' :
+                                 shipment.estado === 'EN_ALMACEN_DESTINO' ? '🏢 En Destino' :
+                                 shipment.estado === 'ENTREGADO' ? '✅ Entregado' : '⏳ Pendiente'}
+                            </span>
                         </div>
                     );
                 })}

@@ -37,6 +37,14 @@ public class EnvioService {
     private final EnvioRepository envioRepo;
     private final AeropuertoRepository aeropuertoRepo;
 
+    @org.springframework.beans.factory.annotation.Autowired
+    @org.springframework.context.annotation.Lazy
+    private com.tasfb2b.planificador.service.SimulationProgressHolder progressHolder;
+
+    @org.springframework.beans.factory.annotation.Autowired
+    @org.springframework.context.annotation.Lazy
+    private com.tasfb2b.tracking.service.ShipmentTrackerRegistry trackerRegistry;
+
     private static final int BATCH_SIZE = 500;
 
     @Transactional(readOnly = true)
@@ -63,6 +71,28 @@ public class EnvioService {
     }
 
     private EnvioResponse toResponse(Envio e) {
+        String estado = "PENDIENTE";
+        Long vueloAsignado = null;
+
+        if (progressHolder != null && trackerRegistry != null) {
+            List<String> sessions = progressHolder.getAllSessionIds();
+            if (!sessions.isEmpty()) {
+                var tracker = trackerRegistry.get(sessions.get(0));
+                if (tracker != null) {
+                    List<com.tasfb2b.tracking.domain.ShipmentState> bags = tracker.getByShipment(e.getCodigoPedido());
+                    if (bags != null && !bags.isEmpty()) {
+                        com.tasfb2b.tracking.domain.ShipmentState firstBag = bags.get(0);
+                        if (firstBag != null) {
+                            if (firstBag.getEstado() != null) {
+                                estado = firstBag.getEstado().name();
+                            }
+                            vueloAsignado = firstBag.getVueloActual();
+                        }
+                    }
+                }
+            }
+        }
+
         return new EnvioResponse(
                 e.getId(),
                 e.getCodigoPedido(),
@@ -70,7 +100,9 @@ public class EnvioService {
                 e.getDestino().getIcaoCode(),
                 e.getCantidadMaletas(),
                 e.getFecha(),
-                e.getHora()
+                e.getHora(),
+                estado,
+                vueloAsignado
         );
     }
 
