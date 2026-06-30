@@ -25,4 +25,6 @@ public class Event {
 
     //Para diferenciar vuelos: "{vueloId}-{departureEpochDeEsteTramo}".
     private String flightInstanceKey;
+
+    private boolean isFinalLeg; //Es true si es el destino final, para otro eventos o caso false
 }

@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.Set;
 
 /**
  * Almacena el progreso en tiempo real de las simulaciones asíncronas.
@@ -155,6 +156,12 @@ public class SimulationProgressHolder {
         
         /** Futuro para el ALNS de la siguiente ventana concurrente */
         private java.util.concurrent.CompletableFuture<?> nextPlanFuture;
+
+        /** Plan maestro de la última planificación realizada (se sobreescribe cada día). */
+        private List<Map<String, Object>> finalMasterPlan = new ArrayList<>();
+
+        /** Vuelos cuya cancelación se difirió al día siguiente por la regla de 1h. */
+        private final Set<Long> pendingNextDayCancellations = ConcurrentHashMap.newKeySet();
     }
 
     private final ConcurrentHashMap<String, SimulationSessionState> sessions =

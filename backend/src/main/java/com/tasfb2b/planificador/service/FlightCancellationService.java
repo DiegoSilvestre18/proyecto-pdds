@@ -1,43 +1,62 @@
 package com.tasfb2b.planificador.service;
 
 import com.tasfb2b.planificador.domain.Solution;
+import com.tasfb2b.vuelo.domain.Vuelo;
 import com.tasfb2b.vuelo.service.VueloService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/**
- * Servicio dedicado para cancelación de vuelos con replanificación ALNS.
- */
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class FlightCancellationService {
+
+    /** Lead time mínimo requerido para cancelar la instancia de HOY. */
+    private static final long MIN_LEAD_TIME_MS = 60L * 60 * 1000;
 
     private final VueloService vueloService;
     private final ALNSPlannerService alnsPlanner;
     private final SimulationProgressHolder progressHolder;
     private final PlanningSessionHolder sessionHolder;
 
-    /**
-     * Cancela un vuelo y dispara la replanificación ALNS para rescatar rutas afectadas.
-     *
-     * @param vueloId   ID del vuelo a cancelar
-     * @param sessionId ID de la sesión de simulación activa (puede ser null)
-     */
     @Transactional
     public void cancelarVuelo(Long vueloId, String sessionId) {
-        log.info("Cancelando manualmente el vuelo {}", vueloId);
 
-        // 1. Delegamos la cancelación de datos al VueloService (DB + Invalida Grafo)
-        vueloService.cancelarVuelo(vueloId);
-
-        // 2. Orquestar la replanificación si hay sesión activa
         SimulationProgressHolder.SimulationSessionState session = null;
         if (sessionId != null) {
             session = progressHolder.get(sessionId);
         }
+
+        boolean diferirAManana = false;
+
+        if (session != null
+                && session.getCurrentEpochTime() != null
+                && session.getStartEpoch() != null
+                && session.getCurrentDay() > 0) {
+
+            Vuelo vuelo = vueloService.obtenerVuelo(vueloId);
+            long dayStartEpoch = session.getStartEpoch()
+                    + ((long) (session.getCurrentDay() - 1) * 86_400_000L);
+            long todayDeparture = vuelo.getDepartureEpoch(dayStartEpoch);
+            long currentSimTime = session.getCurrentEpochTime();
+
+            long leadTimeMs = todayDeparture - currentSimTime;
+            // Si ya despegó hoy (negativo) o faltan menos de 1h, no se puede
+            // cancelar la instancia de hoy: se difiere a la de mañana.
+            diferirAManana = leadTimeMs < MIN_LEAD_TIME_MS;
+        }
+
+        if (diferirAManana) {
+            session.getPendingNextDayCancellations().add(vueloId);
+            log.info("Vuelo {} cancelado con menos de 1h de anticipación. " +
+                    "Se difiere la cancelación a la instancia de mañana.", vueloId);
+            return; // el vuelo de hoy sigue operando con normalidad
+        }
+
+        log.info("Cancelando manualmente el vuelo {}", vueloId);
+        vueloService.cancelarVuelo(vueloId);
 
         if (session != null) {
             if (sessionHolder.hasSolution()) {

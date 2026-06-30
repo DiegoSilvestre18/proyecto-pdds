@@ -16,6 +16,7 @@ import ReportsPanel from "./components/floating/ReportsPanel";
 import EntitiesListPanel from "./components/floating/EntitiesListPanel";
 import ShipmentsPanel from "./components/floating/ShipmentsPanel";
 import UpcomingFlightsPanel from "./components/floating/UpcomingFlightsPanel";
+import FinalPlanPanel from "./components/floating/FinalPlanPanel";
 
 import DayToDayConfig from "./components/scenarios/DayToDayConfig";
 import PeriodSimConfig from "./components/scenarios/PeriodSimConfig";
@@ -41,6 +42,7 @@ const PANEL_LABELS = {
   airportConfig: "Configuración de Almacenes",
   entities: "Monitoreo de Vuelos y Almacenes",
   pendingShipments: "Envíos Pendientes",
+  finalPlan: "Plan Final de la Simulación",
 };
 
 const App = () => {
@@ -108,6 +110,21 @@ const App = () => {
   const currentFlight = activeAircraft.find(p => p.id === selectedAircraftId) ?? null;
 
   const [dismissedInitOverlay, setDismissedInitOverlay] = useState(false)
+
+  const [finalPlanShownSession, setFinalPlanShownSession] = useState(null);
+
+  React.useEffect(() => {
+    if (
+        liveStatus?.status === 'DONE' &&
+        liveStatus?.finalMasterPlan?.length > 0 &&
+        sessionId &&
+        finalPlanShownSession !== sessionId
+    ) {
+      setFinalPlanShownSession(sessionId);
+      if (!isWindowOpen('finalPlan')) handleToggleWindow('finalPlan');
+      handleFocusWindow('finalPlan');
+    }
+  }, [liveStatus?.status, liveStatus?.finalMasterPlan, sessionId]);
 
   // ── Lógica FIFO de Paneles (Draggable Windows) ──
   const [maxWindows, setMaxWindows] = useState(3);
@@ -298,9 +315,12 @@ const App = () => {
                 }
                 onFocus={() => handleFocusWindow("shipments")}
             >
-                <ShipmentsPanel
-
-                />
+              <ShipmentsPanel
+                  sessionId={sessionId}
+                  airports={globalAirports}
+                  onSelectFlight={setSelectedAircraftId}
+                  onAirportSelect={(code) => { setSelectedAirportCode(code); setSelectedAircraftId(null); }}
+              />
             </DraggableWindow>
         )}
 
@@ -319,6 +339,19 @@ const App = () => {
         <DraggableWindow title="Configuración de Almacenes" onClose={() => handleToggleWindow("airportConfig")} initialPosition={{x: 200, y: 150}} isActive={openWindowsQueue[openWindowsQueue.length-1] === "airportConfig"} onFocus={() => handleFocusWindow("airportConfig")}>
           <AirportConfigPanel />
         </DraggableWindow>
+      )}
+
+      {isWindowOpen("finalPlan") && (
+          <DraggableWindow
+              title="📋 Plan Final de la Simulación"
+              onClose={() => handleToggleWindow("finalPlan")}
+              initialPosition={{ x: window.innerWidth / 2 - 320, y: window.innerHeight / 2 - 260 }}
+              defaultSize={{ width: 640, height: 480 }}
+              isActive={openWindowsQueue[openWindowsQueue.length - 1] === "finalPlan"}
+              onFocus={() => handleFocusWindow("finalPlan")}
+          >
+            <FinalPlanPanel plan={liveStatus?.finalMasterPlan || []} />
+          </DraggableWindow>
       )}
 
       {isWindowOpen("entities") && (
