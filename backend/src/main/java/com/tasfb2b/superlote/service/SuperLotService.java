@@ -41,7 +41,7 @@ public class SuperLotService {
                         e.getOrigenContinente(),
                         e.getDestinoContinente(),
                         readyTime
-                )).add(e.getCantidadMaletas(), readyTime, e.getCodigoPedido());
+                )).add(e.getCantidadMaletas(), readyTime, e.getOrigenIcao(), e.getCodigoPedido());
             });
         }
         return construirLotes(grupos);
@@ -69,7 +69,7 @@ public class SuperLotService {
                         e.getOrigenContinente(),
                         e.getDestinoContinente(),
                         readyTime
-                )).add(e.getCantidadMaletas(), readyTime, e.getCodigoPedido());
+                )).add(e.getCantidadMaletas(), readyTime, e.getOrigenIcao(), e.getCodigoPedido());
             });
         }
 
@@ -96,7 +96,7 @@ public class SuperLotService {
                             e.getOrigenContinente(),
                             e.getDestinoContinente(),
                             readyTime
-                    )).add(e.getCantidadMaletas(), readyTime, e.getCodigoPedido());
+                    )).add(e.getCantidadMaletas(), readyTime, e.getOrigenIcao(), e.getCodigoPedido());
                 }
             });
         }
@@ -213,11 +213,12 @@ public class SuperLotService {
             this.minReadyTime = readyTime;
         }
 
-        void add(int bags, long readyTime, String codigoPedido) {
+        void add(int bags, long readyTime, String origenIcao, String codigoPedido) {
             this.totalMaletas += bags;
             this.minReadyTime = Math.min(this.minReadyTime, readyTime);
+            String globalCode = origenIcao + "_" + codigoPedido;
             for (int i = 1; i <= bags; i++) {
-                this.bagIds.add(codigoPedido + "-" + i);
+                this.bagIds.add(globalCode + "-" + i);
             }
         }
     }

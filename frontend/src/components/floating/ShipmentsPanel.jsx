@@ -16,6 +16,12 @@ const STATUS_META = {
     REPLANIFICACION:       { label: "Replanificación",    color: "#ef4444" },
 };
 
+// El código globalmente único de un envío es origenIcao + codigoPedido
+// (codigoPedido SOLO es único por origen — ver @UniqueConstraint en Envio.java).
+function buildGlobalCode(shipment) {
+    return `${shipment.origenIcao}_${shipment.codigoPedido}`;
+}
+
 function summarize(list) {
     if (!list || list.length === 0) return null;
     const counts = {};
@@ -48,9 +54,10 @@ const ShipmentsPanel = ({ sessionId, airports, onSelectFlight, onAirportSelect }
     const [page, setPage] = useState(0);
     const [hasMore, setHasMore] = useState(true);
 
+    // Keyed by GLOBAL code (origenIcao_codigoPedido), no por codigoPedido crudo.
     const [statusByShipment, setStatusByShipment] = useState({});
     const [hopsByShipment, setHopsByShipment] = useState({});
-    const [expandedCode, setExpandedCode] = useState(null);
+    const [expandedCode, setExpandedCode] = useState(null); // global code
     const [expandedBagId, setExpandedBagId] = useState(null);
 
     const [auditViolations, setAuditViolations] = useState([]);
@@ -61,7 +68,6 @@ const ShipmentsPanel = ({ sessionId, airports, onSelectFlight, onAirportSelect }
     const shipmentsRef = useRef(shipments);
     useEffect(() => { shipmentsRef.current = shipments; }, [shipments]);
 
-    // ── Carga paginada de envíos (catálogo) ─────────────────────────────────
     const fetchShipments = async (pageToLoad = 0, reset = false) => {
         if (loading) return;
         setLoading(true);
@@ -105,14 +111,13 @@ const ShipmentsPanel = ({ sessionId, airports, onSelectFlight, onAirportSelect }
         };
     }, [page, loading, hasMore, searchOrigin, searchCode]);
 
-    // ── Estado de trazabilidad por lote (status-batch) ──────────────────────
-    const fetchStatusBatch = useCallback(async (codigos) => {
-        if (!sessionId || codigos.length === 0) return;
+    const fetchStatusBatch = useCallback(async (globalCodes) => {
+        if (!sessionId || globalCodes.length === 0) return;
         try {
             const res = await apiFetch(`/api/shipments/${sessionId}/status-batch`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(codigos),
+                body: JSON.stringify(globalCodes),
             });
             if (!res.ok) return;
             const data = await res.json();
@@ -122,52 +127,48 @@ const ShipmentsPanel = ({ sessionId, airports, onSelectFlight, onAirportSelect }
         }
     }, [sessionId]);
 
-    // refresca estado cuando cambia la lista de envíos visibles
     useEffect(() => {
         if (shipments.length === 0) return;
-        fetchStatusBatch(shipments.map((s) => s.codigoPedido));
+        fetchStatusBatch(shipments.map(buildGlobalCode));
     }, [shipments, fetchStatusBatch]);
 
-    const fetchHops = useCallback(async (codigo) => {
+    const fetchHops = useCallback(async (globalCode) => {
         if (!sessionId) return;
         try {
-            const res = await apiFetch(`/api/shipments/${sessionId}/shipment/${codigo}/hops`);
+            const res = await apiFetch(`/api/shipments/${sessionId}/shipment/${globalCode}/hops`);
             if (res.ok) {
                 const data = await res.json();
-                setHopsByShipment((prev) => ({ ...prev, [codigo]: data }));
+                setHopsByShipment((prev) => ({ ...prev, [globalCode]: data }));
             }
         } catch (err) {
             console.error("Error cargando escalas", err);
         }
     }, [sessionId]);
 
-    // polling: mantiene vivo el estado de lo visible + lo expandido
     useEffect(() => {
         if (!sessionId) return;
         const id = setInterval(() => {
             if (shipmentsRef.current.length > 0) {
-                fetchStatusBatch(shipmentsRef.current.map((s) => s.codigoPedido));
+                fetchStatusBatch(shipmentsRef.current.map(buildGlobalCode));
             }
             if (expandedCode) fetchHops(expandedCode);
         }, 4000);
         return () => clearInterval(id);
     }, [sessionId, fetchStatusBatch, fetchHops, expandedCode]);
 
-    // ── Auditoría de consistencia (Recomendación 1) ─────────────────────────
     useEffect(() => {
         if (!sessionId) return;
         const check = async () => {
             try {
                 const res = await apiFetch(`/api/shipments/${sessionId}/audit`);
                 if (res.ok) setAuditViolations(await res.json());
-            } catch (err) { /* silencioso, es solo diagnóstico */ }
+            } catch (err) { /* solo diagnóstico */ }
         };
         check();
         const id = setInterval(check, 5000);
         return () => clearInterval(id);
     }, [sessionId]);
 
-    // ── Navegación: localizar maleta en mapa ────────────────────────────────
     const handleLocate = useCallback((bagState) => {
         if (!bagState) return;
         if (bagState.estado === "EN_VUELO") {
@@ -189,17 +190,17 @@ const ShipmentsPanel = ({ sessionId, airports, onSelectFlight, onAirportSelect }
         }
     }, [airports, onSelectFlight, onAirportSelect, setFocusedEntity, dispatchMapCommand]);
 
-    const toggleExpand = (codigo) => {
+    const toggleExpand = (globalCode) => {
         setExpandedBagId(null);
         setExpandedCode((prev) => {
-            const next = prev === codigo ? null : codigo;
+            const next = prev === globalCode ? null : globalCode;
             if (next && !hopsByShipment[next]) fetchHops(next);
             if (next && !statusByShipment[next]) fetchStatusBatch([next]);
             return next;
         });
     };
 
-    const expandedShipmentMeta = shipments.find((s) => s.codigoPedido === expandedCode);
+    const expandedShipmentMeta = shipments.find((s) => buildGlobalCode(s) === expandedCode);
     const totalBags = expandedShipmentMeta?.cantidadMaletas ?? 0;
     const statusList = statusByShipment[expandedCode] || [];
     const statusByBagId = useMemo(() => {
@@ -266,17 +267,17 @@ const ShipmentsPanel = ({ sessionId, airports, onSelectFlight, onAirportSelect }
                 )}
 
                 {shipments.map((shipment) => {
-                    const codigo = shipment.codigoPedido;
-                    const summary = summarize(statusByShipment[codigo]);
-                    const isExpanded = expandedCode === codigo;
+                    const globalCode = buildGlobalCode(shipment);
+                    const summary = summarize(statusByShipment[globalCode]);
+                    const isExpanded = expandedCode === globalCode;
 
                     return (
                         <div key={shipment.id} style={{ background: "rgba(255,255,255,0.02)", borderRadius: "4px", border: "1px solid rgba(255,255,255,0.04)" }}>
                             <div
-                                onClick={() => toggleExpand(codigo)}
+                                onClick={() => toggleExpand(globalCode)}
                                 style={{ padding: "4px 6px", display: "flex", alignItems: "center", gap: "6px", cursor: "pointer" }}
                             >
-                                <span style={{ fontSize: "11px", fontWeight: "bold", color: "#38bdf8", minWidth: "90px" }}>{codigo}</span>
+                                <span style={{ fontSize: "11px", fontWeight: "bold", color: "#38bdf8", minWidth: "90px" }}>{shipment.codigoPedido}</span>
                                 <span style={{ fontSize: "10px", color: "#cbd5e1", whiteSpace: "nowrap" }}>{shipment.origenIcao}→{shipment.destinoIcao}</span>
 
                                 {summary && (
@@ -289,7 +290,7 @@ const ShipmentsPanel = ({ sessionId, airports, onSelectFlight, onAirportSelect }
 
                                 {summary && (
                                     <button
-                                        onClick={(e) => { e.stopPropagation(); handleLocate(pickPrimaryBag(statusByShipment[codigo])); }}
+                                        onClick={(e) => { e.stopPropagation(); handleLocate(pickPrimaryBag(statusByShipment[globalCode])); }}
                                         title="Localizar en el mapa"
                                         style={{ background: "transparent", border: "none", color: "#60a5fa", cursor: "pointer", fontSize: "12px", padding: "0 2px" }}
                                     >
@@ -312,7 +313,7 @@ const ShipmentsPanel = ({ sessionId, airports, onSelectFlight, onAirportSelect }
                                             return (
                                                 <div key={bagId} style={{ marginBottom: "3px" }}>
                                                     <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "10px", padding: "2px 0" }}>
-                                                        <span style={{ color: "#94a3b8", minWidth: "85px" }}>{bagId}</span>
+                                                        <span style={{ color: "#94a3b8", minWidth: "115px" }}>{bagId}</span>
                                                         <span style={{ padding: "1px 6px", borderRadius: "8px", background: `${meta.color}20`, color: meta.color, border: `1px solid ${meta.color}` }}>
                               {bagState ? meta.label : "Pendiente de planificación"}
                             </span>
