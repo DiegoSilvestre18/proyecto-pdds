@@ -55,7 +55,9 @@ const ScenarioHeader = ({
           )}
           {systemClock && systemClock !== "--:--" && systemClock !== "--:--:--" && (
             <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "13px" }}>
-              <span style={{ color: "#0284c7", fontWeight: 600, whiteSpace: "nowrap" }}>Hora actual simulada:</span>
+              <span style={{ color: "#0284c7", fontWeight: 600, whiteSpace: "nowrap" }}>
+                {activeTab === "vivo" ? "Hora UTC:" : "Hora actual simulada:"}
+              </span>
               <span style={{ 
                 color: "#0c4a6e", 
                 fontWeight: 700, 

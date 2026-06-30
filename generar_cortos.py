@@ -25,31 +25,37 @@ def generar_vuelos_cortos():
     
     ahora_utc = datetime.datetime.utcnow()
     print(f"Hora UTC actual: {ahora_utc.strftime('%H:%M')} UTC")
-    print("Generando 20 vuelos divididos en 4 grupos (5 vuelos cada uno):")
-    print(" - Grupo 1: 3 a 5 min (Dur: 3-5m)")
-    print(" - Grupo 2: 55 a 59 min (Dur: 3-5m)")
-    print(" - Grupo 3: 62 a 65 min (Dur: 3-5m)")
-    print(" - Grupo 4: 62 a 65 min (Dur: 12 Horas)\n")
+    print("Generando 24 vuelos divididos en 4 grupos (6 vuelos cada uno, separados por 2 horas):")
+    print(" - Grupo 1: Inicia en 3 a 5 min (Dur: 12 Horas)")
+    print(" - Grupo 2: Inicia en 55 a 59 min (Dur: 12 Horas)")
+    print(" - Grupo 3: Inicia en 90 a 95 min (Dur: 12 Horas)")
+    print(" - Grupo 4: Inicia en 90 a 95 min (Dur: 12 Horas)\n")
     
     lineas_txt = []
     
-    # Cada rango tiene: (min_inicio_despegue, min_fin_despegue, dur_min, dur_max)
+    # Cada rango tiene: (min_inicio_despegue, min_fin_despegue)
+    # Todos tendrán 12 horas de duración
     rangos = [
-        (3, 5, 3, 5),          # Grupo 1
-        (55, 59, 3, 5),        # Grupo 2
-        (62, 65, 3, 5),        # Grupo 3
-        (62, 65, 720, 720)     # Grupo 4 (12 horas = 720 minutos)
+        (3, 5),          # Grupo 1
+        (55, 59),        # Grupo 2
+        (90, 95),        # Grupo 3
+        (90, 95)         # Grupo 4
     ]
     
-    for idx_rango, (min_inicio, min_fin, dur_min, dur_max) in enumerate(rangos):
-        for i in range(5):
+    for idx_rango, (min_inicio, min_fin) in enumerate(rangos):
+        # Base despegue para el primer vuelo de este grupo
+        base_despegue_min = random.randint(min_inicio, min_fin)
+        
+        for i in range(6):
             origen = random.choice(AEROPUERTOS_TODOS)
             destino = random.choice([a for a in AEROPUERTOS_TODOS if a != origen])
             
-            minutos_despegue = random.randint(min_inicio, min_fin)
+            # El vuelo i sale i * 2 horas después del primer vuelo
+            minutos_despegue = base_despegue_min + (i * 120)
             despegue_utc = ahora_utc + datetime.timedelta(minutes=minutos_despegue)
             
-            duracion_vuelo = random.randint(dur_min, dur_max)
+            # Duración fija de 12 horas (720 minutos)
+            duracion_vuelo = 720
             llegada_utc = despegue_utc + datetime.timedelta(minutes=duracion_vuelo)
             
             despegue_local = utc_to_local(despegue_utc, origen)
@@ -62,13 +68,13 @@ def generar_vuelos_cortos():
             linea = f"{origen}-{destino}-{str_despegue}-{str_llegada}-{capacidad}\n"
             lineas_txt.append(linea)
             
-            print(f"[Grupo {idx_rango+1}] {origen} -> {destino} | UTC: {despegue_utc.strftime('%H:%M')} | TXT (Local): {str_despegue} -> {str_llegada} | Dur: {duracion_vuelo}m")
+            print(f"[Grupo {idx_rango+1} - Vuelo {i+1}] {origen} -> {destino} | UTC: {despegue_utc.strftime('%H:%M')} | TXT (Local): {str_despegue} -> {str_llegada} | Dur: {duracion_vuelo}m")
         
     nombre_archivo = "vuelos_cortos.txt"
     with open(nombre_archivo, "w") as f:
         f.writelines(lineas_txt)
         
-    print(f"\n¡Listo! Se ha creado el archivo '{nombre_archivo}' con 20 vuelos.")
+    print(f"\n¡Listo! Se ha creado el archivo '{nombre_archivo}' con 24 vuelos.")
     print("Súbelo de inmediato en el Panel de Administración de Vuelos para verlos despegar en vivo.")
 
 if __name__ == "__main__":
