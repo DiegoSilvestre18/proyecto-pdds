@@ -294,7 +294,8 @@ public class SimulationController {
                 .errorMessage(session.getErrorMessage())
                 .reports(reportsList)
                 .taMs(session.getLastTaMs())
-                .saMinutes(session.getCurrentSaMinutes());
+                .saMinutes(session.getCurrentSaMinutes())
+                .finalMasterPlan(session.getFinalMasterPlan());
 
         if ("DONE".equals(session.getStatus().name()) && session.getStartEpoch() != null) {
             try {
@@ -339,7 +340,7 @@ public class SimulationController {
         trace.put("arrival", r.getArrivalTime());
         trace.put("deadline", r.getLot().getDeadline());
         trace.put("status", r.getStatus());
-        
+
         List<Map<String, Object>> hops = r.getFlights().stream().map(v -> {
             Map<String, Object> h = new HashMap<>();
             h.put("id", v.getId());
@@ -349,7 +350,7 @@ public class SimulationController {
             h.put("arr", v.getArrivalMinute());
             return h;
         }).collect(Collectors.toList());
-        
+
         trace.put("route", hops);
         return trace;
     }

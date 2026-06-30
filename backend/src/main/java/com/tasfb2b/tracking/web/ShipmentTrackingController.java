@@ -10,6 +10,8 @@ import lombok.RequiredArgsConstructor;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/shipments")
@@ -59,5 +61,37 @@ public class ShipmentTrackingController {
     @DeleteMapping("/{sessionId}")
     public void clearSession(@PathVariable String sessionId) {
         trackerRegistry.remove(sessionId);
+    }
+
+    @PostMapping("/{sessionId}/status-batch")
+    public Map<String, List<ShipmentState>> getStatusBatch(
+            @PathVariable String sessionId,
+            @RequestBody List<String> codigos) {
+        ShipmentTracker tracker = trackerRegistry.get(sessionId);
+        if (tracker == null) return Map.of();
+
+        Map<String, List<ShipmentState>> result = new HashMap<>();
+        for (String codigo : codigos) {
+            result.put(codigo, tracker.getByShipment(codigo));
+        }
+        return result;
+    }
+
+    @GetMapping("/{sessionId}/bag/{bagId}/hops")
+    public List<ShipmentTracker.HopInfo> getBagHops(@PathVariable String sessionId, @PathVariable String bagId) {
+        ShipmentTracker tracker = trackerRegistry.get(sessionId);
+        return tracker != null ? tracker.getHops(bagId) : List.of();
+    }
+
+    @GetMapping("/{sessionId}/shipment/{codigo}/hops")
+    public Map<String, List<ShipmentTracker.HopInfo>> getShipmentHops(@PathVariable String sessionId, @PathVariable String codigo) {
+        ShipmentTracker tracker = trackerRegistry.get(sessionId);
+        return tracker != null ? tracker.getShipmentHops(codigo) : Map.of();
+    }
+
+    @GetMapping("/{sessionId}/audit")
+    public List<ShipmentTracker.AuditViolation> audit(@PathVariable String sessionId) {
+        ShipmentTracker tracker = trackerRegistry.get(sessionId);
+        return tracker != null ? tracker.auditConsistency() : List.of();
     }
 }

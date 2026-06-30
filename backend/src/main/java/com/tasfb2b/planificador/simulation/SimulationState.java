@@ -233,20 +233,6 @@ public class SimulationState {
                 drainCola(icaoDestino, airports);
             }
 
-            case STORAGE_RELEASE -> {
-                Vuelo v = event.getVuelo();
-                int actualLoad = maletasEmbarcadas.getOrDefault(
-                        v.getId() + "-" + event.getLot().getId(), event.getLoad());
-
-                String icaoDestino = v.getDestino().getIcaoCode();
-                int cargaActual = cargaAeropuerto.getOrDefault(icaoDestino, 0);
-                int nuevaCarga = Math.max(0, cargaActual - actualLoad);
-                cargaAeropuerto.put(icaoDestino, nuevaCarga);
-                maletasEntregadas += actualLoad;
-                recalcularSaturacion(airports);
-                drainCola(icaoDestino, airports);
-            }
-
             case FLIGHT_CANCELLED -> {
                 vuelosCancelados.add(event.getVuelo().getId());
                 maletasEnEsperaReplan += event.getLoad();

@@ -207,6 +207,15 @@ public class SimulationService {
                         if (day > 0) {
                                 restaurarVuelosEnBD();
                                 processedCancelledFlightIds.clear();
+                                // aplicar cancelaciones diferidas por la regla de 1h
+                                if (!session.getPendingNextDayCancellations().isEmpty()) {
+                                        List<Long> aAplicar = new ArrayList<>(session.getPendingNextDayCancellations());
+                                        session.getPendingNextDayCancellations().clear();
+                                        List<Vuelo> aCancelar = vueloRepo.findAllByIdWithAirports(aAplicar);
+                                        aCancelar.forEach(v -> v.setCancelled(true));
+                                        vueloRepo.saveAll(aCancelar);
+                                        networkAdapter.invalidateGraph();
+                                }
                         }
 
                         final int currentDayNum = day + 1;
@@ -377,6 +386,7 @@ public class SimulationService {
                                                                         nuevasComprometidas.size(), bagIds.size()
                                                                 ));
                                                         }
+                                                        shipmentTracker.registerPlannedHops(nuevasComprometidas, r); //registramos los hops
                                                         globalEventQueue.addAll(eventEngine.buildEventsForRoute(r, nuevasComprometidas, dayStartEpochMs));
                                                 }
                                         }
@@ -419,6 +429,7 @@ public class SimulationService {
                                 }
                                 currentSimMinuteOfDay += currentSa;
                         }
+                        session.setFinalMasterPlan(buildFinalPlanSnapshot(masterPlan));
 
                         SimulationDayReport report = new SimulationDayReport();
                         report.setDayIndex(day);
@@ -588,5 +599,40 @@ public class SimulationService {
                         List<Vuelo> c = vueloRepo.findByCancelledTrue();
                         if (!c.isEmpty()) { c.forEach(v -> v.setCancelled(false)); vueloRepo.saveAll(c); networkAdapter.invalidateGraph(); }
                 } catch (Exception e) { log.warn("Error restaurando vuelos: {}", e.getMessage()); }
+        }
+
+        private List<Map<String, Object>> buildFinalPlanSnapshot(List<Route> plan) {
+                if (plan == null) return List.of();
+                List<Map<String, Object>> result = new ArrayList<>();
+
+                for (Route r : plan) {
+                        if (r.getLot() == null) continue;
+                        Map<String, Object> m = new HashMap<>();
+                        m.put("lotId", r.getLot().getId());
+                        m.put("origin", r.getLot().getOrigenIcao());
+                        m.put("destination", r.getLot().getDestinoIcao());
+                        m.put("totalBags", r.getDemandaTotal());
+                        m.put("assignedBags", r.getCapacidadAsignada());
+                        m.put("status", r.getStatus());
+                        m.put("arrivalTime", r.getArrivalTime());
+                        m.put("deadline", r.getDeadline());
+
+                        List<Map<String, Object>> hops = new ArrayList<>();
+                        if (r.getFlights() != null && r.getLegDepartures() != null) {
+                                for (int i = 0; i < r.getFlights().size(); i++) {
+                                        Vuelo v = r.getFlights().get(i);
+                                        Map<String, Object> hop = new HashMap<>();
+                                        hop.put("vueloId", v.getId());
+                                        hop.put("from", v.getOrigen().getIcaoCode());
+                                        hop.put("to", v.getDestino().getIcaoCode());
+                                        hop.put("departureTime", r.getLegDepartures().get(i));
+                                        hop.put("arrivalTime", r.getLegArrivals().get(i));
+                                        hops.add(hop);
+                                }
+                        }
+                        m.put("hops", hops);
+                        result.add(m);
+                }
+                return result;
         }
 }

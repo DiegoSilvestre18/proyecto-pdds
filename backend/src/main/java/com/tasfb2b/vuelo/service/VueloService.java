@@ -246,4 +246,9 @@ public class VueloService {
             throw new RuntimeException("Error procesando archivo de vuelos: " + e.getMessage());
         }
     }
+
+    public Vuelo obtenerVuelo(Long id) {
+        return vueloRepo.findById(id)
+                .orElseThrow(() -> new RuntimeException("Vuelo no encontrado: " + id));
+    }
 }
