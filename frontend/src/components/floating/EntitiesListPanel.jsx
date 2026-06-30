@@ -422,9 +422,30 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
     setActiveFilters(prev => ({ ...prev, flightStatus: status }));
   }, [setActiveFilters]);
 
+  const getContinentCenter = useCallback((continent) => {
+    if (!continent || !airports) return null
+    const filtered = airports.filter(ap => ap.continent === continent)
+    if (filtered.length === 0) return null
+    const lngs = filtered.map(ap => ap.coordinates[0])
+    const lats = filtered.map(ap => ap.coordinates[1])
+    return {
+      coordinates: [
+        (Math.min(...lngs) + Math.max(...lngs)) / 2,
+        (Math.min(...lats) + Math.max(...lats)) / 2,
+      ],
+      zoom: 3,
+    }
+  }, [airports])
+
   const handleContinentFilter = useCallback((continent) => {
     setActiveFilters(prev => ({ ...prev, continent }));
-  }, [setActiveFilters]);
+    if (continent) {
+      const center = getContinentCenter(continent)
+      if (center) {
+        dispatchMapCommand('flyTo', center)
+      }
+    }
+  }, [setActiveFilters, dispatchMapCommand, getContinentCenter]);
 
   const filteredUTs = useMemo(() => {
     if (activeTab !== 'ut') return [];
@@ -653,7 +674,7 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
                           key={opt.value ?? 'all'}
                           onClick={() => handleSemaphoreFilter(opt.value)}
                           style={{
-                            padding: '2px 8px', borderRadius: '12px', fontSize: '9px', fontWeight: 'bold',
+                            padding: '3px 10px', borderRadius: '12px', fontSize: '10px', fontWeight: 'bold',
                             cursor: 'pointer', transition: 'all 0.15s',
                             border: activeFilters.semaphoreLevel === opt.value ? `1px solid ${opt.color}` : '1px solid rgba(255,255,255,0.1)',
                             background: activeFilters.semaphoreLevel === opt.value ? `${opt.color}20` : 'transparent',
@@ -673,7 +694,7 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
                   ].map(opt => (
                       <button key={opt.value ?? 'all'} onClick={() => handleContinentFilter(opt.value)}
                               style={{
-                                padding: '4px 10px', borderRadius: '12px', fontSize: '10px', fontWeight: 'bold',
+                                padding: '3px 10px', borderRadius: '12px', fontSize: '10px', fontWeight: 'bold',
                                 cursor: 'pointer', transition: 'all 0.15s',
                                 border: activeFilters.continent === opt.value ? `1px solid ${opt.color}` : '1px solid rgba(255,255,255,0.1)',
                                 background: activeFilters.continent === opt.value ? `${opt.color}20` : 'transparent',
