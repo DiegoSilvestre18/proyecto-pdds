@@ -60,6 +60,13 @@ public class VueloService {
         Aeropuerto origen = aeropuertoCache.get(request.origenIcao());
         Aeropuerto destino = aeropuertoCache.get(request.destinoIcao());
 
+        if (origen == null) {
+            throw new AeropuertoNotFoundException(request.origenIcao());
+        }
+        if (destino == null) {
+            throw new AeropuertoNotFoundException(request.destinoIcao());
+        }
+
         boolean intercontinental = !origen.getContinent().equals(destino.getContinent());
 
         int depUtc = (request.departureMinute() - (origen.getGmtOffset() * 60) + 1440) % 1440;
