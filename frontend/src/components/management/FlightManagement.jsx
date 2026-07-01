@@ -3,6 +3,9 @@ import { useAirports } from '../../hooks/useAirports';
 import { apiFetch } from '../../hooks/api';
 
 const FlightManagement = ({ flights, setFlights }) => {
+    const [globalOrigenIcao, setGlobalOrigenIcao] = useState(() => {
+        return localStorage.getItem('profileAirport') || '';
+    });
     const [status, setStatus] = useState({ type: '', message: '' });
     const [sessionLogs, setSessionLogs] = useState(() => {
         try {
@@ -46,7 +49,6 @@ const FlightManagement = ({ flights, setFlights }) => {
     const [loading, setLoading] = useState(false);
 
     const [flightData, setFlightData] = useState({
-        origenIcao: '',
         destinoIcao: '',
         capacity: '',
         departureTime: '',
@@ -140,22 +142,27 @@ const FlightManagement = ({ flights, setFlights }) => {
         const file = e.target.files[0];
         if (!file) return;
 
+        if (!globalOrigenIcao) {
+            setStatus({ type: 'error', message: 'No hay perfil seleccionado. Por favor, vuelva a ingresar como Registrador.' });
+            return;
+        }
+
         const reader = new FileReader();
         reader.onload = (event) => {
             const content = event.target.result;
             const lines = content.split('\n');
             const newFlights = [];
 
-            const lineRegex = /^([A-Z]{4})-([A-Z]{4})-(\d{2}:\d{2})-(\d{2}:\d{2})[\s-]+(\d+)/;
+            const lineRegex = /^([A-Z]{4})-(\d{2}:\d{2})-(\d{2}:\d{2})[\s-]+(\d+)/;
 
             for (const line of lines) {
                 const match = line.match(lineRegex);
                 if (match) {
-                    const [_, origenIcao, destinoIcao, departureTime, arrivalTime, cap] = match;
+                    const [_, destinoIcao, departureTime, arrivalTime, cap] = match;
                     
                     newFlights.push({
                         idTemp: Date.now() + Math.random().toString(36).substr(2, 9),
-                        origenIcao: origenIcao.trim(),
+                        origenIcao: globalOrigenIcao,
                         destinoIcao: destinoIcao.trim(),
                         departureMinute: timeToMinutes(departureTime),
                         arrivalMinute: timeToMinutes(arrivalTime),
@@ -191,8 +198,12 @@ const FlightManagement = ({ flights, setFlights }) => {
     };
 
     const handleCreateFlight = () => {
+        if (!globalOrigenIcao) {
+            setStatus({ type: 'error', message: 'No hay perfil seleccionado. Por favor, vuelva a ingresar como Registrador.' });
+            return;
+        }
+
         if (
-            !flightData.origenIcao ||
             !flightData.destinoIcao ||
             !flightData.capacity ||
             !flightData.departureTime ||
@@ -204,7 +215,7 @@ const FlightManagement = ({ flights, setFlights }) => {
 
         const newFlight = {
             idTemp: Date.now() + Math.random().toString(36).substr(2, 9),
-            origenIcao: flightData.origenIcao,
+            origenIcao: globalOrigenIcao,
             destinoIcao: flightData.destinoIcao,
             capacity: Number(flightData.capacity),
             departureMinute: timeToMinutes(flightData.departureTime),
@@ -216,7 +227,6 @@ const FlightManagement = ({ flights, setFlights }) => {
         setStatus({ type: 'success', message: 'Vuelo añadido a la bandeja.' });
 
         setFlightData({
-            origenIcao: '',
             destinoIcao: '',
             capacity: '',
             departureTime: '',
@@ -232,6 +242,7 @@ const FlightManagement = ({ flights, setFlights }) => {
         let successCount = 0;
         let failCount = 0;
         let newlySaved = [];
+        let lastErrorMessage = '';
 
         await Promise.all(sessionLogs.map(async (flight) => {
             try {
@@ -255,9 +266,14 @@ const FlightManagement = ({ flights, setFlights }) => {
                     newlySaved.push({ ...flight, id: savedData.id });
                 } else {
                     failCount++;
+                    try {
+                        const errData = await res.json();
+                        if (errData.message) lastErrorMessage = errData.message;
+                    } catch(e) {}
                 }
             } catch (err) {
                 failCount++;
+                if (err.message) lastErrorMessage = err.message;
             }
         }));
 
@@ -270,7 +286,9 @@ const FlightManagement = ({ flights, setFlights }) => {
             setActiveTab('saved');
             await fetchFlights();
         } else {
-            setStatus({ type: 'error', message: `Hubo ${failCount} errores. Solo se registraron ${successCount} vuelos.` });
+            let errorText = `Hubo ${failCount} errores. Solo se registraron ${successCount} vuelos.`;
+            if (lastErrorMessage) errorText += ` Detalle: ${lastErrorMessage}`;
+            setStatus({ type: 'error', message: errorText });
             if (newlySaved.length > 0) {
                 setRecentlySavedLogs(prev => [...newlySaved, ...prev]);
                 setSessionLogs(prev => prev.filter(p => !newlySaved.some(s => s.idTemp === p.idTemp)));
@@ -290,33 +308,38 @@ const FlightManagement = ({ flights, setFlights }) => {
                 <button type="button" onClick={() => setEntryMode('list')} style={toggleBtnStyle(entryMode === 'list', 'list')}>Listado General</button>
             </div>
             
+            {entryMode !== 'list' && (
+                <div style={{ padding: '1rem', background: 'rgba(56, 189, 248, 0.1)', border: '1px solid rgba(56,189,248,0.4)', borderRadius: '8px', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div>
+                        <span style={{ fontSize: '11px', color: '#38bdf8', fontWeight: 'bold', textTransform: 'uppercase' }}>Aeropuerto de Origen (Por Perfil)</span>
+                        <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#f8fafc', marginTop: '0.2rem' }}>
+                            {globalOrigenIcao || 'No definido'}
+                        </div>
+                    </div>
+                    {!globalOrigenIcao && (
+                        <span style={{ color: '#ef4444', fontSize: '12px' }}>
+                            ⚠ Debe ingresar desde la pantalla de selección de rol.
+                        </span>
+                    )}
+                </div>
+            )}
+
             <div style={{ display: 'flex', gap: '1.5rem', flex: 1, minHeight: 0 }}>
                 {/* Lado Izquierdo: Formularios */}
                 <div style={{ flex: 1, overflowY: 'auto', paddingRight: '0.5rem' }}>
 
-            {entryMode === 'manual' && (
+            {entryMode === 'manual' && globalOrigenIcao && (
                 <div style={{ background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(56,189,248,0.2)', padding: '1.5rem', borderRadius: '12px', marginBottom: '1.5rem' }}>
                     <h3 style={{ margin: '0 0 1rem 0', color: '#38bdf8', fontSize: '16px' }}>Registro Manual de Vuelo Excepcional</h3>
                     <form style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
                         <div>
-                            <label style={labelStyle}>ORIGEN (ICAO)</label>
-                            <select
-                                name="origenIcao"
-                                value={flightData.origenIcao}
-                                onChange={handleInputChange}
-                                style={inputStyle}
-                            >
-                                <option value="">Seleccione origen...</option>
-
-                                {[...airports]
-                                    .sort((a, b) => a.city.localeCompare(b.city))
-                                    .map(a => (
-                                        <option key={a.icao} value={a.icao}>
-                                            {a.city} ({a.icao})
-                                        </option>
-                                    ))
-                                }
-                            </select>
+                            <label style={labelStyle}>ORIGEN (AUTOMÁTICO)</label>
+                            <input
+                                type="text"
+                                value={globalOrigenIcao}
+                                disabled
+                                style={{ ...inputStyle, opacity: 0.7, cursor: 'not-allowed' }}
+                            />
                         </div>
                         <div>
                             <label style={labelStyle}>DESTINO (ICAO)</label>
@@ -387,10 +410,10 @@ const FlightManagement = ({ flights, setFlights }) => {
                 </div>
             )}
 
-            {entryMode === 'txt' && (
+            {entryMode === 'txt' && globalOrigenIcao && (
                 <div style={{ background: 'rgba(15, 23, 42, 0.8)', border: '1px dashed rgba(148, 163, 184, 0.3)', padding: '1.5rem', borderRadius: '12px', marginBottom: '1.5rem' }}>
                     <h3 style={{ margin: '0 0 0.5rem 0', color: '#e2e8f0', fontSize: '14px' }}>Carga Masiva de Planes de Vuelo (.TXT)</h3>
-                    <p style={{ margin: '0 0 1rem 0', fontSize: '11px', color: '#64748b' }}>Formato esperado: ORIG-DEST-HO:MO-HD-MD ####</p>
+                    <p style={{ margin: '0 0 1rem 0', fontSize: '11px', color: '#64748b' }}>Formato esperado: DEST-HO:MO-HD:MD ####</p>
                     <input 
                         type="file" 
                         accept=".txt" 

@@ -3,7 +3,11 @@ import { useAirports } from '../../hooks/useAirports';
 import { apiFetch } from '../../hooks/api';
 
 const ShipmentManagement = () => {
-    const [globalOrigenIcao, setGlobalOrigenIcao] = useState('');
+    // Obtenemos el origen desde el perfil del usuario logueado
+    const [globalOrigenIcao, setGlobalOrigenIcao] = useState(() => {
+        return localStorage.getItem('profileAirport') || '';
+    });
+
     const [trayShipments, setTrayShipments] = useState(() => {
         try {
             const saved = localStorage.getItem('shipmentTray');
@@ -133,7 +137,7 @@ const ShipmentManagement = () => {
                 setSelectedFile(null);
                 if (fileInputRef.current) fileInputRef.current.value = "";
             } else {
-                setStatus({ type: "error", message: "Error al procesar el archivo. Verifique el formato LEYENDA.md." });
+                setStatus({ type: "error", message: "Error al procesar el archivo. Verifique el formato correcto." });
             }
         } catch (err) {
             setStatus({ type: "error", message: "No se pudo conectar con el servidor." });
@@ -195,15 +199,19 @@ const ShipmentManagement = () => {
 
             {entryMode !== 'list' && (
                 <>
-                    {/* ORIGIN SELECTION */}
-                    <div style={{ padding: '1rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid rgba(56,189,248,0.4)', borderRadius: '8px' }}>
-                        <label style={{ display: 'block', marginBottom: '0.4rem', fontSize: '11px', color: '#94a3b8', fontWeight: 'bold' }}>AEROPUERTO DE ORIGEN (OBLIGATORIO PARA CUALQUIER CARGA)</label>
-                        <select value={globalOrigenIcao} onChange={(e) => setGlobalOrigenIcao(e.target.value)} style={inputStyle}>
-                            <option value="">-- Seleccione un aeropuerto de origen --</option>
-                            {[...airports].sort((a, b) => a.city.localeCompare(b.city)).map(a => (
-                                <option key={`orig-global-${a.icao}`} value={a.icao}>{a.city} ({a.icao})</option>
-                            ))}
-                        </select>
+                    {/* ORIGIN DISPLAY */}
+                    <div style={{ padding: '1rem', background: 'rgba(56, 189, 248, 0.1)', border: '1px solid rgba(56,189,248,0.4)', borderRadius: '8px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <div>
+                            <span style={{ fontSize: '11px', color: '#38bdf8', fontWeight: 'bold', textTransform: 'uppercase' }}>Aeropuerto de Origen (Por Perfil)</span>
+                            <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: '#f8fafc', marginTop: '0.2rem' }}>
+                                {globalOrigenIcao || 'No definido'}
+                            </div>
+                        </div>
+                        {!globalOrigenIcao && (
+                            <span style={{ color: '#ef4444', fontSize: '12px' }}>
+                                ⚠ Debe ingresar desde la pantalla de selección de rol.
+                            </span>
+                        )}
                     </div>
 
             {globalOrigenIcao && entryMode !== 'list' && (

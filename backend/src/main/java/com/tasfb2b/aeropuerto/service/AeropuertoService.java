@@ -82,6 +82,8 @@ public class AeropuertoService {
                 if (trimmed.contains("America"))       { currentContinent = Continente.AMERICA; continue; }
                 else if (trimmed.contains("Europa"))   { currentContinent = Continente.EUROPE; continue; }
                 else if (trimmed.contains("Asia"))     { currentContinent = Continente.ASIA; continue; }
+                else if (trimmed.contains("Africa"))   { currentContinent = Continente.AFRICA; continue; }
+                else if (trimmed.contains("Oceania"))  { currentContinent = Continente.OCEANIA; continue; }
 
                 if (currentContinent == null) continue;
 
