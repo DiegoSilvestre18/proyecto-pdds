@@ -194,6 +194,15 @@ const WorldMap = ({
       highlightTimerRef.current = setTimeout(() => setHighlightedId(null), 3000);
     }
 
+    if (action === 'resetView') {
+      const w = containerRef.current?.clientWidth || 1200;
+      const h = containerRef.current?.clientHeight || 800;
+      const fitted = getFitViewState(w, h);
+      setViewState(prev => ({ ...prev, ...fitted, transitionDuration: 800 }));
+      onMoveEnd({ zoom: fitted.zoom, coordinates: [fitted.longitude, fitted.latitude] });
+      setHighlightedId(null);
+    }
+
     clearMapCommand();
   }, [mapCommand, clearMapCommand]);
 
@@ -263,8 +272,16 @@ const WorldMap = ({
     return level === activeFilters.semaphoreLevel;
   }, [activeFilters.semaphoreLevel, activeFilters.continent, activeMetrics, airports]);
 
-  const flightPassesFilter = useCallback((status, fromIcao, toIcao) => {
-    if (activeFilters.flightStatus && status !== activeFilters.flightStatus) return false;
+  const flightPassesFilter = useCallback((capacityPercent, fromIcao, toIcao) => {
+    if (activeFilters.flightStatus) {
+      const pct = capacityPercent ?? 0;
+      const matches =
+        activeFilters.flightStatus === 'low' ? pct < 70 :
+        activeFilters.flightStatus === 'medium' ? (pct >= 70 && pct <= 90) :
+        activeFilters.flightStatus === 'high' ? pct > 90 :
+        true;
+      if (!matches) return false;
+    }
     if (activeFilters.continent) {
       const fromAirport = airportByIcao[fromIcao];
       const toAirport = airportByIcao[toIcao];
@@ -309,7 +326,9 @@ const WorldMap = ({
       selectedAircraftId,
       hasAnySelection,
       flightPassesFilter,
-      selectedAirportCode
+      selectedAirportCode,
+      showFlightsWithoutShipments,
+      showFlightsWithShipments,
     }));
 
     // 2. Airports

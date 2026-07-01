@@ -12,7 +12,9 @@ export const createRoutesLayers = ({
   selectedAircraftId,
   hasAnySelection,
   flightPassesFilter,
-  selectedAirportCode
+  selectedAirportCode,
+  showFlightsWithoutShipments,
+  showFlightsWithShipments,
 }) => {
   const layers = [];
 
@@ -30,11 +32,14 @@ export const createRoutesLayers = ({
     
     if (progress >= 0.99) return;
 
-    const passesFilter = flightPassesFilter(plane.status, plane.from, plane.to);
+    const passesFilter = flightPassesFilter(plane.capacityPercent, plane.from, plane.to);
     if (!passesFilter) return;
 
-    // Solo dibujar línea de ruta si el avión tiene envíos
     const isEmpty = !plane.ocupacionReal || plane.ocupacionReal === 0;
+    if (isEmpty && !showFlightsWithoutShipments) return;
+    if (!isEmpty && !showFlightsWithShipments) return;
+
+    // Solo dibujar línea de ruta si el avión tiene envíos
     if (isEmpty) return;
 
     const colorRgb = getStrokeColorRgb(plane.status, plane.ocupacionReal, plane.capacidadMax, 255);
