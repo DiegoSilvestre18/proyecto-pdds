@@ -126,9 +126,9 @@ const WorldMap = ({
   onBackgroundClick = () => {},
   onReset = () => {},
 }) => {
-  const [showFlightsWithoutShipments, setShowFlightsWithoutShipments] = useState(true);
-  const [showFlightsWithShipments, setShowFlightsWithShipments] = useState(true);
-  const [showFilters, setShowFilters] = useState(false);
+  const [flightColorFilters, setFlightColorFilters] = useState({ gray: true, green: true, yellow: true, red: true });
+  const [airportColorFilters, setAirportColorFilters] = useState({ gray: true, green: true, yellow: true, red: true });
+  const [openFilterMenu, setOpenFilterMenu] = useState(null); // 'flights' | 'airports' | null
 
   const {
     focusedEntity,
@@ -266,15 +266,27 @@ const WorldMap = ({
       const ap = airports.find(a => a.icao === airportIcao);
       if (ap && ap.continent !== activeFilters.continent) return false;
     }
-    if (!activeFilters.semaphoreLevel) return true;
     const metrics = activeMetrics[airportIcao];
+    if (activeFilters.semaphoreLevel) {
+      const level = metrics?.level ?? "green";
+      if (level !== activeFilters.semaphoreLevel) return false;
+    }
+    
+    // Dynamic color filters
     const level = metrics?.level ?? "green";
-    return level === activeFilters.semaphoreLevel;
-  }, [activeFilters.semaphoreLevel, activeFilters.continent, activeMetrics, airports]);
+    const isGray = !metrics || metrics.totalCurrentVolume === 0;
+    
+    if (isGray && !airportColorFilters.gray) return false;
+    if (!isGray && level === "green" && !airportColorFilters.green) return false;
+    if (!isGray && level === "yellow" && !airportColorFilters.yellow) return false;
+    if (!isGray && level === "red" && !airportColorFilters.red) return false;
 
-  const flightPassesFilter = useCallback((capacityPercent, fromIcao, toIcao) => {
+    return true;
+  }, [activeFilters.semaphoreLevel, activeFilters.continent, activeMetrics, airports, airportColorFilters]);
+
+  const flightPassesFilter = useCallback((capacityPercent, fromIcao, toIcao, ocupacionReal = null) => {
+    const pct = capacityPercent ?? 0;
     if (activeFilters.flightStatus) {
-      const pct = capacityPercent ?? 0;
       const matches =
         activeFilters.flightStatus === 'low' ? pct < 70 :
         activeFilters.flightStatus === 'medium' ? (pct >= 70 && pct <= 90) :
@@ -296,8 +308,16 @@ const WorldMap = ({
       };
       if (!checkSemaphore(fromIcao) && !checkSemaphore(toIcao)) return false;
     }
+
+    // Dynamic color filters
+    const isEmpty = ocupacionReal === 0 || pct === 0;
+    if (isEmpty && !flightColorFilters.gray) return false;
+    if (!isEmpty && pct < 70 && !flightColorFilters.green) return false;
+    if (!isEmpty && pct >= 70 && pct <= 90 && !flightColorFilters.yellow) return false;
+    if (!isEmpty && pct > 90 && !flightColorFilters.red) return false;
+
     return true;
-  }, [activeFilters.flightStatus, activeFilters.continent, activeFilters.semaphoreLevel, activeMetrics, airportByIcao]);
+  }, [activeFilters.flightStatus, activeFilters.continent, activeFilters.semaphoreLevel, activeMetrics, airportByIcao, flightColorFilters]);
 
   const hasAnySelection = selectedAircraftId != null || (selectedAirportCode != null && selectedAirportCode !== "");
   const relatedAirportCodes = useMemo(() => {
@@ -406,27 +426,70 @@ const WorldMap = ({
       aria-label="Mapa de operaciones global" 
       style={{ position: "relative", width: "100%", height: "100%", background: "#e5e3df" }}
     >
-      <div className="ct-map-filter">
-        <button
-          onClick={() => setShowFilters(p => !p)}
-          className={`ct-map-filter-btn${showFilters ? ' ct-map-filter-btn--active' : ''}`}
-          title="Filtros de vuelos"
-        >
-          ⚙ FILTROS {showFilters ? '▲' : '▼'}
-        </button>
+      <div className="ct-map-filter" style={{ display: 'flex', gap: '8px' }}>
+        <div style={{ position: 'relative' }}>
+          <button
+            onClick={() => setOpenFilterMenu(p => p === 'flights' ? null : 'flights')}
+            className={`ct-map-filter-btn${openFilterMenu === 'flights' ? ' ct-map-filter-btn--active' : ''}`}
+            title="Filtros de Vuelos"
+            style={{ borderRadius: '50%', width: '40px', height: '40px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', background: openFilterMenu === 'flights' ? 'rgba(96, 165, 250, 0.2)' : 'rgba(15, 23, 42, 0.8)', border: openFilterMenu === 'flights' ? '1px solid rgba(96, 165, 250, 0.5)' : '1px solid rgba(255,255,255,0.1)' }}
+          >
+            ✈️
+          </button>
+          {openFilterMenu === 'flights' && (
+            <div style={{ position: 'absolute', top: '100%', left: '0', marginTop: '8px', background: 'rgba(15, 23, 42, 0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px', minWidth: '150px' }}>
+              <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', marginBottom: '4px' }}>Vuelos</div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: '#e2e8f0' }}>
+                <input type="checkbox" checked={flightColorFilters.gray} onChange={(e) => setFlightColorFilters(p => ({...p, gray: e.target.checked}))} style={{ accentColor: '#64748b' }} />
+                <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#64748b' }}></span> Sin envíos
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: '#e2e8f0' }}>
+                <input type="checkbox" checked={flightColorFilters.green} onChange={(e) => setFlightColorFilters(p => ({...p, green: e.target.checked}))} style={{ accentColor: '#10b981' }} />
+                <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#10b981' }}></span> {'< 70%'}
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: '#e2e8f0' }}>
+                <input type="checkbox" checked={flightColorFilters.yellow} onChange={(e) => setFlightColorFilters(p => ({...p, yellow: e.target.checked}))} style={{ accentColor: '#f59e0b' }} />
+                <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#f59e0b' }}></span> 70% - 90%
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: '#e2e8f0' }}>
+                <input type="checkbox" checked={flightColorFilters.red} onChange={(e) => setFlightColorFilters(p => ({...p, red: e.target.checked}))} style={{ accentColor: '#ef4444' }} />
+                <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#ef4444' }}></span> {'> 90%'}
+              </label>
+            </div>
+          )}
+        </div>
 
-        {showFilters && (
-          <div className="ct-map-filter-panel">
-            <label className="ct-map-filter-check">
-              <input type="checkbox" checked={showFlightsWithoutShipments} onChange={(e) => setShowFlightsWithoutShipments(e.target.checked)} style={{ accentColor: '#64748b' }} />
-              <span>Vuelos sin envíos</span>
-            </label>
-            <label className="ct-map-filter-check">
-              <input type="checkbox" checked={showFlightsWithShipments} onChange={(e) => setShowFlightsWithShipments(e.target.checked)} style={{ accentColor: '#f97316' }} />
-              <span>Vuelos con envíos</span>
-            </label>
-          </div>
-        )}
+        <div style={{ position: 'relative' }}>
+          <button
+            onClick={() => setOpenFilterMenu(p => p === 'airports' ? null : 'airports')}
+            className={`ct-map-filter-btn${openFilterMenu === 'airports' ? ' ct-map-filter-btn--active' : ''}`}
+            title="Filtros de Almacenes"
+            style={{ borderRadius: '50%', width: '40px', height: '40px', padding: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '20px', background: openFilterMenu === 'airports' ? 'rgba(96, 165, 250, 0.2)' : 'rgba(15, 23, 42, 0.8)', border: openFilterMenu === 'airports' ? '1px solid rgba(96, 165, 250, 0.5)' : '1px solid rgba(255,255,255,0.1)' }}
+          >
+            🏭
+          </button>
+          {openFilterMenu === 'airports' && (
+            <div style={{ position: 'absolute', top: '100%', left: '0', marginTop: '8px', background: 'rgba(15, 23, 42, 0.95)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', padding: '12px', display: 'flex', flexDirection: 'column', gap: '10px', minWidth: '150px' }}>
+              <div style={{ fontSize: '11px', color: '#94a3b8', fontWeight: 600, textTransform: 'uppercase', marginBottom: '4px' }}>Almacenes</div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: '#e2e8f0' }}>
+                <input type="checkbox" checked={airportColorFilters.gray} onChange={(e) => setAirportColorFilters(p => ({...p, gray: e.target.checked}))} style={{ accentColor: '#64748b' }} />
+                <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#64748b' }}></span> Vacío / Normal
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: '#e2e8f0' }}>
+                <input type="checkbox" checked={airportColorFilters.green} onChange={(e) => setAirportColorFilters(p => ({...p, green: e.target.checked}))} style={{ accentColor: '#10b981' }} />
+                <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#10b981' }}></span> {'< 70%'}
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: '#e2e8f0' }}>
+                <input type="checkbox" checked={airportColorFilters.yellow} onChange={(e) => setAirportColorFilters(p => ({...p, yellow: e.target.checked}))} style={{ accentColor: '#f59e0b' }} />
+                <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#f59e0b' }}></span> 70% - 90%
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', fontSize: '13px', color: '#e2e8f0' }}>
+                <input type="checkbox" checked={airportColorFilters.red} onChange={(e) => setAirportColorFilters(p => ({...p, red: e.target.checked}))} style={{ accentColor: '#ef4444' }} />
+                <span style={{ width: '10px', height: '10px', borderRadius: '50%', background: '#ef4444' }}></span> {'> 90%'}
+              </label>
+            </div>
+          )}
+        </div>
       </div>
 
       <LegendButton />

@@ -165,18 +165,15 @@ const AirportConfigPanel = () => {
             {status === 'ready' && filtered.map(ap => (
               <div key={ap.id}
                 style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  padding: '8px 10px', borderRadius: '6px', marginBottom: '4px',
-                  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                <div>
-                  <span style={{ fontWeight: 'bold', color: '#60a5fa', fontSize: '13px' }}>{ap.icaoCode}</span>
-                  <span style={{ color: '#94a3b8', fontSize: '11px', marginLeft: '8px' }}>{ap.city}, {ap.country}</span>
-                  <div style={{ fontSize: '10px', color: '#64748b', marginTop: '2px' }}>
-                    Cap: {ap.storageCapacity?.toLocaleString()} · GMT{ap.gmtOffset >= 0 ? '+' : ''}{ap.gmtOffset}
-                  </div>
+                  padding: '4px 8px', borderRadius: '4px', marginBottom: '3px',
+                  background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                  <span style={{ fontWeight: 'bold', color: '#60a5fa', fontSize: '12px' }}>{ap.icaoCode}</span>
+                  <span style={{ fontSize: '10px', color: '#64748b' }}>Cap:{ap.storageCapacity} · GMT{ap.gmtOffset >= 0 ? '+' : ''}{ap.gmtOffset}</span>
                 </div>
                 <button onClick={() => handleEdit(ap)}
-                  style={{ padding: '4px 10px', borderRadius: '5px', border: '1px solid rgba(96,165,250,0.3)',
-                    background: 'rgba(96,165,250,0.1)', color: '#93c5fd', fontSize: '11px', cursor: 'pointer' }}>
+                  style={{ padding: '2px 6px', borderRadius: '4px', border: '1px solid rgba(96,165,250,0.2)',
+                    background: 'transparent', color: '#93c5fd', fontSize: '10px', cursor: 'pointer' }}>
                   ✏️ Editar
                 </button>
               </div>

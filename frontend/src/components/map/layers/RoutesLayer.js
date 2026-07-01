@@ -32,7 +32,7 @@ export const createRoutesLayers = ({
     
     if (progress >= 0.99) return;
 
-    const passesFilter = flightPassesFilter(plane.capacityPercent, plane.from, plane.to);
+    const passesFilter = flightPassesFilter(plane.capacityPercent, plane.from, plane.to, plane.ocupacionReal);
     if (!passesFilter) return;
 
     const isEmpty = !plane.ocupacionReal || plane.ocupacionReal === 0;

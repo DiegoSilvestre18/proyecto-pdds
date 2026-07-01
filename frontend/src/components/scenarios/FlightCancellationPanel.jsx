@@ -99,21 +99,18 @@ export default function FlightCancellationPanel({ sessionId, isRunning, startEpo
 
                 return (
                     <div key={v.id} style={{
-                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 10px',
-                      background: 'rgba(255, 255, 255, 0.03)', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.05)',
+                      display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '4px 8px', marginBottom: '3px',
+                      background: 'rgba(255, 255, 255, 0.02)', borderRadius: '4px', border: '1px solid rgba(255, 255, 255, 0.03)',
                     }}>
-                      <div style={{ fontSize: '12px' }}>
-                        <div style={{ fontWeight: 700, color: '#e2e8f0' }}>
-                          {v.origenIcao} → {v.destinoIcao}
-                          <span style={{ marginLeft: '8px', fontWeight: 400, color: '#94a3b8' }}>ID: {v.id}</span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ fontWeight: 600, color: '#e2e8f0', fontSize: '11px', minWidth: '75px' }}>
+                          {v.origenIcao} ➝ {v.destinoIcao}
                         </div>
-                        <div style={{ fontSize: '11px', color: '#64748b', marginTop: '2px' }}>
-                          Salida: {formatMinute(v.departureMinute)} · en {Math.floor(minutesUntilDeparture / 60)}h {minutesUntilDeparture % 60}m
+                        <div style={{ fontSize: '10px', color: '#64748b' }}>
+                          {formatMinute(v.departureMinute)} ({Math.floor(minutesUntilDeparture / 60)}h)
                         </div>
                         {!state && willDefer && (
-                            <div style={{ fontSize: '10px', color: '#f59e0b', marginTop: '2px' }}>
-                              ⏱ Menos de 1h — se cancelará el vuelo de mañana
-                            </div>
+                            <span style={{ fontSize: '10px', color: '#f59e0b' }} title="Menos de 1h — se cancelará el vuelo de mañana">⏱</span>
                         )}
                       </div>
 
@@ -121,16 +118,17 @@ export default function FlightCancellationPanel({ sessionId, isRunning, startEpo
                           onClick={() => handleCancel(v.id)}
                           disabled={!!state || cancellingId === v.id}
                           style={{
-                            padding: '4px 10px', borderRadius: '6px', fontSize: '11px', fontWeight: 600, border: 'none',
+                            padding: '2px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 600, border: 'none',
                             cursor: (state || cancellingId === v.id) ? 'not-allowed' : 'pointer',
                             background: state === 'cancelled' ? 'rgba(100, 116, 139, 0.2)'
                                 : state === 'deferred' ? 'rgba(245, 158, 11, 0.2)'
-                                    : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-                            color: state === 'cancelled' ? '#94a3b8' : state === 'deferred' ? '#f59e0b' : '#fff',
+                                    : 'transparent',
+                            border: `1px solid ${state === 'cancelled' ? 'rgba(100, 116, 139, 0.3)' : state === 'deferred' ? 'rgba(245, 158, 11, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+                            color: state === 'cancelled' ? '#94a3b8' : state === 'deferred' ? '#f59e0b' : '#ef4444',
                             transition: 'all 0.2s ease',
                           }}
                       >
-                        {cancellingId === v.id ? '...' : state === 'cancelled' ? 'Cancelado hoy' : state === 'deferred' ? 'Diferido a mañana' : 'Cancelar'}
+                        {cancellingId === v.id ? '...' : state === 'cancelled' ? 'Cancelado' : state === 'deferred' ? 'Mañana' : 'Cancelar'}
                       </button>
                     </div>
                 );

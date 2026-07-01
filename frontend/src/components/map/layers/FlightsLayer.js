@@ -35,7 +35,7 @@ export const createFlightsLayer = ({
     const isSelected = selectedAircraftId === plane.id;
     const isHighlighted = highlightedId === plane.id;
     const isWarehouseFlight = selectedAirportCode && (plane.from === selectedAirportCode || plane.to === selectedAirportCode);
-    const passesFilter = flightPassesFilter(plane.capacityPercent, plane.from, plane.to);
+    const passesFilter = flightPassesFilter(plane.capacityPercent, plane.from, plane.to, plane.ocupacionReal);
     
     const isOnGround = progress <= 0.01 || progress >= 0.99;
     const isPreDeparture = progress <= 0.01;

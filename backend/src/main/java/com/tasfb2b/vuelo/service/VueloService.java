@@ -65,12 +65,6 @@ public class VueloService {
         int depUtc = (request.departureMinute() - (origen.getGmtOffset() * 60) + 1440) % 1440;
         int arrUtc = (request.arrivalMinute() - (destino.getGmtOffset() * 60) + 1440) % 1440;
 
-        int currentMin = getCurrentMinute();
-        int diff = depUtc - currentMin;
-        if (diff < 0) diff += 1440;
-        
-        boolean cancelledAndReagendado = diff < 60;
-
         Vuelo vuelo = Vuelo.builder()
                 .origen(origen)
                 .destino(destino)
@@ -78,8 +72,8 @@ public class VueloService {
                 .departureMinute(depUtc)
                 .arrivalMinute(arrUtc)
                 .intercontinental(intercontinental)
-                .cancelled(cancelledAndReagendado)
-                .reagendado(cancelledAndReagendado)
+                .cancelled(false)
+                .reagendado(false)
                 .build();
 
         vueloRepo.save(vuelo);
@@ -205,12 +199,6 @@ public class VueloService {
                 int arrUtc = (parsed.arrivalMinute() - (destino.getGmtOffset() * 60) + 1440) % 1440;
                 boolean intercontinental = !origen.getContinent().equals(destino.getContinent());
 
-                int currentMin = getCurrentMinute();
-                int diff = depUtc - currentMin;
-                if (diff < 0) diff += 1440;
-                
-                boolean cancelledAndReagendado = diff < 60;
-
                 Vuelo vuelo = Vuelo.builder()
                         .origen(origen)
                         .destino(destino)
@@ -218,8 +206,8 @@ public class VueloService {
                         .departureMinute(depUtc)
                         .arrivalMinute(arrUtc)
                         .intercontinental(intercontinental)
-                        .cancelled(cancelledAndReagendado)
-                        .reagendado(cancelledAndReagendado)
+                        .cancelled(false)
+                        .reagendado(false)
                         .build();
 
                 vuelo = vueloRepo.save(vuelo);
