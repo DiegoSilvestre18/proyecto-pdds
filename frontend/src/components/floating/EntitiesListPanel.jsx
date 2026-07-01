@@ -189,7 +189,7 @@ const getLevelColor = (percent) => {
 };
 
 const FlightRow = React.memo(function FlightRow({ index, style, data }) {
-  const { flights, expandedUt, handleSelectUT, setExpandedUt, focusedEntity, utRefsMap } = data;
+  const { flights, expandedUt, handleSelectUT, setExpandedUt, focusedEntity } = data;
   const ut = flights[index];
   if (!ut) return null;
 
@@ -201,47 +201,36 @@ const FlightRow = React.memo(function FlightRow({ index, style, data }) {
 
   return (
       <div style={{ ...style, padding: '2px 4px', boxSizing: 'border-box' }}>
-        <div style={{
-          background: isFocused ? 'rgba(96,165,250,0.12)' : 'rgba(255,255,255,0.05)',
-          borderRadius: '10px',
-          border: `1px solid ${isFocused ? '#60a5fa' : (statusColors[ut.status] || statusColors.default)}`,
-          overflow: 'hidden',
-          height: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          padding: '4px',
-        }}>
-          <div
-              style={{ padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer', height: '100%', boxSizing: 'border-box' }}
-              onClick={() => { setExpandedUt(isExpanded ? null : ut.id); handleSelectUT(ut); }}
-          >
-            <div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-                <span style={{ fontWeight: 'bold', color: '#e2e8f0', fontSize: '13px' }}>Vuelo {numericId}</span>
-                <span style={{ background: statusColors[ut.status] || statusColors.default, fontSize: '10px', padding: '2px 6px', borderRadius: '12px', color: '#fff', textTransform: 'uppercase' }}>{ut.status}</span>
-              </div>
-              <div
-                  style={{
-                    fontSize: '11px',
-                    color: '#9ca3af',
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: '4px',
-                    maxWidth: '100%',
-                    alignItems: 'center'
-                  }}
-              >
-                <span style={{ whiteSpace: 'nowrap' }}>{ut.from}</span>
-                <span>➔</span>
-                <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100px', display: 'inline-block',verticalAlign: 'bottom' }}>
-    {ut.to}
-  </span>
-              </div>
+        <div
+            style={{
+              background: isFocused ? 'rgba(96,165,250,0.12)' : 'rgba(255,255,255,0.05)',
+              borderRadius: '6px',
+              borderLeft: `3px solid ${isFocused ? '#60a5fa' : semaforo}`,
+              overflow: 'hidden',
+              cursor: 'pointer',
+              height: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '10px 12px',
+              boxSizing: 'border-box',
+            }}
+            onClick={() => { setExpandedUt(isExpanded ? null : ut.id); handleSelectUT(ut); }}
+        >
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+              <span style={{ fontWeight: 'bold', color: '#e2e8f0', fontSize: '13px' }}>Vuelo {numericId}</span>
+              <span style={{ background: statusColors[ut.status] || statusColors.default, fontSize: '10px', padding: '2px 6px', borderRadius: '12px', color: '#fff', textTransform: 'uppercase' }}>{ut.status}</span>
             </div>
-            <div style={{ minWidth: '170px',textAlign: 'right' }}>
-              <div style={{ fontSize: '14px', fontWeight: 'bold', color: semaforo }}>{pct}%</div>
-              <div style={{ fontSize: '10px', color: '#94a3b8' }}>{ut.ocupacionReal || 0} / {ut.capacidadMax || 0} maletas</div>
+            <div style={{ fontSize: '11px', color: '#9ca3af', display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
+              <span style={{ whiteSpace: 'nowrap' }}>{ut.from}</span>
+              <span>➔</span>
+              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100px', display: 'inline-block', verticalAlign: 'bottom' }}>{ut.to}</span>
             </div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: '14px', fontWeight: 'bold', color: semaforo }}>{pct}%</div>
+            <div style={{ fontSize: '10px', color: '#94a3b8' }}>{ut.ocupacionReal || 0} / {ut.capacidadMax || 0} maletas</div>
           </div>
         </div>
       </div>
@@ -305,6 +294,125 @@ function FlightDetailPanel({ flight, onClose, bagSummary }) {
   );
 }
 
+const WarehouseRow = React.memo(function WarehouseRow({ index, style, data }) {
+  const { warehouses, expandedWh, setExpandedWh, handleSelectWarehouse, focusedEntity, airportMetrics } = data;
+  const wh = warehouses[index];
+  if (!wh) return null;
+
+  const metrics = airportMetrics[wh.icao] || {};
+  const pct = metrics.occupancy ?? 0;
+  const semaforo = getLevelColor(pct);
+  const isFocused = focusedEntity?.type === 'airport' && focusedEntity?.id === wh.icao;
+
+  return (
+    <div style={{ ...style, padding: '2px 4px', boxSizing: 'border-box' }}>
+      <div
+        style={{
+          background: isFocused ? 'rgba(96,165,250,0.12)' : 'rgba(255,255,255,0.05)',
+          borderRadius: '6px',
+          borderLeft: `3px solid ${isFocused ? '#60a5fa' : semaforo}`,
+          overflow: 'hidden',
+          cursor: 'pointer',
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '10px 12px',
+          boxSizing: 'border-box',
+        }}
+        onClick={() => {
+          setExpandedWh(expandedWh === wh.icao ? null : wh.icao);
+          handleSelectWarehouse(wh);
+        }}
+      >
+        <div>
+          <div style={{ fontWeight: 'bold', color: '#e2e8f0', fontSize: '14px', marginBottom: '2px' }}>{wh.icao}</div>
+          <div style={{ fontSize: '11px', color: '#9ca3af' }}>{wh.city}</div>
+        </div>
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontSize: '14px', fontWeight: 'bold', color: semaforo }}>{Math.trunc(pct).toFixed(0)}%</div>
+          <div style={{ fontSize: '10px', color: '#94a3b8' }}>{metrics.storedBags ?? 0} / {metrics.warehouseCapacity ?? 0} stock</div>
+        </div>
+      </div>
+    </div>
+  );
+}, (prev, next) => {
+  const a = prev.data.warehouses[prev.index];
+  const b = next.data.warehouses[next.index];
+  const ma = prev.data.airportMetrics[a?.icao] || {};
+  const mb = next.data.airportMetrics[b?.icao] || {};
+  return a?.icao === b?.icao
+      && ma.occupancy === mb.occupancy
+      && ma.storedBags === mb.storedBags
+      && prev.data.expandedWh === next.data.expandedWh
+      && prev.data.focusedEntity?.id === next.data.focusedEntity?.id;
+});
+
+function WarehouseDetailPanel({ warehouse, incoming, outgoing, onClose, onSelectFlight, bagSummary }) {
+  if (!warehouse) return null;
+
+  return (
+    <div style={{
+      background: 'rgba(0,0,0,0.4)',
+      borderRadius: '6px',
+      padding: '12px',
+      border: '1px solid rgba(96,165,250,0.3)',
+      position: 'relative',
+    }}>
+      <button
+        onClick={onClose}
+        style={{ position: 'absolute', top: 8, right: 8, background: 'transparent', border: 'none', color: '#9ca3af', cursor: 'pointer', fontSize: 14 }}
+      >
+        ✕
+      </button>
+
+      <div style={{ fontSize: '12px', color: '#e2e8f0', marginBottom: '8px', fontWeight: 'bold' }}>
+        🏭 {warehouse.icao} — {warehouse.city}
+      </div>
+
+      <div style={{ fontSize: '11px', color: '#cbd5e1', marginBottom: '8px', fontWeight: 'bold' }}>
+        📥 VUELOS ENTRANTES ({incoming?.length || 0})
+      </div>
+      {incoming?.length > 0 ? incoming.map(f => {
+        const fId = f.id?.toString().replace("vuelo-", "").split("-")[0];
+        return (
+          <div key={f.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', padding: '2px 0', color: '#9ca3af', cursor: 'pointer' }}
+            onClick={(e) => { e.stopPropagation(); onSelectFlight(f); }}
+          >
+            <span>✈ Vuelo {fId} ({f.from})</span>
+            <span style={{ color: f.ocupacionReal > 0 ? '#10b981' : '#64748b' }}>
+              {f.ocupacionReal > 0 ? `+${f.ocupacionReal} maletas` : 'En tránsito vacío'}
+            </span>
+          </div>
+        );
+      }) : (
+        <div style={{ fontSize: '10px', color: '#475569', fontStyle: 'italic' }}>Sin vuelos entrantes activos</div>
+      )}
+
+      <div style={{ fontSize: '11px', color: '#cbd5e1', margin: '12px 0 8px 0', fontWeight: 'bold' }}>
+        📤 VUELOS SALIENTES ({outgoing?.length || 0})
+      </div>
+      {outgoing?.length > 0 ? outgoing.map(f => {
+        const fId = f.id?.toString().replace("vuelo-", "").split("-")[0];
+        return (
+          <div key={f.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', padding: '2px 0', color: '#9ca3af', cursor: 'pointer' }}
+            onClick={(e) => { e.stopPropagation(); onSelectFlight(f); }}
+          >
+            <span>✈ Vuelo {fId} (→{f.to})</span>
+            <span style={{ color: f.ocupacionReal > 0 ? '#f59e0b' : '#64748b' }}>
+              {f.ocupacionReal > 0 ? `-${f.ocupacionReal} maletas` : 'En tránsito vacío'}
+            </span>
+          </div>
+        );
+      }) : (
+        <div style={{ fontSize: '10px', color: '#475569', fontStyle: 'italic' }}>Sin vuelos salientes activos</div>
+      )}
+
+      {bagSummary}
+    </div>
+  );
+}
+
 const getLevelName = (percent) => {
   if (percent >= 90) return 'red';
   if (percent >= 70) return 'amber';
@@ -318,11 +426,11 @@ const SEMAPHORE_OPTIONS = [
   { value: 'red',   label: '🔴 Crítico', color: '#ef4444' },
 ];
 
-const FLIGHT_STATUS_OPTIONS = [
-  { value: null,        label: '⬜ Todos',     color: '#94a3b8' },
-  { value: 'normal',    label: '🟢 Baja ocupación',    color: '#10b981' },
-  { value: 'critical',  label: '🟡 Ocupación media',   color: '#f59e0b' },
-  { value: 'cancelled', label: '🔴 Alta ocupación', color: '#ef4444' },
+const OCCUPANCY_FILTER_OPTIONS = [
+  { value: null,     label: '⬜ Todos',           color: '#94a3b8' },
+  { value: 'low',    label: '🟢 Baja (<70%)',     color: '#10b981' },
+  { value: 'medium', label: '🟡 Media (70-90%)',  color: '#f59e0b' },
+  { value: 'high',   label: '🔴 Alta (>90%)',     color: '#ef4444' },
 ];
 
 // ── sessionId: nuevo prop, necesario para resolver el tracker correcto ──
@@ -341,32 +449,17 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
   // ── Modal de detalle de maletas (compartido entre vuelo/almacén) ──────
   const [bagDetailTarget, setBagDetailTarget] = useState(null); // { title, bags } | null
 
-  const listContainerRef = useRef(null);
-  const [listHeight, setListHeight] = useState(0);
-
-  useEffect(() => {
-    if (!listContainerRef.current) return;
-    const updateHeight = () => {
-      const rect = listContainerRef.current.getBoundingClientRect();
-      setListHeight(rect.height);
-    };
-    updateHeight();
-    const ro = new ResizeObserver(updateHeight);
-    ro.observe(listContainerRef.current);
-    return () => ro.disconnect();
-  }, [activeTab]);
-
   const {
     focusedEntity,
     setFocusedEntity,
+    clearFocusedEntity,
     dispatchMapCommand,
     activeFilters,
     setActiveFilters,
   } = useSelectionBridge();
 
   const utRefsMap = useRef({});
-  const whRefsMap = useRef({});
-  const scrollContainerRef = useRef(null);
+  const whListRef = useRef(null);
   const lastMapSelectionRef = useRef(null);
 
   useEffect(() => {
@@ -384,21 +477,6 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
       lastMapSelectionRef.current = { type: 'airport', id: focusedEntity.id };
     }
   }, [focusedEntity]);
-
-  useEffect(() => {
-    const last = lastMapSelectionRef.current;
-    if (!last) return;
-
-    const refMap = last.type === 'flight' ? utRefsMap : whRefsMap;
-    const ref = refMap.current[last.id];
-
-    if (ref) {
-      ref.scrollIntoView({ behavior: 'smooth', block: 'center' });
-      ref.classList.add('ct-entity-highlighted');
-      setTimeout(() => ref.classList.remove('ct-entity-highlighted'), 2500);
-      lastMapSelectionRef.current = null;
-    }
-  }, [activeTab, expandedWh, expandedUt]);
 
   const handleSelectUT = useCallback((ut) => {
     setFocusedEntity('flight', ut.id, 'panel');
@@ -418,8 +496,8 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
     setActiveFilters(prev => ({ ...prev, semaphoreLevel: level }));
   }, [setActiveFilters]);
 
-  const handleFlightStatusFilter = useCallback((status) => {
-    setActiveFilters(prev => ({ ...prev, flightStatus: status }));
+  const handleOccupancyFilter = useCallback((level) => {
+    setActiveFilters(prev => ({ ...prev, flightStatus: level }));
   }, [setActiveFilters]);
 
   const getContinentCenter = useCallback((continent) => {
@@ -464,7 +542,13 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
       result = result.filter(ut => ut.to?.toLowerCase().includes(q));
     }
     if (activeFilters.flightStatus) {
-      result = result.filter(ut => ut.status === activeFilters.flightStatus);
+      result = result.filter(ut => {
+        const pct = ut.capacityPercent ?? 0;
+        if (activeFilters.flightStatus === 'low') return pct < 70;
+        if (activeFilters.flightStatus === 'medium') return pct >= 70 && pct <= 90;
+        if (activeFilters.flightStatus === 'high') return pct > 90;
+        return true;
+      });
     }
 
     // Filtro por continente para los vuelos en la lista
@@ -507,6 +591,11 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
     if (!selectedFlightDetail?.id) return null;
     return selectedFlightDetail.id.toString().replace("vuelo-", "").split("-")[0];
   }, [selectedFlightDetail]);
+
+  const selectedWarehouseDetail = useMemo(() => {
+    if (!expandedWh) return null;
+    return (airports || []).find(wh => wh.icao === expandedWh) || null;
+  }, [expandedWh, airports]);
 
   const { bags: flightBags, loading: flightBagsLoading, error: flightBagsError } =
       useBagTracking(sessionId, expandedUt ? 'flight' : null, selectedFlightInstanceKey);
@@ -562,6 +651,27 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
     return result;
   }, [airports, airportMetrics, activeAircraft, whSearch, activeFilters.continent, whSort, activeFilters.semaphoreLevel]);
 
+  useEffect(() => {
+    const last = lastMapSelectionRef.current;
+    if (!last) return;
+
+    if (last.type === 'flight') {
+      const ref = utRefsMap.current[last.id];
+      if (ref) {
+        ref.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        ref.classList.add('ct-entity-highlighted');
+        setTimeout(() => ref.classList.remove('ct-entity-highlighted'), 2500);
+        lastMapSelectionRef.current = null;
+      }
+    } else if (last.type === 'airport' && whListRef.current) {
+      const idx = filteredWarehouses.findIndex(wh => wh.icao === last.id);
+      if (idx >= 0) {
+        whListRef.current.scrollToItem(idx, 'center');
+        lastMapSelectionRef.current = null;
+      }
+    }
+  }, [activeTab, expandedWh, expandedUt, filteredWarehouses]);
+
   const getWarehouseFlights = useCallback((icao) => {
     if (!activeAircraft || activeAircraft.length === 0) return { incoming: [], outgoing: [] };
     const incoming = activeAircraft.filter(f => f.to === icao && f.status !== 'cancelled').slice(0, 5);
@@ -590,227 +700,211 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0, overflow: 'hidden' }}>
 
           {activeTab === 'ut' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-
-                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                  {FLIGHT_STATUS_OPTIONS.map(opt => (
-                      <button key={opt.value ?? 'all'} onClick={() => handleFlightStatusFilter(opt.value)}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+                {expandedUt && selectedFlightDetail ? (
+                    <>
+                      <button onClick={() => { setExpandedUt(null); clearFocusedEntity(); if (onSelectFlight) onSelectFlight(null); dispatchMapCommand('resetView'); }}
                               style={{
-                                padding: '4px 10px', borderRadius: '8px', fontSize: '10px', fontWeight: 'bold',height: '24px',
-                                cursor: 'pointer', transition: 'all 0.15s',
-                                border: activeFilters.flightStatus === opt.value ? `1px solid ${opt.color}` : '1px solid rgba(255,255,255,0.1)',
-                                background: activeFilters.flightStatus === opt.value ? `${opt.color}20` : 'transparent',
-                                color: activeFilters.flightStatus === opt.value ? opt.color : '#64748b',
+                                alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '4px',
+                                padding: '6px 12px', borderRadius: '6px',
+                                border: '1px solid rgba(255,255,255,0.1)',
+                                background: 'transparent', color: '#60a5fa',
+                                fontSize: '11px', fontWeight: 'bold', cursor: 'pointer',
                               }}
                       >
-                        {opt.label}
+                        ← Volver a vuelos
                       </button>
-                  ))}
-                </div>
+                      <FlightDetailPanel
+                          flight={selectedFlightDetail}
+                          onClose={() => { setExpandedUt(null); clearFocusedEntity(); if (onSelectFlight) onSelectFlight(null); dispatchMapCommand('resetView'); }}
+                          bagSummary={
+                            <BagTrackingSummary
+                                bags={flightBags}
+                                loading={flightBagsLoading}
+                                error={flightBagsError}
+                                onShowDetail={() => setBagDetailTarget({
+                                  title: `Vuelo ${selectedFlightNumericId}`,
+                                  bags: flightBags,
+                                })}
+                            />
+                          }
+                      />
+                    </>
+                ) : (
+                    <>
+                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                        {OCCUPANCY_FILTER_OPTIONS.map(opt => (
+                            <button key={opt.value ?? 'all'} onClick={() => handleOccupancyFilter(opt.value)}
+                                    style={{
+                                      padding: '4px 10px', borderRadius: '8px', fontSize: '10px', fontWeight: 'bold',height: '24px',
+                                      cursor: 'pointer', transition: 'all 0.15s',
+                                      border: activeFilters.flightStatus === opt.value ? `1px solid ${opt.color}` : '1px solid rgba(255,255,255,0.1)',
+                                      background: activeFilters.flightStatus === opt.value ? `${opt.color}20` : 'transparent',
+                                      color: activeFilters.flightStatus === opt.value ? opt.color : '#64748b',
+                                    }}
+                            >
+                              {opt.label}
+                            </button>
+                        ))}
+                      </div>
 
-                <div style={{ display: 'flex', gap: '4px' }}>
-                  <input type="text" placeholder="ID..." value={utSearch} onChange={(e) => setUtSearch(e.target.value)}
-                         style={{ width: '55px', height: '10px',fontSize: '11px', padding: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '4px' }} />
-                  <input type="text" placeholder="Origen..." value={utSearchOrigin} onChange={(e) => setUtSearchOrigin(e.target.value)}
-                         style={{ flex: 1, height: '10px',fontSize: '11px',padding: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '4px' }} />
-                  <input type="text" placeholder="Destino..." value={utSearchDest} onChange={(e) => setUtSearchDest(e.target.value)}
-                         style={{ flex: 1, height: '10px', fontSize: '11px',padding: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '4px' }} />
-                </div>
-                <div style={{ display: 'flex', gap: '4px' }}>
-                  <select value={utSort} onChange={(e) => setUtSort(e.target.value)}
-                          style={{ flex: 1,  height: '30px', padding: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '4px', fontSize: '11px' }}
-                  >
-                    <option value="occupancy_desc">Ocupación (Mayor a Menor)</option>
-                    <option value="occupancy_asc">Ocupación (Menor a Mayor)</option>
-                    <option value="dep_asc">Hora de Salida</option>
-                    <option value="arr_asc">Hora de Llegada</option>
-                    <option value="origin">Origen (A-Z)</option>
-                    <option value="dest">Destino (A-Z)</option>
-                  </select>
-                </div>
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <input type="text" placeholder="ID..." value={utSearch} onChange={(e) => setUtSearch(e.target.value)}
+                               style={{ width: '60px', fontSize: '11px', padding: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '4px', boxSizing: 'border-box' }} />
+                        <input type="text" placeholder="Origen..." value={utSearchOrigin} onChange={(e) => setUtSearchOrigin(e.target.value)}
+                               style={{ flex: 1, fontSize: '11px', padding: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '4px', boxSizing: 'border-box' }} />
+                        <input type="text" placeholder="Destino..." value={utSearchDest} onChange={(e) => setUtSearchDest(e.target.value)}
+                               style={{ flex: 1, fontSize: '11px', padding: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '4px', boxSizing: 'border-box' }} />
+                      </div>
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <select value={utSort} onChange={(e) => setUtSort(e.target.value)}
+                                style={{ flex: 1,  height: '30px', padding: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '4px', fontSize: '11px' }}
+                        >
+                          <option value="occupancy_desc">Ocupación (Mayor a Menor)</option>
+                          <option value="occupancy_asc">Ocupación (Menor a Mayor)</option>
+                          <option value="dep_asc">Hora de Salida</option>
+                          <option value="arr_asc">Hora de Llegada</option>
+                          <option value="origin">Origen (A-Z)</option>
+                          <option value="dest">Destino (A-Z)</option>
+                        </select>
+                      </div>
 
-                {selectedFlightDetail && (
-                    <FlightDetailPanel
-                        flight={selectedFlightDetail}
-                        onClose={() => setExpandedUt(null)}
-                        bagSummary={
-                          <BagTrackingSummary
-                              bags={flightBags}
-                              loading={flightBagsLoading}
-                              error={flightBagsError}
-                              onShowDetail={() => setBagDetailTarget({
-                                title: `Vuelo ${selectedFlightNumericId}`,
-                                bags: flightBags,
-                              })}
-                          />
-                        }
-                    />
-                )}
-
-                {filteredUTs.length > 0 && (
-                    <List
-                        height={selectedFlightDetail ? 300 : 420}
-                        width="100%"
-                        itemCount={filteredUTs.length}
-                        itemSize={72}
-                        itemData={{ flights: filteredUTs, expandedUt, setExpandedUt, handleSelectUT, focusedEntity, utRefsMap }}
-                    >
-                      {FlightRow}
-                    </List>
-                )}
-                {filteredUTs.length === 0 && (
-                    <div style={{ textAlign: 'center', color: '#64748b', fontSize: '12px', padding: '10px' }}>
-                      No hay unidades de transporte activas.
-                    </div>
+                      {filteredUTs.length > 0 && (
+                          <List
+                              height={420}
+                              width="100%"
+                              itemCount={filteredUTs.length}
+                              itemSize={72}
+                              itemData={{ flights: filteredUTs, expandedUt, setExpandedUt, handleSelectUT, focusedEntity }}
+                          >
+                            {FlightRow}
+                          </List>
+                      )}
+                      {filteredUTs.length === 0 && (
+                          <div style={{ textAlign: 'center', color: '#64748b', fontSize: '12px', padding: '10px' }}>
+                            No hay unidades de transporte activas.
+                          </div>
+                      )}
+                    </>
                 )}
               </div>
           )}
 
           {activeTab === 'wh' && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                  {SEMAPHORE_OPTIONS.map(opt => (
-                      <button
-                          key={opt.value ?? 'all'}
-                          onClick={() => handleSemaphoreFilter(opt.value)}
-                          style={{
-                            padding: '3px 10px', borderRadius: '12px', fontSize: '10px', fontWeight: 'bold',
-                            cursor: 'pointer', transition: 'all 0.15s',
-                            border: activeFilters.semaphoreLevel === opt.value ? `1px solid ${opt.color}` : '1px solid rgba(255,255,255,0.1)',
-                            background: activeFilters.semaphoreLevel === opt.value ? `${opt.color}20` : 'transparent',
-                            color: activeFilters.semaphoreLevel === opt.value ? opt.color : '#64748b',
-                          }}
-                      >
-                        {opt.label}
-                      </button>
-                  ))}
-                </div>
-
-                <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
-                  {[{ value: null, label: '🌎 Todos', color: '#94a3b8' },
-                    { value: 'america', label: '🌎 América', color: '#10b981' },
-                    { value: 'europe', label: '🌎 Europa', color: '#3b82f6' },
-                    { value: 'asia', label: '🌎 Asia', color: '#f59e0b' },
-                  ].map(opt => (
-                      <button key={opt.value ?? 'all'} onClick={() => handleContinentFilter(opt.value)}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', flex: 1, minHeight: 0, overflow: 'hidden' }}>
+                {expandedWh && selectedWarehouseDetail ? (
+                    <>
+                      <button onClick={() => { setExpandedWh(null); clearFocusedEntity(); dispatchMapCommand('resetView'); }}
                               style={{
-                                padding: '3px 10px', borderRadius: '12px', fontSize: '10px', fontWeight: 'bold',
-                                cursor: 'pointer', transition: 'all 0.15s',
-                                border: activeFilters.continent === opt.value ? `1px solid ${opt.color}` : '1px solid rgba(255,255,255,0.1)',
-                                background: activeFilters.continent === opt.value ? `${opt.color}20` : 'transparent',
-                                color: activeFilters.continent === opt.value ? opt.color : '#64748b',
+                                alignSelf: 'flex-start', display: 'flex', alignItems: 'center', gap: '4px',
+                                padding: '6px 12px', borderRadius: '6px',
+                                border: '1px solid rgba(255,255,255,0.1)',
+                                background: 'transparent', color: '#60a5fa',
+                                fontSize: '11px', fontWeight: 'bold', cursor: 'pointer',
                               }}
                       >
-                        {opt.label}
+                        ← Volver a almacenes
                       </button>
-                  ))}
-                </div>
+                      <WarehouseDetailPanel
+                          warehouse={selectedWarehouseDetail}
+                          incoming={getWarehouseFlights(expandedWh).incoming}
+                          outgoing={getWarehouseFlights(expandedWh).outgoing}
+                          onClose={() => { setExpandedWh(null); clearFocusedEntity(); dispatchMapCommand('resetView'); }}
+                          onSelectFlight={handleSelectUT}
+                          bagSummary={
+                            <BagTrackingSummary
+                                bags={warehouseBags}
+                                loading={warehouseBagsLoading}
+                                error={warehouseBagsError}
+                                onShowDetail={() => setBagDetailTarget({
+                                  title: `Almacén ${selectedWarehouseDetail.icao}`,
+                                  bags: warehouseBags,
+                                })}
+                            />
+                          }
+                      />
+                    </>
+                ) : (
+                    <>
+                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                        {SEMAPHORE_OPTIONS.map(opt => (
+                            <button
+                                key={opt.value ?? 'all'}
+                                onClick={() => handleSemaphoreFilter(opt.value)}
+                                style={{
+                                  padding: '3px 10px', borderRadius: '12px', fontSize: '10px', fontWeight: 'bold',
+                                  cursor: 'pointer', transition: 'all 0.15s',
+                                  border: activeFilters.semaphoreLevel === opt.value ? `1px solid ${opt.color}` : '1px solid rgba(255,255,255,0.1)',
+                                  background: activeFilters.semaphoreLevel === opt.value ? `${opt.color}20` : 'transparent',
+                                  color: activeFilters.semaphoreLevel === opt.value ? opt.color : '#64748b',
+                                }}
+                            >
+                              {opt.label}
+                            </button>
+                        ))}
+                      </div>
 
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <input type="text" placeholder="Buscar por código o ciudad..."
-                         value={whSearch} onChange={(e) => setWhSearch(e.target.value)}
-                         style={{ flex: 1, padding: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '4px', fontSize: '12px' }}
-                  />
-                  <select value={whSort} onChange={(e) => setWhSort(e.target.value)}
-                          style={{ padding: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '4px', fontSize: '12px' }}
-                  >
-                    <option value="occupancy_desc">Ocupación (Mayor a Menor)</option>
-                    <option value="occupancy_asc">Ocupación (Menor a Mayor)</option>
-                    <option value="next_departure">Próxima salida de UT</option>
-                    <option value="next_arrival">Próxima llegada de UT</option>
-                    <option value="name_asc">Código (A-Z)</option>
-                  </select>
-                </div>
+                      <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
+                        {[{ value: null, label: '🌎 Todos', color: '#94a3b8' },
+                          { value: 'america', label: '🌎 América', color: '#10b981' },
+                          { value: 'europe', label: '🌎 Europa', color: '#3b82f6' },
+                          { value: 'asia', label: '🌎 Asia', color: '#f59e0b' },
+                        ].map(opt => (
+                            <button key={opt.value ?? 'all'} onClick={() => handleContinentFilter(opt.value)}
+                                    style={{
+                                      padding: '3px 10px', borderRadius: '12px', fontSize: '10px', fontWeight: 'bold',
+                                      cursor: 'pointer', transition: 'all 0.15s',
+                                      border: activeFilters.continent === opt.value ? `1px solid ${opt.color}` : '1px solid rgba(255,255,255,0.1)',
+                                      background: activeFilters.continent === opt.value ? `${opt.color}20` : 'transparent',
+                                      color: activeFilters.continent === opt.value ? opt.color : '#64748b',
+                                    }}
+                            >
+                              {opt.label}
+                            </button>
+                        ))}
+                      </div>
 
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {filteredWarehouses.map(wh => {
-                    const metrics = airportMetrics[wh.icao] || {};
-                    const pct = metrics.occupancy ?? 0;
-                    const semaforo = getLevelColor(pct);
-                    const isExpanded = expandedWh === wh.icao;
-                    const isFocused = focusedEntity?.type === 'airport' && focusedEntity?.id === wh.icao;
-                    const flights = isExpanded ? getWarehouseFlights(wh.icao) : null;
-
-                    return (
-                        <div
-                            key={wh.icao}
-                            ref={el => { whRefsMap.current[wh.icao] = el; }}
-                            style={{
-                              background: isFocused ? 'rgba(96,165,250,0.12)' : 'rgba(255,255,255,0.05)',
-                              borderRadius: '6px',
-                              borderLeft: `3px solid ${isFocused ? '#60a5fa' : semaforo}`,
-                              overflow: 'hidden',
-                              transition: 'background 0.3s ease, border-color 0.3s ease',
-                            }}
+                      <div style={{ display: 'flex', gap: '8px' }}>
+                        <input type="text" placeholder="Buscar por código o ciudad..."
+                               value={whSearch} onChange={(e) => setWhSearch(e.target.value)}
+                               style={{ flex: 1, padding: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '4px', fontSize: '12px' }}
+                        />
+                        <select value={whSort} onChange={(e) => setWhSort(e.target.value)}
+                                style={{ padding: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '4px', fontSize: '12px' }}
                         >
-                          <div
-                              style={{ padding: '10px 12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', cursor: 'pointer' }}
-                              onClick={() => {
-                                setExpandedWh(isExpanded ? null : wh.icao);
-                                handleSelectWarehouse(wh);
+                          <option value="occupancy_desc">Ocupación (Mayor a Menor)</option>
+                          <option value="occupancy_asc">Ocupación (Menor a Mayor)</option>
+                          <option value="next_departure">Próxima salida de UT</option>
+                          <option value="next_arrival">Próxima llegada de UT</option>
+                          <option value="name_asc">Código (A-Z)</option>
+                        </select>
+                      </div>
+
+                      {filteredWarehouses.length > 0 ? (
+                          <List
+                              ref={whListRef}
+                              height={420}
+                              width="100%"
+                              itemCount={filteredWarehouses.length}
+                              itemSize={56}
+                              itemData={{
+                                warehouses: filteredWarehouses,
+                                expandedWh,
+                                setExpandedWh,
+                                handleSelectWarehouse,
+                                focusedEntity,
+                                airportMetrics,
                               }}
                           >
-                            <div>
-                              <div style={{ fontWeight: 'bold', color: '#e2e8f0', fontSize: '14px', marginBottom: '2px' }}>{wh.icao}</div>
-                              <div style={{ fontSize: '11px', color: '#9ca3af' }}>{wh.city}</div>
-                            </div>
-                            <div style={{ textAlign: 'right' }}>
-                              <div style={{ fontSize: '14px', fontWeight: 'bold', color: semaforo }}>{Math.trunc(pct).toFixed(2)}%</div>
-                              <div style={{ fontSize: '10px', color: '#94a3b8' }}>{metrics.storedBags ?? 0} / {metrics.warehouseCapacity ?? 0} stock</div>
-                            </div>
+                            {WarehouseRow}
+                          </List>
+                      ) : (
+                          <div style={{ textAlign: 'center', color: '#64748b', fontSize: '12px', padding: '10px' }}>
+                            No hay almacenes que coincidan con los filtros.
                           </div>
-
-                          {isExpanded && (
-                              <div style={{ background: 'rgba(0,0,0,0.3)', padding: '12px', borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-                                <div style={{ fontSize: '11px', color: '#cbd5e1', marginBottom: '8px', fontWeight: 'bold' }}>📥 VUELOS ENTRANTES ({flights?.incoming?.length || 0})</div>
-                                {flights?.incoming?.length > 0 ? flights.incoming.map(f => {
-                                  const fId = f.id?.toString().replace("vuelo-", "").split("-")[0];
-                                  return (
-                                      <div key={f.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', padding: '2px 0', color: '#9ca3af', cursor: 'pointer' }}
-                                           onClick={(e) => { e.stopPropagation(); handleSelectUT(f); }}
-                                      >
-                                        <span>✈ Vuelo {fId} ({f.from})</span>
-                                        <span style={{ color: f.ocupacionReal > 0 ? '#10b981' : '#64748b' }}>
-                                {f.ocupacionReal > 0 ? `+${f.ocupacionReal} maletas` : 'En tránsito vacío'}
-                              </span>
-                                      </div>
-                                  );
-                                }) : (
-                                    <div style={{ fontSize: '10px', color: '#475569', fontStyle: 'italic' }}>Sin vuelos entrantes activos</div>
-                                )}
-
-                                <div style={{ fontSize: '11px', color: '#cbd5e1', margin: '12px 0 8px 0', fontWeight: 'bold' }}>📤 VUELOS SALIENTES ({flights?.outgoing?.length || 0})</div>
-                                {flights?.outgoing?.length > 0 ? flights.outgoing.map(f => {
-                                  const fId = f.id?.toString().replace("vuelo-", "").split("-")[0];
-                                  return (
-                                      <div key={f.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', padding: '2px 0', color: '#9ca3af', cursor: 'pointer' }}
-                                           onClick={(e) => { e.stopPropagation(); handleSelectUT(f); }}
-                                      >
-                                        <span>✈ Vuelo {fId} (→{f.to})</span>
-                                        <span style={{ color: f.ocupacionReal > 0 ? '#f59e0b' : '#64748b' }}>
-                                {f.ocupacionReal > 0 ? `-${f.ocupacionReal} maletas` : 'En tránsito vacío'}
-                              </span>
-                                      </div>
-                                  );
-                                }) : (
-                                    <div style={{ fontSize: '10px', color: '#475569', fontStyle: 'italic' }}>Sin vuelos salientes activos</div>
-                                )}
-
-                                <BagTrackingSummary
-                                    bags={warehouseBags}
-                                    loading={warehouseBagsLoading}
-                                    error={warehouseBagsError}
-                                    onShowDetail={() => setBagDetailTarget({
-                                      title: `Almacén ${wh.icao}`,
-                                      bags: warehouseBags,
-                                    })}
-                                />
-                              </div>
-                          )}
-                        </div>
-                    );
-                  })}
-                </div>
+                      )}
+                    </>
+                )}
               </div>
           )}
 
