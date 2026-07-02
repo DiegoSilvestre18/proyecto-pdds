@@ -270,17 +270,19 @@ const WorldMap = ({
     }
     const metrics = activeMetrics[airportIcao];
     if (activeFilters.semaphoreLevel) {
-      const level = metrics?.level ?? "green";
-      if (level !== activeFilters.semaphoreLevel) return false;
+      const stockBagsCheck = metrics?.storedBags ?? metrics?.load ?? 0;
+      const levelCheck = stockBagsCheck === 0 && metrics ? "empty" : (metrics?.level ?? "green");
+      if (levelCheck !== activeFilters.semaphoreLevel) return false;
     }
     
-    // Dynamic color filters
-    const level = metrics?.level ?? "green";
-    const isGray = !metrics || metrics.totalCurrentVolume === 0;
+    // Dynamic color filters — same criterion as AirportsLayer.js
+    const stockBags = metrics?.storedBags ?? metrics?.load ?? 0;
+    const level = stockBags === 0 && metrics ? "empty" : (metrics?.level ?? "green");
+    const isGray = !metrics || stockBags === 0;
     
     if (isGray && !airportColorFilters.gray) return false;
     if (!isGray && level === "green" && !airportColorFilters.green) return false;
-    if (!isGray && level === "yellow" && !airportColorFilters.yellow) return false;
+    if (!isGray && level === "amber" && !airportColorFilters.yellow) return false;
     if (!isGray && level === "red" && !airportColorFilters.red) return false;
 
     return true;
