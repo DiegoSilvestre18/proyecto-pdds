@@ -118,6 +118,8 @@ const WorldMap = ({
   selectedAircraftId = null,
   onAircraftSelect = () => {},
   showCityLabels = true,
+  showFlightsWithoutShipments = true,
+  showFlightsWithShipments = true,
   onMoveEnd = () => {},
   currentEpochTime = 0,
   systemClock = "--:--:--",
