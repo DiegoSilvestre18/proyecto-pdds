@@ -128,8 +128,7 @@ const WorldMap = ({
   onBackgroundClick = () => {},
   onReset = () => {},
 }) => {
-  const [flightColorFilters, setFlightColorFilters] = useState({ gray: true, green: true, yellow: true, red: true });
-  const [airportColorFilters, setAirportColorFilters] = useState({ gray: true, green: true, yellow: true, red: true });
+  // flightColorFilters y airportColorFilters ahora vienen del SelectionBridge (compartidos)
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
 
   const {
@@ -142,6 +141,10 @@ const WorldMap = ({
     exceptionHighlight,
     clearExceptionHighlight,
     activeFilters,
+    flightColorFilters,
+    setFlightColorFilters,
+    airportColorFilters,
+    setAirportColorFilters,
   } = useSelectionBridge();
 
   const [highlightedId, setHighlightedId] = useState(null);
