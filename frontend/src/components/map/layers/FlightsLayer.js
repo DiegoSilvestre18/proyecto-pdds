@@ -38,6 +38,8 @@ export const createFlightsLayer = ({
     const isWarehouseFlight = selectedAirportCode && (plane.from === selectedAirportCode || plane.to === selectedAirportCode);
     const passesFilter = flightPassesFilter(plane.capacityPercent, plane.from, plane.to, plane.ocupacionReal);
     
+    if (!passesFilter) return;
+
     const isOnGround = progress <= 0.01 || progress >= 0.99;
     const isPreDeparture = progress <= 0.01;
 
@@ -49,7 +51,7 @@ export const createFlightsLayer = ({
     const isAircraftSelected = selectedAircraftId != null;
     const isTrackingActive = trackedRoute?.hops?.length > 0;
     const isDimmed = isAircraftSelected || isTrackingActive;
-    const baseOpacity = passesFilter ? (isDimmed ? (isSelected ? 255 : 60) : 255) : 20;
+    const baseOpacity = isDimmed ? (isSelected ? 255 : 60) : 255;
     const color = isSelected && isAircraftSelected
       ? [129, 140, 248, baseOpacity]
       : isCancelled 
