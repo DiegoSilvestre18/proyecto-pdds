@@ -8,12 +8,9 @@ const NAV_ITEMS = [
   { key: 'occupancy',      icon: '🏆', label: 'Top Aeropuertos' },
   { key: 'pendingShipments', icon: '📦', label: 'Envíos Pendientes' },
   { key: 'transitInventory', icon: '🎒', label: 'Inventario' },
-  { key: 'comparison',     icon: '⚖',  label: 'Comparativa' },
-  { key: 'airportConfig',  icon: '🏢', label: 'Almacenes' },
   { key: 'tracking',    icon: '🔍', label: 'Seguimiento' },
   { key: 'shipments', icon: '✉',  label: 'Envío' },
   { key: 'cancellation', icon: '❌',  label: 'Cancelaciones' },
-  { key: 'reports',        icon: '📑', label: 'Reportes' },
 ];
 
 const ControlDock = ({
