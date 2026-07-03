@@ -68,12 +68,15 @@ export const SelectionBridgeProvider = ({ children }) => {
 
   // Traduce checkboxes del mapa → valor del panel (radio single-select)
   const _checkboxesToFlightStatus = (filters) => {
-    const { green, yellow, red } = filters;
-    // Si solo uno está activo → mapeamos al panel
-    if (green && !yellow && !red) return 'low';
-    if (!green && yellow && !red) return 'medium';
-    if (!green && !yellow && red) return 'high';
-    return null; // mixto o todos → "Todos" en el panel
+    const { gray, green, yellow, red } = filters;
+    // "Sin envíos" (gray) es una categoría ortogonal a los rangos de capacidad.
+    // Si gray está activo junto a cualquier color → combinación mixta → "Todos" en panel.
+    if (gray && (green || yellow || red)) return null;
+    // Selecciones puras de un solo color (sin gray)
+    if (!gray && green && !yellow && !red) return 'low';
+    if (!gray && !green && yellow && !red) return 'medium';
+    if (!gray && !green && !yellow && red) return 'high';
+    return null; // mixto, todos, o solo gray → "Todos" en el panel
   };
 
   const _checkboxesToSemaphore = (filters) => {
