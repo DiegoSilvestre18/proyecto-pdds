@@ -374,6 +374,7 @@ const WorldMap = ({
       airportByIcao,
       selectedAircraftId,
       highlightedId,
+      trackedRoute,
       flightPassesFilter,
       showFlightsWithoutShipments,
       showFlightsWithShipments,
@@ -517,23 +518,6 @@ const WorldMap = ({
           onMoveEnd({ zoom: fitted.zoom, coordinates: [fitted.longitude, fitted.latitude] })
         }}
       />
-
-
-      {trackedRoute && (
-        <button
-          onClick={(e) => { e.stopPropagation(); clearTrackedRoute(); }}
-          style={{
-            position: 'absolute', bottom: 36, right: 20, zIndex: 200,
-            background: 'rgba(167, 139, 250, 0.2)', border: '1px solid rgba(167, 139, 250, 0.5)',
-            borderRadius: '8px', padding: '6px 14px', color: '#a78bfa',
-            fontSize: '11px', fontWeight: 'bold', cursor: 'pointer',
-            backdropFilter: 'blur(6px)',
-          }}
-          title="Limpiar ruta rastreada del mapa"
-        >
-          ✕ Limpiar ruta rastreada
-        </button>
-      )}
 
       {exceptionHighlight && (
         <button

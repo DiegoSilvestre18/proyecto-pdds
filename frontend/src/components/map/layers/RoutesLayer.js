@@ -47,7 +47,9 @@ export const createRoutesLayers = ({
 
     const isSelected = selectedAircraftId === plane.id;
     const isAircraftSelected = selectedAircraftId != null;
-    const opacity = isAircraftSelected ? (isSelected ? 255 : 80) : 220;
+    const isTrackingActive = trackedRoute?.hops?.length > 0;
+    const isDimmed = isAircraftSelected || isTrackingActive;
+    const opacity = isDimmed ? (isSelected ? 255 : 60) : 220;
     const trailColor = isSelected
       ? [129, 140, 248, opacity]
       : [colorRgb[0], colorRgb[1], colorRgb[2], opacity];

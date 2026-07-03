@@ -14,6 +14,7 @@ import AirportDetailPanel from "./components/floating/AirportDetailPanel";
 import FlightCancellationPanel from "./components/scenarios/FlightCancellationPanel";
 import ReportsPanel from "./components/floating/ReportsPanel";
 import EntitiesListPanel from "./components/floating/EntitiesListPanel";
+import TrackingPanel from "./components/floating/TrackingPanel";
 import ShipmentsPanel from "./components/floating/ShipmentsPanel";
 import UpcomingFlightsPanel from "./components/floating/UpcomingFlightsPanel";
 import FinalPlanPanel from "./components/floating/FinalPlanPanel";
@@ -30,6 +31,7 @@ import "./App.css";
 
 // Etiquetas legibles para notificar el cierre de paneles por límite FIFO.
 const PANEL_LABELS = {
+  tracking: "Seguimiento de Rutas",
   cancellation: "Cancelar Vuelos",
   telemetry: "Telemetría en Tiempo Real",
   occupancy: "Top Aeropuertos",
@@ -296,6 +298,31 @@ const App = () => {
         />
       </div>
 
+        {isWindowOpen("tracking") && (
+            <DraggableWindow
+                title="Seguimiento de Rutas"
+                onClose={() => handleToggleWindow("tracking")}
+                initialPosition={{
+                    x: 250,
+                    y: 120,
+                }}
+                defaultSize={{
+                    width: 360,
+                    height: 420,
+                }}
+                isActive={
+                    openWindowsQueue[
+                    openWindowsQueue.length - 1
+                        ] === "tracking"
+                }
+                onFocus={() => handleFocusWindow("tracking")}
+            >
+              <TrackingPanel
+                  sessionId={sessionId}
+              />
+            </DraggableWindow>
+        )}
+
         {isWindowOpen("shipments") && (
             <DraggableWindow
                 title="Gestión de Envíos"
@@ -495,6 +522,7 @@ const App = () => {
         isCollapsed={isDockCollapsed}
         isScenarioConfigOpen={isScenarioConfigOpen}
         panelVisibility={{
+          tracking: isWindowOpen("tracking"),
           telemetry: isWindowOpen("telemetry"),
           entities: isWindowOpen("entities"),
           pendingShipments: isWindowOpen("pendingShipments"),
