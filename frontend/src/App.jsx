@@ -181,16 +181,7 @@ const App = () => {
               };
           }
           return kpi;
-      }),
-      ...(isSimScenario || (activeTab === "vivo" && simState !== "idle") ? [
-          {
-              key: "sim_elapsed_times",
-              title: "T. Ejecución (Real)",
-              value: summary.realTimeElapsed || "00:00:00",
-              subtitle: isSimScenario ? `Restante est: ~${summary.realTimeRemaining || "00:00:00"}` : "Transcurrido",
-              status: "default"
-          }
-      ] : [])
+      })
   ];
 
   return (
@@ -254,8 +245,8 @@ const App = () => {
               onClose={() => handleToggleWindow("telemetry")}
               initialPosition={{ x: 20, y: 100 }}
               defaultSize={{
-                  width: 600,
-                  height: 320
+                  width: 340,
+                  height: 400
               }}
               isActive={openWindowsQueue[openWindowsQueue.length-1] === "telemetry"}
               onFocus={() => handleFocusWindow("telemetry")}

@@ -61,8 +61,87 @@ export const SelectionBridgeProvider = ({ children }) => {
     continent: null,      // null = todos, 'america', 'europe', 'asia'
   });
 
+  // ── 6. Filtros de color del mapa (checkboxes del popover) ─────────────────
+  // Compartidos para sincronizar con los botones del panel lateral
+  const [flightColorFilters, setFlightColorFiltersRaw] = useState({ gray: true, green: true, yellow: true, red: true });
+  const [airportColorFilters, setAirportColorFiltersRaw] = useState({ gray: true, green: true, yellow: true, red: true });
+
+  // Traduce checkboxes del mapa → valor del panel (radio single-select)
+  const _checkboxesToFlightStatus = (filters) => {
+    const { gray, green, yellow, red } = filters;
+    // "Sin envíos" (gray) es una categoría ortogonal a los rangos de capacidad.
+    // Si gray está activo junto a cualquier color → combinación mixta → "Todos" en panel.
+    if (gray && (green || yellow || red)) return null;
+    // Selecciones puras de un solo color (sin gray)
+    if (!gray && green && !yellow && !red) return 'low';
+    if (!gray && !green && yellow && !red) return 'medium';
+    if (!gray && !green && !yellow && red) return 'high';
+    return null; // mixto, todos, o solo gray → "Todos" en el panel
+  };
+
+  const _checkboxesToSemaphore = (filters) => {
+    const { green, yellow, red } = filters;
+    if (green && !yellow && !red) return 'green';
+    if (!green && yellow && !red) return 'amber';
+    if (!green && !yellow && red) return 'red';
+    return null;
+  };
+
+  // Cuando el mapa cambia sus checkboxes de vuelos → sincroniza el panel
+  const setFlightColorFilters = useCallback((updater) => {
+    setFlightColorFiltersRaw(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      // Sincroniza panel lateral
+      setActiveFilters(f => ({ ...f, flightStatus: _checkboxesToFlightStatus(next) }));
+      return next;
+    });
+  }, []);
+
+  // Cuando el mapa cambia sus checkboxes de almacenes → sincroniza el panel
+  const setAirportColorFilters = useCallback((updater) => {
+    setAirportColorFiltersRaw(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      // Sincroniza panel lateral
+      setActiveFilters(f => ({ ...f, semaphoreLevel: _checkboxesToSemaphore(next) }));
+      return next;
+    });
+  }, []);
+
+  // Traduce valor del panel de vuelos → checkboxes del mapa
+  const _flightStatusToCheckboxes = (status) => {
+    if (status === 'low')    return { gray: true,  green: true,  yellow: false, red: false };
+    if (status === 'medium') return { gray: false, green: false, yellow: true,  red: false };
+    if (status === 'high')   return { gray: false, green: false, yellow: false, red: true  };
+    return { gray: true, green: true, yellow: true, red: true }; // null → todos
+  };
+
+  // Traduce valor del panel de almacenes → checkboxes del mapa
+  const _semaphoreToCheckboxes = (level) => {
+    if (level === 'green') return { gray: true,  green: true,  yellow: false, red: false };
+    if (level === 'amber') return { gray: false, green: false, yellow: true,  red: false };
+    if (level === 'red')   return { gray: false, green: false, yellow: false, red: true  };
+    return { gray: true, green: true, yellow: true, red: true }; // null → todos
+  };
+
+  // Wrapper de setActiveFilters que también sincroniza los checkboxes del mapa
+  const setActiveFiltersSync = useCallback((updater) => {
+    setActiveFilters(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      // Sincroniza checkboxes del mapa si cambiaron estos valores
+      if (next.flightStatus !== prev.flightStatus) {
+        setFlightColorFiltersRaw(_flightStatusToCheckboxes(next.flightStatus));
+      }
+      if (next.semaphoreLevel !== prev.semaphoreLevel) {
+        setAirportColorFiltersRaw(_semaphoreToCheckboxes(next.semaphoreLevel));
+      }
+      return next;
+    });
+  }, []);
+
   const resetFilters = useCallback(() => {
     setActiveFilters({ semaphoreLevel: null, flightStatus: null, continent: null });
+    setFlightColorFiltersRaw({ gray: true, green: true, yellow: true, red: true });
+    setAirportColorFiltersRaw({ gray: true, green: true, yellow: true, red: true });
   }, []);
 
   const value = {
@@ -82,10 +161,15 @@ export const SelectionBridgeProvider = ({ children }) => {
     exceptionHighlight,
     setExceptionHighlight,
     clearExceptionHighlight,
-    // 5. Visual Filters
+    // 5. Visual Filters (sincronizados con checkboxes del mapa)
     activeFilters,
-    setActiveFilters,
+    setActiveFilters: setActiveFiltersSync,
     resetFilters,
+    // 6. Color filters del mapa (sincronizados con panel lateral)
+    flightColorFilters,
+    setFlightColorFilters,
+    airportColorFilters,
+    setAirportColorFilters,
   };
 
   return (

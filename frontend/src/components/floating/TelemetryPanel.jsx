@@ -13,7 +13,8 @@ function TelemetryPanel({ isVisible, summary, elapsedOperationTime, kpis, onHide
   return (
     <>
       <aside className="ct-panel ct-panel--telemetry telemetry-scroll" style={{ 
-        maxWidth: '600px',
+        width: '100%',
+        height: '100%',
         overflowX: 'hidden', 
         overflowY: 'auto',
         backdropFilter: 'blur(12px)', 
@@ -41,9 +42,10 @@ function TelemetryPanel({ isVisible, summary, elapsedOperationTime, kpis, onHide
                   display: 'flex',
                   flexDirection: 'column',
                   gap: '2px',
-                  alignItems: 'center'
+                  alignItems: 'center',
+                  minWidth: 0
                 }}>
-                  <span style={{ fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{kpi.title}</span>
+                  <span title={kpi.title} style={{ display: 'block', width: '100%', textAlign: 'center', fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{kpi.title}</span>
                     <strong style={{ fontSize: '13px', color: meta.color, display: 'flex', alignItems: 'center', gap: '4px', textShadow: '0 0 8px rgba(255,255,255,0.08)' }}>
                       {showBadge && <span title={meta.text} aria-label={meta.text}>{meta.icon}</span>}
                       {kpi.value}
@@ -67,11 +69,11 @@ function TelemetryPanel({ isVisible, summary, elapsedOperationTime, kpis, onHide
             <strong style={{ fontSize: '13px', color: '#f8fafc' }}>{summary.flightsInCourse.value}</strong>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <span style={{ fontSize: '9px', color: '#94a3b8' }}>HORA INICIO</span>
-            <strong style={{ fontSize: '13px', color: '#f8fafc' }}>{summary.operationStart}</strong>
+            <span style={{ fontSize: '9px', color: '#94a3b8' }}>T. SIMULADO</span>
+            <strong style={{ fontSize: '13px', color: '#f8fafc' }}>{summary.simulatedElapsed}</strong>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-            <span style={{ fontSize: '9px', color: '#94a3b8' }}>TRANSCURRIDO</span>
+            <span style={{ fontSize: '9px', color: '#94a3b8' }}>T. REAL</span>
             <strong style={{ fontSize: '13px', color: '#f8fafc' }}>{elapsedOperationTime}</strong>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>

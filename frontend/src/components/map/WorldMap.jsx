@@ -128,8 +128,7 @@ const WorldMap = ({
   onBackgroundClick = () => {},
   onReset = () => {},
 }) => {
-  const [flightColorFilters, setFlightColorFilters] = useState({ gray: true, green: true, yellow: true, red: true });
-  const [airportColorFilters, setAirportColorFilters] = useState({ gray: true, green: true, yellow: true, red: true });
+  // flightColorFilters y airportColorFilters ahora vienen del SelectionBridge (compartidos)
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
 
   const {
@@ -142,6 +141,10 @@ const WorldMap = ({
     exceptionHighlight,
     clearExceptionHighlight,
     activeFilters,
+    flightColorFilters,
+    setFlightColorFilters,
+    airportColorFilters,
+    setAirportColorFilters,
   } = useSelectionBridge();
 
   const [highlightedId, setHighlightedId] = useState(null);
@@ -322,6 +325,17 @@ const WorldMap = ({
 
     return true;
   }, [activeFilters.flightStatus, activeFilters.continent, activeFilters.semaphoreLevel, activeMetrics, airportByIcao, flightColorFilters]);
+
+  // Si el avión seleccionado ya no cumple los filtros, lo deseleccionamos automáticamente
+  useEffect(() => {
+    if (selectedAircraftId) {
+      const plane = activeAircraft.find(p => p.id === selectedAircraftId);
+      if (plane && !flightPassesFilter(plane.capacityPercent, plane.from, plane.to, plane.ocupacionReal)) {
+        onAircraftSelect(null);
+        onBackgroundClick();
+      }
+    }
+  }, [selectedAircraftId, activeAircraft, flightPassesFilter, onAircraftSelect, onBackgroundClick]);
 
   const hasAnySelection = selectedAircraftId != null || (selectedAirportCode != null && selectedAirportCode !== "");
   const relatedAirportCodes = useMemo(() => {
