@@ -7,6 +7,7 @@ export const createFlightsLayer = ({
   airportByIcao,
   selectedAircraftId,
   highlightedId,
+  trackedRoute,
   flightPassesFilter,
   showFlightsWithoutShipments,
   showFlightsWithShipments,
@@ -46,7 +47,9 @@ export const createFlightsLayer = ({
     const bearing = getVisualBearing(position, nextPosition);
 
     const isAircraftSelected = selectedAircraftId != null;
-    const baseOpacity = passesFilter ? (isAircraftSelected ? (isSelected ? 255 : 80) : 255) : 20;
+    const isTrackingActive = trackedRoute?.hops?.length > 0;
+    const isDimmed = isAircraftSelected || isTrackingActive;
+    const baseOpacity = passesFilter ? (isDimmed ? (isSelected ? 255 : 60) : 255) : 20;
     const color = isSelected && isAircraftSelected
       ? [129, 140, 248, baseOpacity]
       : isCancelled 
@@ -88,7 +91,7 @@ export const createFlightsLayer = ({
       getAngle: d => -d.angle,
       updateTriggers: {
         getPosition: [activeAircraft],
-        getColor: [activeAircraft, selectedAircraftId, hasAnySelection, selectedAirportCode],
+        getColor: [activeAircraft, selectedAircraftId, hasAnySelection, selectedAirportCode, trackedRoute],
         getAngle: [activeAircraft]
       }
     }),
@@ -109,7 +112,7 @@ export const createFlightsLayer = ({
       outlineColor: [0, 0, 0, 200],
       updateTriggers: {
         getPosition: [activeAircraft],
-        getColor: [activeAircraft, selectedAircraftId, hasAnySelection, selectedAirportCode]
+        getColor: [activeAircraft, selectedAircraftId, hasAnySelection, selectedAirportCode, trackedRoute]
       }
     })
   ];

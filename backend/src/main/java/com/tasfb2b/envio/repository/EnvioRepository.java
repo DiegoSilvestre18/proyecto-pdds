@@ -17,10 +17,17 @@ public interface EnvioRepository extends JpaRepository<Envio, Long> {
 
     @Query("""
     SELECT e FROM Envio e
-    WHERE (:origen IS NULL OR e.origen.icaoCode = :origen)
+    WHERE (:origen IS NULL OR
+      LOWER(e.origen.icaoCode) LIKE CONCAT('%', LOWER(:origen), '%') OR
+      LOWER(e.origen.city) LIKE CONCAT('%', LOWER(:origen), '%') OR
+      LOWER(e.origen.country) LIKE CONCAT('%', LOWER(:origen), '%'))
+    AND (:destino IS NULL OR
+      LOWER(e.destino.icaoCode) LIKE CONCAT('%', LOWER(:destino), '%') OR
+      LOWER(e.destino.city) LIKE CONCAT('%', LOWER(:destino), '%') OR
+      LOWER(e.destino.country) LIKE CONCAT('%', LOWER(:destino), '%'))
     AND (:codigo IS NULL OR e.codigoPedido LIKE CONCAT(:codigo, '%'))
     """)
-    Page<Envio> buscar(String origen, String codigo, Pageable pageable);
+    Page<Envio> buscar(String origen, String destino, String codigo, Pageable pageable);
 
     @org.springframework.transaction.annotation.Transactional
     @org.springframework.data.jpa.repository.Modifying

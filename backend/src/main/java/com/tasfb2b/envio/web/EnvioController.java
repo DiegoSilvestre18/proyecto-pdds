@@ -26,6 +26,7 @@ public class EnvioController {
     @GetMapping
     public Page<EnvioResponse> listar(
             @RequestParam(required = false) String origen,
+            @RequestParam(required = false) String destino,
             @RequestParam(required = false) String codigo,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size
@@ -36,7 +37,7 @@ public class EnvioController {
                 Sort.by("fecha").descending().and(Sort.by("hora").descending())
         );
 
-        return envioService.buscar(origen, codigo, pageable);
+        return envioService.buscar(origen, destino, codigo, pageable);
     }
 
 

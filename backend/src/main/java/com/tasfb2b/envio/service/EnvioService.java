@@ -56,14 +56,17 @@ public class EnvioService {
     @Transactional(readOnly = true)
     public Page<EnvioResponse> buscar(
             String origen,
+            String destino,
             String codigo,
             Pageable pageable
     ) {
         origen = (origen == null || origen.isBlank()) ? null : origen;
+        destino = (destino == null || destino.isBlank()) ? null : destino;
         codigo = (codigo == null || codigo.isBlank()) ? null : codigo;
         return envioRepo
                 .buscar(
                         origen,
+                        destino,
                         codigo,
                         pageable
                 )
@@ -97,7 +100,11 @@ public class EnvioService {
                 e.getId(),
                 e.getCodigoPedido(),
                 e.getOrigen().getIcaoCode(),
+                e.getOrigen().getCity(),
+                e.getOrigen().getCountry(),
                 e.getDestino().getIcaoCode(),
+                e.getDestino().getCity(),
+                e.getDestino().getCountry(),
                 e.getCantidadMaletas(),
                 e.getFecha(),
                 e.getHora(),

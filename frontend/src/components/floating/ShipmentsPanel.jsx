@@ -50,6 +50,7 @@ const ShipmentsPanel = ({ sessionId, airports, onSelectFlight, onAirportSelect }
     const [shipments, setShipments] = useState([]);
     const [loading, setLoading] = useState(false);
     const [searchOrigin, setSearchOrigin] = useState("");
+    const [searchDestino, setSearchDestino] = useState("");
     const [searchCode, setSearchCode] = useState("");
     const [page, setPage] = useState(0);
     const [hasMore, setHasMore] = useState(true);
@@ -74,6 +75,7 @@ const ShipmentsPanel = ({ sessionId, airports, onSelectFlight, onAirportSelect }
         try {
             const params = new URLSearchParams({ page: pageToLoad, size: PAGE_SIZE });
             if (searchOrigin) params.append("origen", searchOrigin);
+            if (searchDestino) params.append("destino", searchDestino);
             if (searchCode) params.append("codigo", searchCode);
 
             const res = await fetch(`/api/v1/envios?${params.toString()}`);
@@ -92,7 +94,7 @@ const ShipmentsPanel = ({ sessionId, airports, onSelectFlight, onAirportSelect }
     useEffect(() => {
         const timer = setTimeout(() => fetchShipments(0, true), 300);
         return () => clearTimeout(timer);
-    }, [searchOrigin, searchCode]);
+    }, [searchOrigin, searchDestino, searchCode]);
 
     useEffect(() => {
         const el = containerRef.current;
@@ -109,7 +111,7 @@ const ShipmentsPanel = ({ sessionId, airports, onSelectFlight, onAirportSelect }
             el.removeEventListener("scroll", handleScroll);
             if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
         };
-    }, [page, loading, hasMore, searchOrigin, searchCode]);
+    }, [page, loading, hasMore, searchOrigin, searchDestino, searchCode]);
 
     const fetchStatusBatch = useCallback(async (globalCodes) => {
         if (!sessionId || globalCodes.length === 0) return;
@@ -245,18 +247,26 @@ const ShipmentsPanel = ({ sessionId, airports, onSelectFlight, onAirportSelect }
                 </div>
             )}
 
-            <div style={{ display: "flex", gap: "4px" }}>
+            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                <div style={{ display: "flex", gap: "4px" }}>
+                    <input
+                        placeholder="Origen (ICAO/ciudad/pais)"
+                        value={searchOrigin}
+                        onChange={(e) => setSearchOrigin(e.target.value)}
+                        style={{ flex: 1, padding: "4px 6px", borderRadius: "4px", fontSize: "11px", background: "rgba(15,23,42,0.9)", border: "1px solid rgba(255,255,255,0.1)", color: "white", outline: "none" }}
+                    />
+                    <input
+                        placeholder="Destino (ICAO/ciudad/pais)"
+                        value={searchDestino}
+                        onChange={(e) => setSearchDestino(e.target.value)}
+                        style={{ flex: 1, padding: "4px 6px", borderRadius: "4px", fontSize: "11px", background: "rgba(15,23,42,0.9)", border: "1px solid rgba(255,255,255,0.1)", color: "white", outline: "none" }}
+                    />
+                </div>
                 <input
-                    placeholder="Origen"
-                    value={searchOrigin}
-                    onChange={(e) => setSearchOrigin(e.target.value.toUpperCase())}
-                    style={{ flex: 1, padding: "4px 6px", borderRadius: "4px", fontSize: "11px", background: "rgba(15,23,42,0.9)", border: "1px solid rgba(255,255,255,0.1)", color: "white", outline: "none" }}
-                />
-                <input
-                    placeholder="Código"
+                    placeholder="Código de pedido"
                     value={searchCode}
                     onChange={(e) => setSearchCode(e.target.value)}
-                    style={{ flex: 1, padding: "4px 6px", borderRadius: "4px", fontSize: "11px", background: "rgba(15,23,42,0.9)", border: "1px solid rgba(255,255,255,0.1)", color: "white", outline: "none" }}
+                    style={{ width: "100%", padding: "4px 6px", borderRadius: "4px", fontSize: "11px", background: "rgba(15,23,42,0.9)", border: "1px solid rgba(255,255,255,0.1)", color: "white", outline: "none", boxSizing: "border-box" }}
                 />
             </div>
 
@@ -278,7 +288,9 @@ const ShipmentsPanel = ({ sessionId, airports, onSelectFlight, onAirportSelect }
                                 style={{ padding: "4px 6px", display: "flex", alignItems: "center", gap: "6px", cursor: "pointer" }}
                             >
                                 <span style={{ fontSize: "11px", fontWeight: "bold", color: "#38bdf8", minWidth: "90px" }}>{shipment.codigoPedido}</span>
-                                <span style={{ fontSize: "10px", color: "#cbd5e1", whiteSpace: "nowrap" }}>{shipment.origenIcao}→{shipment.destinoIcao}</span>
+                                <span style={{ fontSize: "10px", color: "#cbd5e1", whiteSpace: "nowrap" }}>
+                                    {shipment.origenIcao}{shipment.origenCiudad ? ` (${shipment.origenCiudad}${shipment.origenPais ? `, ${shipment.origenPais}` : ""})` : ""}→{shipment.destinoIcao}{shipment.destinoCiudad ? ` (${shipment.destinoCiudad}${shipment.destinoPais ? `, ${shipment.destinoPais}` : ""})` : ""}
+                                </span>
 
                                 {summary && (
                                     <span style={{ fontSize: "9px", padding: "1px 6px", borderRadius: "8px", background: `${STATUS_META[summary.dominant]?.color}20`, color: STATUS_META[summary.dominant]?.color, border: `1px solid ${STATUS_META[summary.dominant]?.color}` }}>

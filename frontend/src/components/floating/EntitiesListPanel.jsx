@@ -434,7 +434,7 @@ const OCCUPANCY_FILTER_OPTIONS = [
 ];
 
 // ── sessionId: nuevo prop, necesario para resolver el tracker correcto ──
-export default function EntitiesListPanel({ activeAircraft, airports, airportMetrics, onSelectFlight, sessionId }) {
+export default function EntitiesListPanel({ activeAircraft, airports, airportMetrics, onSelectFlight, onAirportSelect, sessionId }) {
   const [activeTab, setActiveTab] = useState('ut');
   const [utSearch, setUtSearch] = useState('');
   const [utSearchOrigin, setUtSearchOrigin] = useState('');
@@ -485,12 +485,13 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
 
   const handleSelectWarehouse = useCallback((wh) => {
     setFocusedEntity('airport', wh.icao, 'panel');
+    if (onAirportSelect) onAirportSelect(wh.icao);
     dispatchMapCommand('flyTo', {
       coordinates: wh.coordinates,
       zoom: 5,
       targetId: wh.icao,
     });
-  }, [setFocusedEntity, dispatchMapCommand]);
+  }, [setFocusedEntity, dispatchMapCommand, onAirportSelect]);
 
   const handleSemaphoreFilter = useCallback((level) => {
     setActiveFilters(prev => ({ ...prev, semaphoreLevel: level }));
@@ -603,6 +604,17 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
   const { bags: warehouseBags, loading: warehouseBagsLoading, error: warehouseBagsError } =
       useBagTracking(sessionId, expandedWh ? 'airport' : null, expandedWh);
 
+  const connectedIcaoSet = useMemo(() => {
+    if (!focusedEntity || focusedEntity.type !== 'airport') return null;
+    const icao = focusedEntity.id;
+    const connected = new Set([icao]);
+    (activeAircraft || []).forEach(f => {
+        if (f.from === icao) connected.add(f.to);
+        if (f.to === icao) connected.add(f.from);
+    });
+    return connected.size > 1 ? connected : null;
+  }, [focusedEntity, activeAircraft]);
+
   const filteredWarehouses = useMemo(() => {
     if (activeTab !== 'wh') return [];
     let result = [...(airports || [])];
@@ -627,6 +639,10 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
       result = result.filter(wh => wh.continent === activeFilters.continent);
     }
 
+    if (connectedIcaoSet) {
+      result = result.filter(wh => connectedIcaoSet.has(wh.icao));
+    }
+
     const nearestDep = {}
     const nearestArr = {}
     ;(activeAircraft || []).forEach(f => {
@@ -649,7 +665,7 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
     });
 
     return result;
-  }, [airports, airportMetrics, activeAircraft, whSearch, activeFilters.continent, whSort, activeFilters.semaphoreLevel]);
+  }, [airports, airportMetrics, activeAircraft, whSearch, activeFilters.continent, whSort, activeFilters.semaphoreLevel, connectedIcaoSet]);
 
   useEffect(() => {
     const last = lastMapSelectionRef.current;
@@ -863,6 +879,16 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
                             </button>
                         ))}
                       </div>
+
+                      {connectedIcaoSet && (
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '11px', color: '#60a5fa', padding: '4px 0' }}>
+                          <span>🔗 Conectados a <strong>{focusedEntity.id}</strong></span>
+                          <button onClick={clearFocusedEntity}
+                                  style={{ background: 'rgba(255,255,255,0.1)', border: 'none', color: '#94a3b8', cursor: 'pointer', borderRadius: '50%', width: '18px', height: '18px', fontSize: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            ✕
+                          </button>
+                        </div>
+                      )}
 
                       <div style={{ display: 'flex', gap: '8px' }}>
                         <input type="text" placeholder="Buscar por código o ciudad..."
