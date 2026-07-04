@@ -94,6 +94,7 @@ export const useControlTowerController = () => {
   const realStartRef = useRef(null);
   const [logs, setLogs] = useState([]);
   const [realTimeTicker, setRealTimeTicker] = useState(Date.now());
+  const [finalMasterPlan, setFinalMasterPlan] = useState([]);
 
   // Ticker para actualizar el reloj de la vida real (incluso en idle)
   useEffect(() => {
@@ -118,8 +119,9 @@ export const useControlTowerController = () => {
       ...clock,
       interpolatedTime: smoothSimTime,
       eventLog: logs,
+      finalMasterPlan
     };
-  }, [meta, kpis, airportLoads, aircraft, clock, smoothSimTime, logs, sessionId]);
+  }, [meta, kpis, airportLoads, aircraft, clock, smoothSimTime, logs, sessionId, finalMasterPlan]);
 
   // ── Clock local para interpolar movimiento y tiempo ───────────────────────
   const simClockRef = useRef({
@@ -248,6 +250,7 @@ export const useControlTowerController = () => {
                    if (res.ok) {
                        res.json().then(finalStatus => {
                            setMeta(prev => ({ ...prev, ...finalStatus }));
+                           setFinalMasterPlan(finalStatus.finalMasterPlan || []);
                        });
                    }
                });
@@ -305,6 +308,7 @@ export const useControlTowerController = () => {
     setRealElapsedSecs(0);
     realStartRef.current = null;
     setLogs([]);
+    setFinalMasterPlan([]);
     snapshotBufferRef.current = [];
     simClockRef.current = { serverEpoch: 0, receivedAt: 0, ratio: 1 };
   }, [selectedAlgorithm]);
@@ -1183,6 +1187,7 @@ activeAircraft,
     kpiCards,
     liveStatus,
     masterPlan,
+    finalMasterPlan,
     selectedAircraftId,
     selectedAirportCode,
     setSelectedAirportCode,

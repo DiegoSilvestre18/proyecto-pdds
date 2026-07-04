@@ -94,4 +94,19 @@ public class ShipmentTrackingController {
         ShipmentTracker tracker = trackerRegistry.get(sessionId);
         return tracker != null ? tracker.auditConsistency() : List.of();
     }
+
+    @GetMapping("/{sessionId}/codes-by-status/{status}")
+    public List<String> getCodesByStatus(@PathVariable String sessionId, @PathVariable String status) {
+        ShipmentTracker tracker = trackerRegistry.get(sessionId);
+        if (tracker == null) return List.of();
+        try {
+            com.tasfb2b.tracking.domain.ShipmentStatus s =
+                    com.tasfb2b.tracking.domain.ShipmentStatus.valueOf(status);
+            return tracker.getAll().stream()
+                    .filter(b -> b.getEstado() == s)
+                    .map(b -> b.getShipmentCode())
+                    .distinct().sorted()
+                    .collect(java.util.stream.Collectors.toList());
+        } catch (IllegalArgumentException e) { return List.of(); }
+    }
 }

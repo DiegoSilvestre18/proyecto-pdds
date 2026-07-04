@@ -355,6 +355,14 @@ public class SimulationController {
         return trace;
     }
 
+    @GetMapping("/current-plan/{sessionId}")
+    public ResponseEntity<List<Map<String, Object>>> getCurrentPlan(@PathVariable String sessionId) {
+        SimulationProgressHolder.SimulationSessionState session = progressHolder.get(sessionId);
+        if (session == null) return ResponseEntity.notFound().build();
+        List<Map<String, Object>> plan = session.getFinalMasterPlan();
+        return ResponseEntity.ok(plan != null ? plan : List.of());
+    }
+
     // ── POST /export-excel/{sessionId} ─────────────────────────────────────
 
     @PostMapping("/export-excel/{sessionId}")

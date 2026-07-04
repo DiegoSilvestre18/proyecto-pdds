@@ -79,7 +79,7 @@ export default function FlightCancellationPanel({ sessionId, isRunning, startEpo
         <div style={{ marginBottom: '12px' }}>
           <input
               type="text"
-              placeholder="Buscar origen o destino (ej: SPIM)..."
+              placeholder="Buscar por id, origen o destino (ej: SPIM)..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               style={{ width: '100%', background: 'rgba(30, 41, 59, 0.8)', border: '1px solid rgba(100, 116, 139, 0.4)', borderRadius: '8px', padding: '8px 12px', color: '#e2e8f0', fontSize: '13px', outline: 'none' }}
@@ -103,6 +103,9 @@ export default function FlightCancellationPanel({ sessionId, isRunning, startEpo
                       background: 'rgba(255, 255, 255, 0.02)', borderRadius: '4px', border: '1px solid rgba(255, 255, 255, 0.03)',
                     }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ width: '90px', fontWeight: 600, fontSize: '11px' }}>
+                          Vuelo {v.id}
+                        </div>
                         <div style={{ fontWeight: 600, color: '#e2e8f0', fontSize: '11px', minWidth: '75px' }}>
                           {v.origenIcao} ➝ {v.destinoIcao}
                         </div>

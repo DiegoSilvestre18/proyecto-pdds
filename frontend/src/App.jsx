@@ -18,6 +18,7 @@ import TrackingPanel from "./components/floating/TrackingPanel";
 import ShipmentsPanel from "./components/floating/ShipmentsPanel";
 import UpcomingFlightsPanel from "./components/floating/UpcomingFlightsPanel";
 import FinalPlanPanel from "./components/floating/FinalPlanPanel";
+import MergedShipmentPanel from "./components/floating/MergedShipmentPanel";
 
 import DayToDayConfig from "./components/scenarios/DayToDayConfig";
 import PeriodSimConfig from "./components/scenarios/PeriodSimConfig";
@@ -36,11 +37,9 @@ const PANEL_LABELS = {
   telemetry: "Telemetría en Tiempo Real",
   occupancy: "Top Aeropuertos",
   transitInventory: "Inventario en Tránsito",
-  comparison: "Comparativa de Envíos",
   shipmentDetail: "Detalle de Envío",
   shipments: "Gestión de Envíos",
   upcoming: "Vuelos Próximos",
-  reports: "Reportes y Exportación",
   airportConfig: "Configuración de Almacenes",
   entities: "Monitoreo de Vuelos y Almacenes",
   pendingShipments: "Envíos Pendientes",
@@ -115,18 +114,7 @@ const App = () => {
 
   const [finalPlanShownSession, setFinalPlanShownSession] = useState(null);
 
-  React.useEffect(() => {
-    if (
-        liveStatus?.status === 'DONE' &&
-        liveStatus?.finalMasterPlan?.length > 0 &&
-        sessionId &&
-        finalPlanShownSession !== sessionId
-    ) {
-      setFinalPlanShownSession(sessionId);
-      if (!isWindowOpen('finalPlan')) handleToggleWindow('finalPlan');
-      handleFocusWindow('finalPlan');
-    }
-  }, [liveStatus?.status, liveStatus?.finalMasterPlan, sessionId]);
+
 
   // ── Lógica FIFO de Paneles (Draggable Windows) ──
   const [maxWindows, setMaxWindows] = useState(3);
@@ -167,6 +155,27 @@ const App = () => {
       handleFocusWindow("shipmentDetail");
     }
   }, [searchedShipment]);
+
+  React.useEffect(() => {
+    if (
+        liveStatus?.status === 'DONE' &&
+        Array.isArray(liveStatus?.finalMasterPlan) &&
+        liveStatus.finalMasterPlan.length > 0 &&
+        sessionId &&
+        finalPlanShownSession !== sessionId
+    ) {
+      setFinalPlanShownSession(sessionId);
+      setOpenWindowsQueue(prev => {           // ← directo al estado, sin closures
+        if (prev.includes('finalPlan')) {
+          // ya estaba abierto: solo traerlo al frente
+          return [...prev.filter(p => p !== 'finalPlan'), 'finalPlan'];
+        }
+        const next = [...prev, 'finalPlan'];
+        while (next.length > maxWindows) next.shift();
+        return next;
+      });
+    }
+  }, [liveStatus?.status, liveStatus?.finalMasterPlan?.length, sessionId, finalPlanShownSession, maxWindows]);
 
   const [mapZoom, setMapZoom] = useState(2.0);
   const [mapCenter, setMapCenter] = useState([22, 15]);
@@ -314,7 +323,7 @@ const App = () => {
             </DraggableWindow>
         )}
 
-        {isWindowOpen("shipments") && (
+        {/*{isWindowOpen("shipments") && (
             <DraggableWindow
                 title="Gestión de Envíos"
                 onClose={() => handleToggleWindow("shipments")}
@@ -340,6 +349,31 @@ const App = () => {
                   onAirportSelect={(code) => { setSelectedAirportCode(code); setSelectedAircraftId(null); }}
               />
             </DraggableWindow>
+        )}*/}
+
+        {isWindowOpen("shipments") && (
+          <DraggableWindow title="📦 Envíos y Rastreo" onClose={() => handleToggleWindow("shipments")}
+             initialPosition={{
+               x: 250,
+               y: 120
+             }}
+             defaultSize={{
+               width: 400,
+               height: 280
+             }}
+             isActive={
+                 openWindowsQueue[
+                 openWindowsQueue.length - 1
+                     ] === "shipments"
+             }
+             onFocus={() => handleFocusWindow("shipments")}>
+            <MergedShipmentPanel
+            sessionId={sessionId}
+            airports={globalAirports}
+            onSelectFlight={setSelectedAircraftId}
+            onAirportSelect={(code) => { setSelectedAirportCode(code); setSelectedAircraftId(null); }}
+          />
+        </DraggableWindow>
         )}
 
       {isWindowOpen("reports") && (
@@ -363,12 +397,18 @@ const App = () => {
           <DraggableWindow
               title="📋 Plan Final de la Simulación"
               onClose={() => handleToggleWindow("finalPlan")}
-              initialPosition={{ x: window.innerWidth / 2 - 320, y: window.innerHeight / 2 - 260 }}
-              defaultSize={{ width: 640, height: 480 }}
+              initialPosition={{
+                x: Math.max(0, window.innerWidth  / 2 - 500),
+                y: Math.max(0, window.innerHeight / 2 - 300),
+              }}
+              defaultSize={{ width: 1000, height: 580 }}
               isActive={openWindowsQueue[openWindowsQueue.length - 1] === "finalPlan"}
               onFocus={() => handleFocusWindow("finalPlan")}
           >
-            <FinalPlanPanel plan={liveStatus?.finalMasterPlan || []} />
+            <FinalPlanPanel
+                plan={liveStatus?.finalMasterPlan || []}
+                sessionId={sessionId}
+            />
           </DraggableWindow>
       )}
 
@@ -519,7 +559,6 @@ const App = () => {
           pendingShipments: isWindowOpen("pendingShipments"),
           occupancy: isWindowOpen("occupancy"),
           transitInventory: isWindowOpen("transitInventory"),
-          comparison: isWindowOpen("comparison"),
           shipmentDetail: isWindowOpen("shipmentDetail"),
           airportConfig: isWindowOpen("airportConfig"),
           cancellation: isWindowOpen("cancellation")
