@@ -166,7 +166,10 @@ const App = () => {
     ) {
       setFinalPlanShownSession(sessionId);
       setOpenWindowsQueue(prev => {           // ← directo al estado, sin closures
-        if (prev.includes('finalPlan')) return prev;
+        if (prev.includes('finalPlan')) {
+          // ya estaba abierto: solo traerlo al frente
+          return [...prev.filter(p => p !== 'finalPlan'), 'finalPlan'];
+        }
         const next = [...prev, 'finalPlan'];
         while (next.length > maxWindows) next.shift();
         return next;

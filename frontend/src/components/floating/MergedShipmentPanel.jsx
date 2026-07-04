@@ -291,7 +291,7 @@ function ListSection({ sessionId }) {
                 const codigoPedido = rest.join('_');
                 // Intentar encontrar el envío real en la página actual
                 const found = shipments.find(s => buildGlobalCode(s.origenIcao, s.codigoPedido) === gc);
-                return found || { id: gc, codigoPedido, origenIcao, destinoIcao: '—', cantidadMaletas: 0, _fromTracker: true };
+                return found || { id: gc, codigoPedido, origenIcao, destinoIcao: '—', cantidadMaletas: (filteredStatusData[gc] || []).length,  _fromTracker: true };
             });
         }
         return sortedShipments;
