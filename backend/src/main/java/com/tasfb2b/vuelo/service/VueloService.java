@@ -166,9 +166,10 @@ public class VueloService {
         String q = query != null ? query.toUpperCase() : "";
         
         return todos.stream()
-                .filter(v -> q.isEmpty() || 
-                        v.getOrigen().getIcaoCode().contains(q) || 
-                        v.getDestino().getIcaoCode().contains(q))
+                .filter(v -> q.isEmpty()
+                        || v.getOrigen().getIcaoCode().contains(q)
+                        || v.getDestino().getIcaoCode().contains(q)
+                        || v.getId().toString().startsWith(q))
                 .map(v -> new VueloResponse(
                         v.getId(),
                         v.getOrigen().getIcaoCode(),
