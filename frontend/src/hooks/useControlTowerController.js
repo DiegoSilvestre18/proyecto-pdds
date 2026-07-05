@@ -47,7 +47,7 @@ export const useControlTowerController = () => {
   const [isScenarioConfigOpen, setIsScenarioConfigOpen] = useState(false);
   const [selectedAlgorithm, setSelectedAlgorithm] = useState("alns");
   const [simState, setSimState] = useState("idle");
-  const [targetPlaybackMinutes, setTargetPlaybackMinutes] = useState(30);
+  const [targetPlaybackMinutes, setTargetPlaybackMinutes] = useState(6);
 
   const [sessionId, setSessionId] = useState(() => {
     if (typeof window !== "undefined") {
@@ -504,10 +504,12 @@ export const useControlTowerController = () => {
     }
   }, []);
 
-  const exportSimulationReportMd = useCallback(async (sid, name = "Escenario") => {
+  const exportSimulationReportMd = useCallback(async (sid, name = "Ultima_Planificacion") => {
     if (!sid) return;
     try {
-      const res = await apiFetch(`/api/v1/simulation/status/${sid}`);
+      const safeSid = String(sid);
+      const safeName = String(name || "Ultima_Planificacion").replace(/\s+/g, '');
+      const res = await apiFetch(`/api/v1/simulation/status/${safeSid}`);
       if (!res.ok) throw new Error(`Error al obtener status: ${res.status}`);
       const finalStatus = await res.json();
       
@@ -515,127 +517,101 @@ export const useControlTowerController = () => {
       let modeText = '✅ **Operación Normal**';
       if (isCollapse) {
         modeText = '🚨 **COLAPSO INDUCIDO / ESTRÉS DE RED**';
-      } else if (name === 'Operacion_Dia_a_Dia') {
+      } else if (safeName.includes('Dia_a_Dia')) {
         modeText = '📅 **Operación Día a Día**';
-      } else if (name === 'Simulacion_Periodo') {
+      } else if (safeName.includes('Periodo')) {
         modeText = '📊 **Simulación de Periodo**';
       }
 
-      let md = `# 📊 Reporte Ejecutivo de Simulación Logística: ${name.replace(/_/g, ' ')}\n\n`;
-      md += `> **Documento de nivel ejecutivo generado automáticamente por el Sistema de Control Logístico TASF-B2B.**\n\n`;
+      let md = `# 📋 Reporte de Última Planificación Estable: ${safeName.replace(/_/g, ' ')}\n\n`;
+      md += `> **Documento generado automáticamente por el Sistema de Control Logístico TASF-B2B.**\n\n`;
       
-      md += `## 📋 Información y Metadatos de la Sesión\n`;
-      md += `| Parámetro | Detalle |\n`;
-      md += `| :--- | :--- |\n`;
-      md += `| **ID de Sesión** | \`${sid}\` |\n`;
-      md += `| **Fecha de Generación** | ${new Date().toLocaleString()} |\n`;
-      md += `| **Duración de Simulación** | ${finalStatus.totalDays} días |\n`;
-      if (finalStatus.startEpoch) {
-        md += `| **Fecha Simulada de Inicio** | ${new Date(finalStatus.startEpoch).toLocaleDateString()} |\n`;
-      }
-      if (isCollapse) {
-        md += `| **Días hasta Colapso** | **${finalStatus.currentDay} días** |\n`;
-        md += `| **Motivo de Fin** | **${finalStatus.endCondition || 'DESCONOCIDO'}** |\n`;
-      }
-      md += `| **Modo de Escenario** | ${modeText} |\n`;
+      md += `## ⚙️ Metadatos de la Sesión\n`;
+      md += `- **ID de Sesión**: \`${safeSid}\`\n`;
+      md += `- **Fecha de Generación**: ${new Date().toLocaleString()}\n`;
+      md += `- **Modo de Escenario**: ${modeText}\n`;
       
       const algoName = (finalStatus.algorithm || selectedAlgorithm || "ALNS").toUpperCase();
-      const algoBadge = algoName === "ALNS" 
-        ? `🟢 **${algoName}** (Adaptive Large Neighborhood Search)`
-        : `🔵 **${algoName}** (Hybrid Genetic Algorithm)`;
-      md += `| **Algoritmo de Optimización** | ${algoBadge} |\n\n`;
+      md += `- **Algoritmo de Optimización**: **${algoName}**\n\n`;
 
-      const slaVal = (finalStatus.slaFinal ?? 0).toFixed(2);
-      let slaStatus = "✅ Óptimo";
-      if (parseFloat(slaVal) < 80.0) {
-        slaStatus = "⚠️ Crítico";
-      } else if (parseFloat(slaVal) < 95.0) {
-        slaStatus = "🟡 En riesgo";
-      }
-
-      md += `## 📊 Resumen Global de KPIs\n`;
-      md += `| Métrica | Valor Destacado | Estado / Umbral |\n`;
-      md += `| :--- | :--- | :---: |\n`;
-      md += `| **SLA Global (Acumulado)** | **\`${slaVal}%\`** | ${slaStatus} |\n`;
-      md += `| **Total de Envíos (Demanda)** | **${((finalStatus.totalMissed ?? 0) + (finalStatus.totalAttended ?? 0)).toLocaleString()}** maletas | - |\n`;
-      md += `| **Maletas Atendidas** | ${finalStatus.totalAttended?.toLocaleString()} | - |\n`;
-      md += `| **Maletas Perdidas** | ${finalStatus.totalMissed?.toLocaleString()} | - |\n`;
-      if (isCollapse) {
-        md += `| **Vuelos Rescatados (ALNS)** | **${finalStatus.rescuedFlights ?? 0}** | - |\n`;
-      }
-      md += `\n`;
-
-      md += `## ⚠️ Cuellos de Botella y Top Aeropuertos Congestionados\n`;
+      md += `## 📦 Desglose de la Última Planificación Estable\n\n`;
       
-      if (finalStatus.airportLoads && Object.keys(finalStatus.airportLoads).length > 0) {
-        const sortedAirports = Object.entries(finalStatus.airportLoads)
-          .map(([icao, data]) => ({ icao, occupancy: data.occupancy || 0 }))
-          .sort((a, b) => b.occupancy - a.occupancy);
+      if (finalStatus.finalMasterPlan && finalStatus.finalMasterPlan.length > 0) {
+        md += `A continuación se muestra el plan maestro final (asignaciones de envío a vuelos).\n\n`;
+        md += `| Lote ID | Origen | Destino | Maletas | Estado | Deadline | LLegada Estimada |\n`;
+        md += `| :---: | :---: | :---: | :---: | :---: | :---: | :---: |\n`;
         
-        const top5 = sortedAirports.slice(0, 5);
-        
-        md += `| Puesto | Código ICAO | Ocupación | Nivel de Congestión | Alerta |\n`;
-        md += `| :---: | :---: | :---: | :--- | :---: |\n`;
-        
-        top5.forEach((item, index) => {
-          let level = "🟢 Bajo";
-          let alertEmoji = "";
-          if (item.occupancy >= 90) { level = "🔴 Crítico"; alertEmoji = "⚠️"; }
-          else if (item.occupancy >= 70) { level = "🟡 Moderado"; alertEmoji = "⚠️"; }
-          md += `| ${index + 1} | **${item.icao}** | ${item.occupancy}% | ${level} | ${alertEmoji} |\n`;
+        finalStatus.finalMasterPlan.forEach(plan => {
+           const deadlineStr = plan.deadline ? new Date(plan.deadline).toLocaleString() : '-';
+           const arrivalStr = plan.arrivalTime ? new Date(plan.arrivalTime).toLocaleString() : '-';
+           md += `| **${plan.lotId}** | ${plan.origin} | ${plan.destination} | ${plan.assignedBags} / ${plan.totalBags} | ${plan.status} | ${deadlineStr} | ${arrivalStr} |\n`;
         });
-      } else {
-        md += `*No se registraron datos de carga.*\n`;
-      }
-      md += `\n`;
+        
+        md += `\n### ✈️ Detalle de Tramos de Vuelo Asignados\n\n`;
+        
+        finalStatus.finalMasterPlan.forEach(plan => {
+           md += `#### Lote **${plan.lotId}** (${plan.origin} ➔ ${plan.destination})\n`;
+           if (plan.hops && plan.hops.length > 0) {
+               md += `| Vuelo ID | Origen | Destino | Salida | Llegada |\n`;
+               md += `| :---: | :---: | :---: | :---: | :---: |\n`;
+               plan.hops.forEach(hop => {
+                   const depStr = hop.departureTime ? new Date(hop.departureTime).toLocaleString() : '-';
+                   const arrStr = hop.arrivalTime ? new Date(hop.arrivalTime).toLocaleString() : '-';
+                   md += `| ${hop.vueloId} | ${hop.from} | ${hop.to} | ${depStr} | ${arrStr} |\n`;
+               });
+           } else {
+               md += `*No hay tramos de vuelo registrados para este lote.*\n`;
+           }
+           md += `\n`;
+        });
 
-      md += `## 📅 Desglose de Rendimiento Diario\n\n`;
-      md += `| Día | Maletas Procesadas | Demanda del Día | SLA Diario | Saturación Max | Colapso Técnico |\n`;
-      md += `| :---: | :---: | :---: | :---: | :---: | :---: |\n`;
-
-      if (finalStatus.reports && finalStatus.reports.length > 0) {
-        for (const d of finalStatus.reports) {
-          const colapsedIcon = d.colapsed ? '⚠️ Sí' : '✔️ No';
-          md += `| Día ${d.dayIndex + 1} | ${d.malatetasAtendidas} | ${d.totalMaletas} | ${(d.slaPercent ?? 0).toFixed(2)}% | ${d.airportSaturation ?? 0} | ${colapsedIcon} |\n`;
-        }
       } else {
-        md += `| - | No hay datos disponibles | - | - | - | - |\n`;
+        md += `*La simulación no generó un plan maestro final (posiblemente toda la carga ya fue procesada o no hubo demanda nueva).* \n`;
       }
-      md += `\n`;
 
       md += `---\n> 🔒 **Nota de Confidencialidad:** Propiedad exclusiva de **TASF-B2B**.`;
       
       const blob = new Blob([md], { type: "text/markdown;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
+      const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
+      a.style.display = "none";
       a.href = url;
-      a.download = `ResultadosDeEscenario_${name.replace(/\s+/g, '')}_${sid.substring(0, 8)}.md`;
+      a.download = `UltimaPlanificacion_${safeName}_${safeSid.substring(0, 8)}.md`;
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      
+      setTimeout(() => {
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      }, 150);
     } catch (err) {
-      console.error("[Tasf.B2B] Error al exportar MD:", err);
+      console.error("[Tasf.B2B] Error al exportar MD de Última Planificación:", err);
+      alert("Error al exportar MD: " + err.message);
     }
   }, [selectedAlgorithm]);
 
-
-const exportDetailedSimulationReport = useCallback(async (sid) => {
+  const exportDetailedSimulationReport = useCallback(async (sid) => {
     if (!sid) return;
     try {
-      const res = await apiFetch(`/api/v1/simulation/export-details/${sid}`);
+      const safeSid = String(sid);
+      const res = await apiFetch(`/api/v1/simulation/export-details/${safeSid}`);
       if (!res.ok) throw new Error(`Error al exportar reporte detallado: ${res.status}`);
       const blob = await res.blob();
-      const url  = URL.createObjectURL(blob);
+      const url  = window.URL.createObjectURL(blob);
       const a    = document.createElement("a");
+      a.style.display = "none";
       a.href     = url;
-      a.download = `ReporteDetalladoVuelos_${sid.substring(0, 8)}.md`;
+      a.download = `ReporteDetalladoVuelos_${safeSid.substring(0, 8)}.md`;
       document.body.appendChild(a);
       a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
+      
+      setTimeout(() => {
+        document.body.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      }, 150);
     } catch (err) {
       console.error("[Tasf.B2B] Error al exportar Reporte Detallado:", err);
+      alert("Error al exportar reporte detallado: " + err.message);
     }
   }, []);
 

@@ -247,9 +247,12 @@ public class SimulationController {
         double globalOccupancy = 0;
         if (session.getAirportLoads() != null && !session.getAirportLoads().isEmpty()) {
             globalOccupancy = session.getAirportLoads().values().stream()
-                    .mapToInt(data -> (Integer) data.getOrDefault("occupancy", 0))
+                    .mapToDouble(data -> {
+                        Object occ = data.getOrDefault("occupancy", 0.0);
+                        return occ instanceof Number ? ((Number) occ).doubleValue() : 0.0;
+                    })
                     .average()
-                    .orElse(0);
+                    .orElse(0.0);
         }
 
         java.util.List<java.util.Map<String, Object>> reportsList = session.getReports().stream()

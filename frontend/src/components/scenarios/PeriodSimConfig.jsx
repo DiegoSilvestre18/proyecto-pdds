@@ -339,7 +339,7 @@ function PeriodSimConfig({
                     boxShadow: "0 4px 15px rgba(79, 70, 229, 0.35)",
                   }}
                 >
-                  📝 Exportar Reporte (.md)
+                  📋 Exportar Última Planificación (.md)
                 </button>
               )}
               {onExportDetails && (

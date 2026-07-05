@@ -130,7 +130,13 @@ const WorldMap = ({
 }) => {
   // flightColorFilters y airportColorFilters ahora vienen del SelectionBridge (compartidos)
   const [isFilterPanelOpen, setIsFilterPanelOpen] = useState(false);
+  const [isModalDismissed, setIsModalDismissed] = useState(false);
 
+  useEffect(() => {
+    if (simState !== "completed") {
+      setIsModalDismissed(false);
+    }
+  }, [simState]);
   const {
     focusedEntity,
     setFocusedEntity,
@@ -565,13 +571,21 @@ const WorldMap = ({
       </DeckGL>
 
 
-      {simState === "completed" && (
+      {simState === "completed" && !isModalDismissed && (
         <div style={{
           position: "absolute", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
           background: "rgba(15, 23, 42, 0.95)", border: `2px solid ${isCollapseScenario ? "#ef4444" : "#10b981"}`,
           borderRadius: "16px", padding: "32px 48px", textAlign: "center", zIndex: 1000,
           backdropFilter: "blur(12px)", boxShadow: "0 20px 50px rgba(0,0,0,0.7)", animation: "fadeIn 0.5s ease-out"
         }}>
+          <button
+            onClick={(e) => { e.stopPropagation(); setIsModalDismissed(true); }}
+            style={{ position: "absolute", top: "12px", right: "16px", background: "transparent", border: "none", color: "#94a3b8", fontSize: "18px", cursor: "pointer", padding: "4px" }}
+            aria-label="Cerrar"
+            title="Cerrar modal y ver plan final"
+          >
+            ✕
+          </button>
           <div style={{ fontSize: "24px", fontWeight: "900", color: isCollapseScenario ? "#fca5a5" : "#34d399", letterSpacing: "2px", marginBottom: "8px" }}>
             {isCollapseScenario ? "PUNTO DE QUIEBRE ALCANZADO" : "SIMULACIÓN COMPLETADA"}
           </div>

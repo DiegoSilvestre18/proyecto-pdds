@@ -429,7 +429,9 @@ public class SimulationService {
                                 }
                                 currentSimMinuteOfDay += currentSa;
                         }
-                        session.setFinalMasterPlan(buildFinalPlanSnapshot(masterPlan));
+                        if (masterPlan != null && !masterPlan.isEmpty()) {
+                                session.setFinalMasterPlan(buildFinalPlanSnapshot(masterPlan));
+                        }
 
                         SimulationDayReport report = new SimulationDayReport();
                         report.setDayIndex(day);
