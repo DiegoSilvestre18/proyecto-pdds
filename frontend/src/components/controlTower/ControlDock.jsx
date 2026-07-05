@@ -7,7 +7,6 @@ const NAV_ITEMS = [
   { key: 'upcoming',       icon: '⏳', label: 'Vuelos Próximos' },
   { key: 'occupancy',      icon: '🏆', label: 'Top Aeropuertos' },
   { key: 'transitInventory', icon: '🎒', label: 'Inventario' },
-  { key: 'tracking',    icon: '🔍', label: 'Seguimiento' },
   { key: 'shipments', icon: '✉',  label: 'Envío' },
   { key: 'cancellation', icon: '❌',  label: 'Cancelaciones' },
 ];
