@@ -48,6 +48,7 @@ export const useControlTowerController = () => {
   const [selectedAlgorithm, setSelectedAlgorithm] = useState("alns");
   const [simState, setSimState] = useState("idle");
   const [targetPlaybackMinutes, setTargetPlaybackMinutes] = useState(30);
+  const [cancelledFlights, setCancelledFlights] = useState([]);
 
   // Si había un ?session= en la URL al abrir, lo guardamos para reconexión
   const initialSessionId = useRef(
@@ -316,6 +317,7 @@ export const useControlTowerController = () => {
     realStartRef.current = null;
     setLogs([]);
     setFinalMasterPlan([]);
+    setCancelledFlights([]);
     snapshotBufferRef.current = [];
     simClockRef.current = { serverEpoch: 0, receivedAt: 0, ratio: 1 };
   }, [selectedAlgorithm]);
@@ -369,6 +371,24 @@ export const useControlTowerController = () => {
       console.error("[Tasf.B2B] Error cancelando vuelo:", err);
     }
   }, [sessionId]);
+
+  const addCancelledFlight = useCallback((id, { origenIcao, destinoIcao, departureMinute, cancelledAt, deferred }) => {
+    if (!cancelledAt) return
+    const d = new Date(cancelledAt)
+    const utcDayStart = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
+    let cancelledFlightDay = utcDayStart + departureMinute * 60000
+    if (deferred) cancelledFlightDay += 86400000
+
+    setCancelledFlights(prev => [{
+      id,
+      cancelKey: cancelledAt + '-' + id,
+      origenIcao,
+      destinoIcao,
+      cancelledAt,
+      cancelledFlightDay,
+      deferred,
+    }, ...prev])
+  }, [])
 
   const startDayToDaySimulation = useCallback(async (startDate, dias = 5, preCancelledIds = [], startTime = null, options = {}) => {
     try {
@@ -1304,6 +1324,8 @@ activeAircraft,
     exportDetailedSimulationReport,
     resetSimulation,
     cancelFlight,
+    cancelledFlights,
+    addCancelledFlight,
     summary,
     tabs: SCENARIO_TABS,
     toggleDock,

@@ -11,7 +11,7 @@ import TransitInventoryPanel from "./components/floating/TransitInventoryPanel";
 import AlgorithmComparisonPanel from "./components/floating/AlgorithmComparisonPanel";
 import ShipmentDetailPanel from "./components/floating/ShipmentDetailPanel";
 import AirportDetailPanel from "./components/floating/AirportDetailPanel";
-import FlightCancellationPanel from "./components/scenarios/FlightCancellationPanel";
+import CancellationPanel from "./components/scenarios/CancellationPanel";
 import ReportsPanel from "./components/floating/ReportsPanel";
 import EntitiesListPanel from "./components/floating/EntitiesListPanel";
 import TrackingPanel from "./components/floating/TrackingPanel";
@@ -33,7 +33,7 @@ import "./App.css";
 // Etiquetas legibles para notificar el cierre de paneles por límite FIFO.
 const PANEL_LABELS = {
   tracking: "Seguimiento de Rutas",
-  cancellation: "Cancelar Vuelos",
+  cancellation: "Cancelaciones",
   telemetry: "Telemetría en Tiempo Real",
   occupancy: "Top Aeropuertos",
   transitInventory: "Inventario en Tránsito",
@@ -89,6 +89,8 @@ const App = () => {
     exportSimulationReportMd,
     exportDetailedSimulationReport,
     resetSimulation,
+    cancelledFlights,
+    addCancelledFlight,
     summary,
     tabs,
     toggleDock,
@@ -234,17 +236,20 @@ const App = () => {
 
       {isWindowOpen("cancellation") && (
         <DraggableWindow 
-          title="Cancelar Vuelos" 
+          title="Cancelaciones" 
           onClose={() => handleToggleWindow("cancellation")}
           initialPosition={{x: 20, y: window.innerHeight - 300}}
           isActive={openWindowsQueue[openWindowsQueue.length - 1] === "cancellation"}
           onFocus={() => handleFocusWindow("cancellation")}
         >
-          <FlightCancellationPanel
+          <CancellationPanel
             sessionId={sessionId}
             isRunning={simState === "running"}
             startEpoch={liveStatus?.startEpoch}
             currentEpochTime={liveStatus?.interpolatedTime}
+            activeAircraft={activeAircraft}
+            cancelledFlights={cancelledFlights}
+            onFlightCancelled={addCancelledFlight}
           />
         </DraggableWindow>
       )}
