@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAirports } from '../hooks/useAirports';
 
 const RoleSelection = () => {
     const navigate = useNavigate();
+    const location = useLocation();
     const { airports } = useAirports();
     
     const [showModal, setShowModal] = useState(false);
@@ -15,7 +16,10 @@ const RoleSelection = () => {
             setShowModal(true);
         } else {
             sessionStorage.setItem('userRole', role);
-            navigate(path);
+            // Preservamos el ?session= usando location.search que es confiable en React Router
+            const existingSession = new URLSearchParams(location.search).get('session');
+            const destination = existingSession ? `${path}?session=${existingSession}` : path;
+            navigate(destination);
         }
     };
 

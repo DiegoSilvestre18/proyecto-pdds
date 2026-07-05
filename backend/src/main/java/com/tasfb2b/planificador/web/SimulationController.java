@@ -248,8 +248,9 @@ public class SimulationController {
         if (session.getAirportLoads() != null && !session.getAirportLoads().isEmpty()) {
             globalOccupancy = session.getAirportLoads().values().stream()
                     .mapToDouble(data -> {
-                        Object occ = data.getOrDefault("occupancy", 0.0);
-                        return occ instanceof Number ? ((Number) occ).doubleValue() : 0.0;
+                        Object occ = data.getOrDefault("occupancy", 0);
+                        if (occ instanceof Number) return ((Number) occ).doubleValue();
+                        return 0.0;
                     })
                     .average()
                     .orElse(0.0);

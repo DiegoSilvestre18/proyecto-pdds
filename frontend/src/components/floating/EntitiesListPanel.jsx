@@ -2,16 +2,6 @@ import React, { useState, useMemo, useEffect, useRef, useCallback } from 'react'
 import { useSelectionBridge } from '../../hooks/useSelectionBridge';
 import { FixedSizeList as List } from 'react-window';
 
-const statusColors = {
-  critical: '#ef4444',
-  blocked: '#f59e0b',
-  rescued: '#3b82f6',
-  cancelled: '#ef4444',
-  high: '#f97316',
-  normal: '#10b981',
-  default: '#64748b'
-};
-
 // ── Tracking de maletas: estados y colores ──────────────────────────────
 const TRACKING_STATUS_LABELS = {
   SIN_ASIGNAR: 'Sin asignar',
@@ -218,14 +208,8 @@ const FlightRow = React.memo(function FlightRow({ index, style, data }) {
             onClick={() => { setExpandedUt(isExpanded ? null : ut.id); handleSelectUT(ut); }}
         >
           <div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-              <span style={{ fontWeight: 'bold', color: '#e2e8f0', fontSize: '13px' }}>Vuelo {numericId}</span>
-            </div>
-            <div style={{ fontSize: '11px', color: '#9ca3af', display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
-              <span style={{ whiteSpace: 'nowrap' }}>{ut.from}</span>
-              <span>➔</span>
-              <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '100px', display: 'inline-block', verticalAlign: 'bottom' }}>{ut.to}</span>
-            </div>
+            <div style={{ fontWeight: 'bold', color: '#e2e8f0', fontSize: '14px', marginBottom: '2px' }}>Vuelo {numericId}</div>
+            <div style={{ fontSize: '11px', color: '#9ca3af' }}>{ut.from} ➔ {ut.to}</div>
           </div>
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: '14px', fontWeight: 'bold', color: semaforo }}>{pct}%</div>
@@ -281,7 +265,6 @@ function FlightDetailPanel({ flight, onClose, bagSummary }) {
           <span>Progreso</span>
           <span style={{ color: '#e2e8f0' }}>{((flight.progress ?? 0) * 100).toFixed(0)}%</span>
         </div>
-
         {bagSummary}
       </div>
   );

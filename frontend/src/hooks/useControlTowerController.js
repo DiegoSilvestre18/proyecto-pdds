@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { apiFetch } from "./api";
 import { createStompClient } from "./ws";
 import {
@@ -36,6 +37,7 @@ const readStoredKpiCollapsed = () => {
 
 export const useControlTowerController = () => {
   const { airports: globalAirports, airportByIcao } = useAirports();
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState("vivo");
   const isCollapseScenario = activeTab === "colapso";
   const isSimScenario = activeTab === "periodo" || activeTab === "colapso";
@@ -47,14 +49,18 @@ export const useControlTowerController = () => {
   const [isScenarioConfigOpen, setIsScenarioConfigOpen] = useState(false);
   const [selectedAlgorithm, setSelectedAlgorithm] = useState("alns");
   const [simState, setSimState] = useState("idle");
-  const [targetPlaybackMinutes, setTargetPlaybackMinutes] = useState(6);
+  const [targetPlaybackMinutes, setTargetPlaybackMinutes] = useState(30);
+  const [cancelledFlights, setCancelledFlights] = useState([]);
+
+  // Si había un ?session= en la URL al abrir, lo guardamos para reconexión
+  const initialSessionId = useRef(
+    new URLSearchParams(location.search).get("session")
+  );
+  // true mientras consultamos el backend para reconectar (evita que auto-inicie vivo encima)
+  const [isReconnecting, setIsReconnecting] = useState(() => !!initialSessionId.current);
 
   const [sessionId, setSessionId] = useState(() => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      return params.get("session");
-    }
-    return null;
+    return new URLSearchParams(location.search).get("session");
   });
 
   // Actualizar URL cuando cambia el sessionId
@@ -94,7 +100,6 @@ export const useControlTowerController = () => {
   const realStartRef = useRef(null);
   const [logs, setLogs] = useState([]);
   const [realTimeTicker, setRealTimeTicker] = useState(Date.now());
-  const [finalMasterPlan, setFinalMasterPlan] = useState([]);
 
   // Ticker para actualizar el reloj de la vida real (incluso en idle)
   useEffect(() => {
@@ -119,9 +124,8 @@ export const useControlTowerController = () => {
       ...clock,
       interpolatedTime: smoothSimTime,
       eventLog: logs,
-      finalMasterPlan
     };
-  }, [meta, kpis, airportLoads, aircraft, clock, smoothSimTime, logs, sessionId, finalMasterPlan]);
+  }, [meta, kpis, airportLoads, aircraft, clock, smoothSimTime, logs, sessionId]);
 
   // ── Clock local para interpolar movimiento y tiempo ───────────────────────
   const simClockRef = useRef({
@@ -250,12 +254,13 @@ export const useControlTowerController = () => {
                    if (res.ok) {
                        res.json().then(finalStatus => {
                            setMeta(prev => ({ ...prev, ...finalStatus }));
-                           setFinalMasterPlan(finalStatus.finalMasterPlan || []);
                        });
                    }
                });
            } else if (data.status === 'FAILED') {
                setSimState('idle');
+           } else if (data.status === 'RUNNING' || data.status === 'RECONSTRUCTING') {
+               setSimState(prev => prev !== 'running' ? 'running' : prev);
            }
         }
       }
@@ -309,6 +314,7 @@ export const useControlTowerController = () => {
     realStartRef.current = null;
     setLogs([]);
     setFinalMasterPlan([]);
+    setCancelledFlights([]);
     snapshotBufferRef.current = [];
     simClockRef.current = { serverEpoch: 0, receivedAt: 0, ratio: 1 };
   }, [selectedAlgorithm]);
@@ -362,6 +368,24 @@ export const useControlTowerController = () => {
       console.error("[Tasf.B2B] Error cancelando vuelo:", err);
     }
   }, [sessionId]);
+
+  const addCancelledFlight = useCallback((id, { origenIcao, destinoIcao, departureMinute, cancelledAt, deferred }) => {
+    if (!cancelledAt) return
+    const d = new Date(cancelledAt)
+    const utcDayStart = Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate())
+    let cancelledFlightDay = utcDayStart + departureMinute * 60000
+    if (deferred) cancelledFlightDay += 86400000
+
+    setCancelledFlights(prev => [{
+      id,
+      cancelKey: cancelledAt + '-' + id,
+      origenIcao,
+      destinoIcao,
+      cancelledAt,
+      cancelledFlightDay,
+      deferred,
+    }, ...prev])
+  }, [])
 
   const startDayToDaySimulation = useCallback(async (startDate, dias = 5, preCancelledIds = [], startTime = null, options = {}) => {
     try {
@@ -420,7 +444,74 @@ export const useControlTowerController = () => {
     }
   }, [selectedAlgorithm, targetPlaybackMinutes]);
 
+  // ── Reconexión a sesión existente (cuando se abre el link con ?session=) ───
   useEffect(() => {
+    const sid = initialSessionId.current;
+    if (!sid) {
+      setIsReconnecting(false);
+      return;
+    }
+    let cancelled = false;
+    apiFetch(`/api/v1/simulation/status/${sid}`)
+      .then(res => {
+        if (!res.ok) throw new Error(`Sesión ${sid} no encontrada (${res.status})`);
+        return res.json();
+      })
+      .then(data => {
+        if (cancelled) return;
+        const status = data.status; // RUNNING | DONE | FAILED
+        const isCollapse = !!data.isCollapseMode;
+        const totalDays = data.totalDays ?? 1;
+        // Determinar pestaña correcta según el tipo de sesión
+        let tab = "vivo";
+        if (isCollapse) tab = "colapso";
+        else if (totalDays > 1) tab = "periodo";
+        setActiveTab(tab);
+        if (tab !== "vivo") setIsDockCollapsed(true);
+        // Restaurar meta del backend
+        setMeta(prev => ({
+          ...prev,
+          status: data.status,
+          percent: data.percent ?? prev.percent,
+          currentDay: data.currentDay ?? prev.currentDay,
+          totalDays: data.totalDays ?? prev.totalDays,
+          isCollapseMode: !!data.isCollapseMode,
+          algorithm: data.algorithm ?? prev.algorithm,
+          startEpoch: data.startEpoch ?? prev.startEpoch,
+          slaFinal: data.slaFinal ?? prev.slaFinal,
+          totalAttended: data.totalAttended ?? prev.totalAttended,
+          totalMissed: data.totalMissed ?? prev.totalMissed,
+          reports: data.reports ?? prev.reports,
+        }));
+        if (data.algorithm) setSelectedAlgorithm(data.algorithm.toLowerCase());
+        if (status === 'RUNNING' || status === 'RECONSTRUCTING') {
+          realStartRef.current = realStartRef.current || Date.now();
+          setSimState('running');
+        } else if (status === 'DONE') {
+          setSimState('completed');
+          setFinalMasterPlan(data.finalMasterPlan || []);
+        } else {
+          setSimState('idle');
+        }
+      })
+      .catch(err => {
+        if (cancelled) return;
+        console.warn('[Tasf.B2B] No se pudo reconectar a sesión:', err.message);
+        // Si la sesión no existe, limpiamos la URL y arrancamos normal
+        setSessionId(null);
+        initialSessionId.current = null;
+      })
+      .finally(() => {
+        if (!cancelled) setIsReconnecting(false);
+      });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Solo al montar
+
+  // ── Auto-inicio de simulación día a día (vivo) ───────────────────────────
+  useEffect(() => {
+    // No auto-iniciar si estamos reconectando una sesión existente desde la URL
+    if (isReconnecting) return;
     if (activeTab === "vivo" && simState === "idle" && !sessionId) {
       const now = new Date();
       const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
@@ -692,32 +783,11 @@ let f = pendingBySeq.get(seq);
         try {
           const envelope = JSON.parse(msg.body)
           const data = envelope?.data ?? {}
-
           if (data.currentEpochTime) {
             upsertBySeq(envelope?.seq ?? 0, 'kpi', data);
-          }
-
-          if (data.status =='DONE'){
-            setSimState('completed');
-            setMeta(prev => ({
-              ...prev,
-              status: 'DONE',
-              percent: 100,
-              currentDay: data.currentDay ?? prev.currentDay,
-              totalDays:  data.totalDays  ?? prev.totalDays,
-            }));
-            // Fetch para obtener finalMasterPlan y métricas finales
-            apiFetch(`/api/v1/simulation/status/${sessionId}`).then(res => {
-              if (res.ok) res.json().then(finalStatus => {
-                setMeta(prev => ({ ...prev, ...finalStatus }));
-                setFinalMasterPlan(finalStatus.finalMasterPlan || []);
-              });
-            });
-            setTimeout(() => client.deactivate(), 250); //se cierra la com para ambos
-          }else if (data.status === 'FAILED') {
-            setSimState('idle');
-            setMeta(prev => ({ ...prev, status: 'FAILED', errorMessage: data.errorMessage }));
-            setTimeout(() => client.deactivate(), 250);//se cierra la com para ambos
+            if (data.status === 'DONE' || data.status === 'FAILED') {
+              setTimeout(() => client.deactivate(), 250);
+            }
           }
         } catch (err) { console.error('Error parsing kpi:', err) }
       })
@@ -1017,6 +1087,15 @@ if (selected && !finalSelection.some((p) => p.id === selected.id)) {
     };
 
     if (sessionId && meta.status !== "idle") {
+      let fleetLoad = 0, fleetCap = 0
+      aircraft.forEach(p => {
+        if (p.status !== "cancelled") {
+          fleetLoad += p.ocupacionReal || 0
+          fleetCap += p.capacidadMax || 0
+        }
+      })
+      const fleetOccupancyPct = fleetCap > 0 ? (fleetLoad / fleetCap) * 100 : 0
+
       return {
         scenarioLabel: "Simulación en vivo",
         systemClock: fmtSim(smoothSimTime || currentEpochTime, meta.startEpoch),
@@ -1027,7 +1106,20 @@ if (selected && !finalSelection.some((p) => p.id === selected.id)) {
         globalCapacity: `${globalOccupancyCalculated.toFixed(1)}%`,
         networkLatency: "OK",
         flightsInCourse: { value: aircraft.length ?? 0, delta: "datos reales", status: "green" },
-        storageOccupancy: { value: Math.round(globalOccupancyCalculated), subtitle: "Promedio red", status: (globalOccupancyCalculated >= 90) ? "red" : "green" },
+        storageOccupancy: {
+          value: globalOccupancyCalculated.toFixed(1),
+          subtitle: "Promedio red",
+          status: globalOccupancyCalculated === 0 ? "idle"
+            : globalOccupancyCalculated >= 90 ? "red"
+            : globalOccupancyCalculated >= 70 ? "amber" : "green",
+        },
+        fleetOccupancy: {
+          value: fleetOccupancyPct.toFixed(1),
+          subtitle: "Carga total / Capacidad máxima",
+          status: fleetOccupancyPct === 0 ? "idle"
+            : fleetOccupancyPct >= 90 ? "red"
+            : fleetOccupancyPct >= 70 ? "amber" : "green",
+        },
         sla: { value: kpis.slaPercent?.toFixed(1) ?? 0, subtitle: "Real", status: (kpis.slaPercent >= 90) ? "green" : "red" },
         criticalNodes: { value: kpis.criticalNodes ?? 0, subtitle: ">90% ocupación", status: (kpis.criticalNodes > 5) ? "red" : "green" },
         progress: { label: meta.status === "DONE" ? "Completado" : "Ejecutando", percent: meta.percent ?? 0, simulatedTime: clock.simulatedTime ?? `Día ${meta.currentDay}`, status: meta.status === "DONE" ? "green" : "amber" },
@@ -1046,7 +1138,7 @@ if (selected && !finalSelection.some((p) => p.id === selected.id)) {
       globalCapacity: "0%",
       networkLatency: "--",
       flightsInCourse: { value: 0, delta: "--", status: "green" },
-      storageOccupancy: { value: 0, subtitle: "--", status: "green" },
+      storageOccupancy: { value: "0.0", subtitle: "--", status: "idle" },
       sla: { value: 0, subtitle: "--", status: "green" },
       criticalNodes: { value: 0, subtitle: "--", status: "green" },
       progress: { label: "Listo", percent: 0, simulatedTime: "00:00:00", status: "amber" },
@@ -1075,6 +1167,22 @@ if (selected && !finalSelection.some((p) => p.id === selected.id)) {
 
       return [
         {
+          key: "fleetOccupancy",
+          title: "Ocupación global flota (UT)",
+          value: `${fleetOccupancyPct.toFixed(1)}%`,
+          subtitle: "Carga total / Capacidad máxima",
+          status: fleetOccupancyPct === 0 ? "idle" : fleetOccupancyPct >= 90 ? "red" : fleetOccupancyPct >= 70 ? "amber" : "green",
+        },
+        {
+          key: "occupancy",
+          title: "Ocupación global almacenes",
+          value: `${globalOccupancyCalculated.toFixed(1)}%`,
+          subtitle: "Promedio red · datos reales",
+          status: globalOccupancyCalculated === 0 ? "idle"
+            : globalOccupancyCalculated >= 90 ? "red"
+            : globalOccupancyCalculated >= 70 ? "amber" : "green",
+        },
+        {
           key: "flights",
           title: "Vuelos en curso",
           value: aircraft.filter(r => r.status !== "cancelled").length ?? 0,
@@ -1082,21 +1190,6 @@ if (selected && !finalSelection.some((p) => p.id === selected.id)) {
             ? `Rescatados: ${kpis.rescuedFlights ?? 0}` 
             : `Día ${meta.currentDay} de simulación`,
           status: "green",
-        },
-        {
-          key: "fleetOccupancy",
-          title: "Ocupación global flota (UT)",
-          value: `${fleetOccupancyPct.toFixed(1)}%`,
-          subtitle: "Carga total / Capacidad máxima",
-          status: fleetOccupancyPct >= 90 ? "red" : fleetOccupancyPct >= 70 ? "amber" : "green",
-        },
-        {
-          key: "occupancy",
-          title: "Ocupación global almacenes",
-          value: `${globalOccupancyCalculated.toFixed(1)}%`,
-          subtitle: "Promedio red · datos reales",
-          status: globalOccupancyCalculated >= 90 ? "red"
-            : globalOccupancyCalculated >= 70 ? "amber" : "green",
         },
         {
           key: "sla",
@@ -1184,7 +1277,6 @@ activeAircraft,
     kpiCards,
     liveStatus,
     masterPlan,
-    finalMasterPlan,
     selectedAircraftId,
     selectedAirportCode,
     setSelectedAirportCode,
@@ -1206,6 +1298,8 @@ activeAircraft,
     exportDetailedSimulationReport,
     resetSimulation,
     cancelFlight,
+    cancelledFlights,
+    addCancelledFlight,
     summary,
     tabs: SCENARIO_TABS,
     toggleDock,

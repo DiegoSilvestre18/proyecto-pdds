@@ -1,21 +1,53 @@
 import { useState, useCallback, useEffect, useMemo } from 'react'
 import { apiFetch } from '../../hooks/api'
 
-export default function FlightCancellationPanel({ sessionId, isRunning, startEpoch, currentEpochTime }) {
+export default function FlightCancellationPanel({ sessionId, isRunning, startEpoch, currentEpochTime, onFlightCancelled }) {
   const [query, setQuery] = useState('')
   const [vuelos, setVuelos] = useState([])
   const [loading, setLoading] = useState(false)
   const [cancellingId, setCancellingId] = useState(null)
   const [resultado, setResultado] = useState(null)
-  const [localState, setLocalState] = useState({}) // { [id]: 'cancelled' | 'deferred' }
+  const [localState, setLocalState] = useState({}) // { [id]: { status: 'cancelled'|'deferred', depMinute, cancelledDay } }
 
-  // Minuto del DÍA actual (0-1439) — necesario para comparar contra departureMinute,
-  // que siempre es relativo a un día (los vuelos son recurrentes diarios).
+  // Minuto UTC actual (0-1439) — departureMinute del API es UTC, misma base
   const minuteOfDay = useMemo(() => {
-    if (!startEpoch || !currentEpochTime) return 0;
-    const absoluteMinutes = Math.floor((currentEpochTime - startEpoch) / 60000);
-    return ((absoluteMinutes % 1440) + 1440) % 1440;
-  }, [startEpoch, currentEpochTime]);
+    if (!currentEpochTime) return 0;
+    const d = new Date(currentEpochTime);
+    return d.getUTCHours() * 60 + d.getUTCMinutes();
+  }, [currentEpochTime]);
+
+  // Día UTC actual para detectar cambio de día
+  const currentUtcDay = useMemo(() => {
+    if (!currentEpochTime) return 0
+    return Math.floor(currentEpochTime / 86400000)
+  }, [currentEpochTime])
+
+  // Gestionar localState:
+  //   cancelled → se limpia cuando pasa la hora de salida
+  //   deferred  → cambia a cancelled cuando llega el día (backend ya aplicó cancelación)
+  useEffect(() => {
+    const now = minuteOfDay
+    setLocalState(prev => {
+      let changed = false
+      const next = {}
+      for (const [id, entry] of Object.entries(prev)) {
+        let e = entry
+
+        if (e.status === 'deferred' && e.cancelledDay < currentUtcDay) {
+          e = { ...e, status: 'cancelled', cancelledDay: currentUtcDay }
+          changed = true
+        }
+
+        if (e.status === 'cancelled' && now > e.depMinute) {
+          changed = true
+          continue
+        }
+
+        next[id] = e
+      }
+      return changed ? next : prev
+    })
+  }, [minuteOfDay, currentUtcDay])
 
   useEffect(() => {
     if (!isRunning) return;
@@ -34,30 +66,42 @@ export default function FlightCancellationPanel({ sessionId, isRunning, startEpo
     return () => clearTimeout(timer);
   }, [query, isRunning]);
 
-  const handleCancel = useCallback(async (id) => {
+  const handleCancel = useCallback(async (flight) => {
+    const id = flight.id;
     if (!sessionId || !id) return;
     setCancellingId(id);
     setResultado(null);
 
     try {
+      const leadTime = flight.departureMinute - minuteOfDay
+      const effectiveDeferred = leadTime < 60 // coincide con backend
+
       const res = await apiFetch(
           `/api/v1/simulation/cancel-flight/${id}?sessionId=${sessionId}`,
           { method: 'POST' }
       )
       const data = await res.json()
-      const deferred = data.deferred === 'true' || data.deferred === true;
 
-      setResultado({ ok: res.ok, deferred, message: data.message || (res.ok ? 'Vuelo cancelado' : 'Error al cancelar') })
+      setResultado({ ok: res.ok, deferred: effectiveDeferred, message: data.message || (res.ok ? 'Vuelo cancelado' : 'Error al cancelar') })
 
       if (res.ok) {
-        setLocalState(prev => ({ ...prev, [id]: deferred ? 'deferred' : 'cancelled' }));
+        setLocalState(prev => ({ ...prev, [id]: { status: effectiveDeferred ? 'deferred' : 'cancelled', depMinute: flight.departureMinute, cancelledDay: currentUtcDay } }));
+        if (onFlightCancelled) {
+          onFlightCancelled(id, {
+            origenIcao: flight.origenIcao,
+            destinoIcao: flight.destinoIcao,
+            departureMinute: flight.departureMinute,
+            cancelledAt: currentEpochTime,
+            deferred: effectiveDeferred,
+          })
+        }
       }
     } catch (err) {
       setResultado({ ok: false, message: err.message })
     } finally {
       setCancellingId(null);
     }
-  }, [sessionId]);
+  }, [sessionId, currentEpochTime, onFlightCancelled, minuteOfDay]);
 
   const formatMinute = (m) => {
     const h = Math.floor(m / 60);
@@ -67,6 +111,7 @@ export default function FlightCancellationPanel({ sessionId, isRunning, startEpo
 
   return (
       <div style={{
+        flex: 1, display: 'flex', flexDirection: 'column',
         background: 'rgba(15, 23, 42, 0.85)', backdropFilter: 'blur(12px)', borderRadius: '12px',
         border: '1px solid rgba(239, 68, 68, 0.3)', padding: '14px 16px', marginTop: '10px',
       }}>
@@ -86,16 +131,17 @@ export default function FlightCancellationPanel({ sessionId, isRunning, startEpo
           />
         </div>
 
-        <div style={{ maxHeight: '220px', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px', paddingRight: '4px' }}>
+        <div style={{ flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '6px', paddingRight: '4px', minHeight: 0 }}>
           {loading && vuelos.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '10px', color: '#64748b', fontSize: '12px' }}>Cargando vuelos...</div>
           ) : vuelos.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '10px', color: '#64748b', fontSize: '12px' }}>No se encontraron vuelos</div>
           ) : (
               vuelos.map(v => {
+                const leadTime = v.departureMinute - minuteOfDay // negativo = ya partió
+                const willDefer = leadTime < 60 // mismo criterio que backend
                 const minutesUntilDeparture = ((v.departureMinute - minuteOfDay) + 1440) % 1440;
-                const willDefer = minutesUntilDeparture < 60;
-                const state = localState[v.id]; // 'cancelled' | 'deferred' | undefined
+                const state = localState[v.id]?.status
 
                 return (
                     <div key={v.id} style={{
@@ -118,10 +164,10 @@ export default function FlightCancellationPanel({ sessionId, isRunning, startEpo
                       </div>
 
                       <button
-                          onClick={() => handleCancel(v.id)}
+                          onClick={() => handleCancel(v)}
                           disabled={!!state || cancellingId === v.id}
                           style={{
-                            padding: '2px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 600, border: 'none',
+                            padding: '2px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 600,
                             cursor: (state || cancellingId === v.id) ? 'not-allowed' : 'pointer',
                             background: state === 'cancelled' ? 'rgba(100, 116, 139, 0.2)'
                                 : state === 'deferred' ? 'rgba(245, 158, 11, 0.2)'
@@ -131,7 +177,7 @@ export default function FlightCancellationPanel({ sessionId, isRunning, startEpo
                             transition: 'all 0.2s ease',
                           }}
                       >
-                        {cancellingId === v.id ? '...' : state === 'cancelled' ? 'Cancelado' : state === 'deferred' ? 'Mañana' : 'Cancelar'}
+                        {cancellingId === v.id ? '...' : state === 'cancelled' ? 'Cancelado' : state === 'deferred' ? 'Cancelado mañana' : 'Cancelar'}
                       </button>
                     </div>
                 );

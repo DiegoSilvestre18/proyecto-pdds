@@ -2,7 +2,15 @@
 const STATUS_META = {
   danger:  { icon: '⛔', text: 'Crítico', color: '#f87171' },
   warning: { icon: '⚠️', text: 'Alerta', color: '#fbbf24' },
+  idle:    { icon: '○', text: 'Inactivo', color: '#f8fafc' },
   default: { icon: '✓', text: 'Normal', color: '#f8fafc' },
+}
+
+const OCCUPANCY_COLORS = {
+  red: '#f87171',
+  amber: '#fbbf24',
+  green: '#4ade80',
+  idle: '#f8fafc',
 }
 
 function TelemetryPanel({ isVisible, summary, elapsedOperationTime, kpis, onHide }) {
@@ -33,6 +41,10 @@ function TelemetryPanel({ isVisible, summary, elapsedOperationTime, kpis, onHide
               {kpis.map((kpi, idx) => {
                 const meta = STATUS_META[kpi.status] || STATUS_META.default
                 const showBadge = kpi.status === 'danger' || kpi.status === 'warning'
+                const isOccupancy = kpi.key === 'occupancy' || kpi.key === 'fleetOccupancy'
+                const valueColor = isOccupancy
+                  ? (OCCUPANCY_COLORS[kpi.status] || '#f8fafc')
+                  : meta.color
                 return (
                 <div key={kpi.key || idx} style={{
                   background: 'rgba(40, 58, 78, 0.65)',
@@ -45,8 +57,12 @@ function TelemetryPanel({ isVisible, summary, elapsedOperationTime, kpis, onHide
                   alignItems: 'center',
                   minWidth: 0
                 }}>
-                  <span title={kpi.title} style={{ display: 'block', width: '100%', textAlign: 'center', fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{kpi.title}</span>
-                    <strong style={{ fontSize: '13px', color: meta.color, display: 'flex', alignItems: 'center', gap: '4px', textShadow: '0 0 8px rgba(255,255,255,0.08)' }}>
+                  <span title={kpi.title} style={{ display: 'block', width: '100%', textAlign: 'center', fontSize: '10px', color: '#94a3b8', textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                    {isOccupancy ? (
+                      <>{kpi.title.slice(0, 17)}<br />{kpi.title.slice(17)}</>
+                    ) : kpi.title}
+                  </span>
+                    <strong style={{ fontSize: '13px', color: valueColor, display: 'flex', alignItems: 'center', gap: '4px', textShadow: '0 0 8px rgba(255,255,255,0.08)' }}>
                       {showBadge && <span title={meta.text} aria-label={meta.text}>{meta.icon}</span>}
                       {kpi.value}
                     </strong>
@@ -61,8 +77,12 @@ function TelemetryPanel({ isVisible, summary, elapsedOperationTime, kpis, onHide
         <h4 style={{ margin: '0 0 6px 0', fontSize: '10px', color: '#94a3b8', letterSpacing: '1px' }}>DATOS OPERATIVOS</h4>
         <div className="ct-metrics-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px', margin: 0 }}>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+            <span style={{ fontSize: '9px', color: '#94a3b8' }}>OCUPACIÓN FLOTA</span>
+            <strong style={{ fontSize: '13px', color: OCCUPANCY_COLORS[summary.fleetOccupancy?.status] || '#f8fafc' }}>{summary.fleetOccupancy?.value ?? '--'}%</strong>
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <span style={{ fontSize: '9px', color: '#94a3b8' }}>USO ALMACENES</span>
-            <strong style={{ fontSize: '13px', color: '#f8fafc' }}>{summary.storageOccupancy.value}%</strong>
+            <strong style={{ fontSize: '13px', color: OCCUPANCY_COLORS[summary.storageOccupancy?.status] || '#f8fafc' }}>{summary.storageOccupancy.value}%</strong>
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <span style={{ fontSize: '9px', color: '#94a3b8' }}>VUELOS EN CURSO</span>
