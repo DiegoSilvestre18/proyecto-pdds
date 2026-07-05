@@ -199,27 +199,7 @@ const App = () => {
     <div
       className={`control-tower ${isCollapseScenario ? "control-tower--collapse" : ""}`}
     >
-      {(simState === "completed" || liveStatus?.status === "DONE") && (
-        <button
-          onClick={() => {
-            const name = activeTab === 'vivo' ? 'Operacion_Dia_a_Dia' :
-              activeTab === 'periodo' ? 'Simulacion_Periodo' :
-                'Simulacion_Colapso';
-            exportSimulationReportMd(sessionId, name);
-          }}
-          title="Exportar los resultados finales a Markdown (.md)"
-          style={{
-            position: 'fixed', top: 12, right: 460, zIndex: 9999,
-            background: 'linear-gradient(90deg, #db2777, #be185d)',
-            color: 'white', border: 'none', borderRadius: 8,
-            padding: '7px 14px', cursor: 'pointer',
-            fontSize: 12, fontWeight: 700, letterSpacing: 0.5,
-            boxShadow: '0 4px 15px rgba(219, 39, 119, 0.4)',
-          }}
-        >
-          📝 Descargar Reporte (.md)
-        </button>
-      )}
+
 
       <ScenarioHeader
         tabs={tabs}

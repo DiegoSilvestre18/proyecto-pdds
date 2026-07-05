@@ -220,7 +220,6 @@ const FlightRow = React.memo(function FlightRow({ index, style, data }) {
           <div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
               <span style={{ fontWeight: 'bold', color: '#e2e8f0', fontSize: '13px' }}>Vuelo {numericId}</span>
-              <span style={{ background: statusColors[ut.status] || statusColors.default, fontSize: '10px', padding: '2px 6px', borderRadius: '12px', color: '#fff', textTransform: 'uppercase' }}>{ut.status}</span>
             </div>
             <div style={{ fontSize: '11px', color: '#9ca3af', display: 'flex', flexWrap: 'wrap', gap: '4px', alignItems: 'center' }}>
               <span style={{ whiteSpace: 'nowrap' }}>{ut.from}</span>
@@ -278,15 +277,9 @@ function FlightDetailPanel({ flight, onClose, bagSummary }) {
           <span>Capacidad Máxima</span>
           <span style={{ color: '#e2e8f0' }}>{flight.capacidadMax || 0} maletas</span>
         </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', padding: '4px 0', color: '#9ca3af', borderBottom: '1px dashed rgba(255,255,255,0.1)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', padding: '4px 0', color: '#9ca3af' }}>
           <span>Progreso</span>
           <span style={{ color: '#e2e8f0' }}>{((flight.progress ?? 0) * 100).toFixed(0)}%</span>
-        </div>
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '11px', padding: '4px 0', color: '#9ca3af' }}>
-          <span>Estado</span>
-          <span style={{ color: statusColors[flight.status] || statusColors.default, fontWeight: 'bold', textTransform: 'uppercase' }}>
-          {flight.status}
-        </span>
         </div>
 
         {bagSummary}

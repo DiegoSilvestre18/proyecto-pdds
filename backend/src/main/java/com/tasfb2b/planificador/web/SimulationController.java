@@ -557,9 +557,13 @@ public class SimulationController {
         sb.append("- **Maletas Atendidas (A tiempo)**: ").append(String.format("%,d", session.getTotalAttended())).append("\n");
         sb.append("- **Maletas No Atendidas (Ecap)**: ").append(String.format("%,d", session.getTotalMissed())).append("\n");
         if (session.isCollapseMode()) {
-            sb.append("- **Modo de Simulación**: 🚨 Búsqueda de Punto de Quiebre (Colapso Logístico/Computacional)\n");  sb.append("- **Vuelos Replanificados/Rescatados**: ").append(session.getRescuedFlights()).append("\n");
-        } else {
+            sb.append("- **Modo de Simulación**: 🚨 Búsqueda de Punto de Quiebre (Colapso Logístico/Computacional)\n");
+            sb.append("- **Vuelos Replanificados/Rescatados**: ").append(session.getRescuedFlights()).append("\n");
+        } else if (session.isRealTime()) {
             sb.append("- **Modo de Simulación**: 🟢 Operación Día a Día (Normal)\n");
+        } else {
+            sb.append("- **Modo de Simulación**: 📊 Simulación de Periodo\n");
+            sb.append("\n> Presentar como reporte la última planificación estable al finalizar en simulación del periodo\n");
         }
         sb.append("\n---\n\n");
 

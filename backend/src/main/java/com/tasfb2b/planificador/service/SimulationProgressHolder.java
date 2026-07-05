@@ -200,6 +200,34 @@ public class SimulationProgressHolder {
         if (state != null) {
             state.setStatus(Status.DONE);
             state.setPercent(100);
+            
+            WsFrame oldFrame = state.getWsFrame();
+            if (oldFrame != null) {
+                state.setWsFrame(new WsFrame(
+                        oldFrame.sessionId(),
+                        Status.DONE.name(),
+                        oldFrame.currentEpochTime(),
+                        oldFrame.simulatedTime(),
+                        100,
+                        oldFrame.currentDay(),
+                        oldFrame.totalDays(),
+                        oldFrame.slaPercent(),
+                        oldFrame.criticalNodes(),
+                        oldFrame.airportLoads(),
+                        oldFrame.totalBagsWaiting(),
+                        oldFrame.isCollapseMode(),
+                        oldFrame.rescuedFlights(),
+                        oldFrame.errorMessage(),
+                        oldFrame.startEpoch(),
+                        oldFrame.activeRoutes(),
+                        oldFrame.algorithm(),
+                        oldFrame.taMs(),
+                        oldFrame.saMinutes(),
+                        oldFrame.planId(),
+                        oldFrame.plannedRoutes(),
+                        oldFrame.globalFleetOccupancy()
+                ));
+            }
         }
     }
 
@@ -208,6 +236,34 @@ public class SimulationProgressHolder {
         if (state != null) {
             state.setStatus(Status.FAILED);
             state.setErrorMessage(errorMessage);
+            
+            WsFrame oldFrame = state.getWsFrame();
+            if (oldFrame != null) {
+                state.setWsFrame(new WsFrame(
+                        oldFrame.sessionId(),
+                        Status.FAILED.name(),
+                        oldFrame.currentEpochTime(),
+                        oldFrame.simulatedTime(),
+                        oldFrame.percent(),
+                        oldFrame.currentDay(),
+                        oldFrame.totalDays(),
+                        oldFrame.slaPercent(),
+                        oldFrame.criticalNodes(),
+                        oldFrame.airportLoads(),
+                        oldFrame.totalBagsWaiting(),
+                        oldFrame.isCollapseMode(),
+                        oldFrame.rescuedFlights(),
+                        errorMessage,
+                        oldFrame.startEpoch(),
+                        oldFrame.activeRoutes(),
+                        oldFrame.algorithm(),
+                        oldFrame.taMs(),
+                        oldFrame.saMinutes(),
+                        oldFrame.planId(),
+                        oldFrame.plannedRoutes(),
+                        oldFrame.globalFleetOccupancy()
+                ));
+            }
         }
     }
 
