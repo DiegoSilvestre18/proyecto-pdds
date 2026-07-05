@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { apiFetch } from "./api";
 import { createStompClient } from "./ws";
 import {
@@ -36,6 +37,7 @@ const readStoredKpiCollapsed = () => {
 
 export const useControlTowerController = () => {
   const { airports: globalAirports, airportByIcao } = useAirports();
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState("vivo");
   const isCollapseScenario = activeTab === "colapso";
   const isSimScenario = activeTab === "periodo" || activeTab === "colapso";
@@ -48,20 +50,15 @@ export const useControlTowerController = () => {
   const [selectedAlgorithm, setSelectedAlgorithm] = useState("alns");
   const [simState, setSimState] = useState("idle");
   const [targetPlaybackMinutes, setTargetPlaybackMinutes] = useState(30);
-
   // Si había un ?session= en la URL al abrir, lo guardamos para reconexión
   const initialSessionId = useRef(
-    typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("session") : null
+    new URLSearchParams(location.search).get("session")
   );
-  // true mientras estamos consultando el backend para reconectar
+  // true mientras consultamos el backend para reconectar (evita que auto-inicie vivo encima)
   const [isReconnecting, setIsReconnecting] = useState(() => !!initialSessionId.current);
 
   const [sessionId, setSessionId] = useState(() => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      return params.get("session");
-    }
-    return null;
+    return new URLSearchParams(location.search).get("session");
   });
 
   // Actualizar URL cuando cambia el sessionId
@@ -101,7 +98,6 @@ export const useControlTowerController = () => {
   const realStartRef = useRef(null);
   const [logs, setLogs] = useState([]);
   const [realTimeTicker, setRealTimeTicker] = useState(Date.now());
-  const [finalMasterPlan, setFinalMasterPlan] = useState([]);
 
   // Ticker para actualizar el reloj de la vida real (incluso en idle)
   useEffect(() => {
@@ -126,9 +122,8 @@ export const useControlTowerController = () => {
       ...clock,
       interpolatedTime: smoothSimTime,
       eventLog: logs,
-      finalMasterPlan
     };
-  }, [meta, kpis, airportLoads, aircraft, clock, smoothSimTime, logs, sessionId, finalMasterPlan]);
+  }, [meta, kpis, airportLoads, aircraft, clock, smoothSimTime, logs, sessionId]);
 
   // ── Clock local para interpolar movimiento y tiempo ───────────────────────
   const simClockRef = useRef({
@@ -257,12 +252,13 @@ export const useControlTowerController = () => {
                    if (res.ok) {
                        res.json().then(finalStatus => {
                            setMeta(prev => ({ ...prev, ...finalStatus }));
-                           setFinalMasterPlan(finalStatus.finalMasterPlan || []);
                        });
                    }
                });
            } else if (data.status === 'FAILED') {
                setSimState('idle');
+           } else if (data.status === 'RUNNING' || data.status === 'RECONSTRUCTING') {
+               setSimState(prev => prev !== 'running' ? 'running' : prev);
            }
         }
       }
@@ -315,7 +311,6 @@ export const useControlTowerController = () => {
     setRealElapsedSecs(0);
     realStartRef.current = null;
     setLogs([]);
-    setFinalMasterPlan([]);
     snapshotBufferRef.current = [];
     simClockRef.current = { serverEpoch: 0, receivedAt: 0, ratio: 1 };
   }, [selectedAlgorithm]);
@@ -437,7 +432,7 @@ export const useControlTowerController = () => {
     let cancelled = false;
     apiFetch(`/api/v1/simulation/status/${sid}`)
       .then(res => {
-        if (!res.ok) throw new Error(`Session ${sid} not found (${res.status})`);
+        if (!res.ok) throw new Error(`Sesión ${sid} no encontrada (${res.status})`);
         return res.json();
       })
       .then(data => {
@@ -445,7 +440,7 @@ export const useControlTowerController = () => {
         const status = data.status; // RUNNING | DONE | FAILED
         const isCollapse = !!data.isCollapseMode;
         const totalDays = data.totalDays ?? 1;
-        // Determinar pestaña correcta
+        // Determinar pestaña correcta según el tipo de sesión
         let tab = "vivo";
         if (isCollapse) tab = "colapso";
         else if (totalDays > 1) tab = "periodo";
@@ -467,7 +462,7 @@ export const useControlTowerController = () => {
           reports: data.reports ?? prev.reports,
         }));
         if (data.algorithm) setSelectedAlgorithm(data.algorithm.toLowerCase());
-        if (status === 'RUNNING') {
+        if (status === 'RUNNING' || status === 'RECONSTRUCTING') {
           realStartRef.current = realStartRef.current || Date.now();
           setSimState('running');
         } else if (status === 'DONE') {
@@ -480,7 +475,7 @@ export const useControlTowerController = () => {
       .catch(err => {
         if (cancelled) return;
         console.warn('[Tasf.B2B] No se pudo reconectar a sesión:', err.message);
-        // Si falla (sesión no existe), limpiamos la URL y dejamos arrancar normal
+        // Si la sesión no existe, limpiamos la URL y arrancamos normal
         setSessionId(null);
         initialSessionId.current = null;
       })
@@ -493,14 +488,14 @@ export const useControlTowerController = () => {
 
   // ── Auto-inicio de simulación día a día (vivo) ───────────────────────────
   useEffect(() => {
-    // No auto-iniciar si estamos reconectando una sesión existente
+    // No auto-iniciar si estamos reconectando una sesión existente desde la URL
     if (isReconnecting) return;
     if (activeTab === "vivo" && simState === "idle" && !sessionId) {
       const now = new Date();
       const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       startDayToDaySimulation(today, 1, [], null, { isRealTime: true, planningHorizon: 30 });
     }
-  }, [activeTab, simState, sessionId, isReconnecting, startDayToDaySimulation]);
+  }, [activeTab, simState, sessionId, startDayToDaySimulation]);
 
   const startCollapseSimulation = useCallback(async (dias = 90, startDate = null, stressFactor = 5, endCondition = "FAILED_DELIVERY") => {
     try {
@@ -790,32 +785,11 @@ let f = pendingBySeq.get(seq);
         try {
           const envelope = JSON.parse(msg.body)
           const data = envelope?.data ?? {}
-
           if (data.currentEpochTime) {
             upsertBySeq(envelope?.seq ?? 0, 'kpi', data);
-          }
-
-          if (data.status =='DONE'){
-            setSimState('completed');
-            setMeta(prev => ({
-              ...prev,
-              status: 'DONE',
-              percent: 100,
-              currentDay: data.currentDay ?? prev.currentDay,
-              totalDays:  data.totalDays  ?? prev.totalDays,
-            }));
-            // Fetch para obtener finalMasterPlan y métricas finales
-            apiFetch(`/api/v1/simulation/status/${sessionId}`).then(res => {
-              if (res.ok) res.json().then(finalStatus => {
-                setMeta(prev => ({ ...prev, ...finalStatus }));
-                setFinalMasterPlan(finalStatus.finalMasterPlan || []);
-              });
-            });
-            setTimeout(() => client.deactivate(), 250); //se cierra la com para ambos
-          }else if (data.status === 'FAILED') {
-            setSimState('idle');
-            setMeta(prev => ({ ...prev, status: 'FAILED', errorMessage: data.errorMessage }));
-            setTimeout(() => client.deactivate(), 250);//se cierra la com para ambos
+            if (data.status === 'DONE' || data.status === 'FAILED') {
+              setTimeout(() => client.deactivate(), 250);
+            }
           }
         } catch (err) { console.error('Error parsing kpi:', err) }
       })
@@ -1282,7 +1256,6 @@ activeAircraft,
     kpiCards,
     liveStatus,
     masterPlan,
-    finalMasterPlan,
     selectedAircraftId,
     selectedAirportCode,
     setSelectedAirportCode,
