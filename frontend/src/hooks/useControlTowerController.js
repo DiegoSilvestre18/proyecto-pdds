@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation } from "react-router-dom";
 import { apiFetch } from "./api";
 import { createStompClient } from "./ws";
 import {
@@ -36,6 +37,7 @@ const readStoredKpiCollapsed = () => {
 
 export const useControlTowerController = () => {
   const { airports: globalAirports, airportByIcao } = useAirports();
+  const location = useLocation();
   const [activeTab, setActiveTab] = useState("vivo");
   const isCollapseScenario = activeTab === "colapso";
   const isSimScenario = activeTab === "periodo" || activeTab === "colapso";
@@ -48,13 +50,15 @@ export const useControlTowerController = () => {
   const [selectedAlgorithm, setSelectedAlgorithm] = useState("alns");
   const [simState, setSimState] = useState("idle");
   const [targetPlaybackMinutes, setTargetPlaybackMinutes] = useState(30);
+  // Si había un ?session= en la URL al abrir, lo guardamos para reconexión
+  const initialSessionId = useRef(
+    new URLSearchParams(location.search).get("session")
+  );
+  // true mientras consultamos el backend para reconectar (evita que auto-inicie vivo encima)
+  const [isReconnecting, setIsReconnecting] = useState(() => !!initialSessionId.current);
 
   const [sessionId, setSessionId] = useState(() => {
-    if (typeof window !== "undefined") {
-      const params = new URLSearchParams(window.location.search);
-      return params.get("session");
-    }
-    return null;
+    return new URLSearchParams(location.search).get("session");
   });
 
   // Actualizar URL cuando cambia el sessionId
@@ -253,6 +257,8 @@ export const useControlTowerController = () => {
                });
            } else if (data.status === 'FAILED') {
                setSimState('idle');
+           } else if (data.status === 'RUNNING' || data.status === 'RECONSTRUCTING') {
+               setSimState(prev => prev !== 'running' ? 'running' : prev);
            }
         }
       }
@@ -416,7 +422,74 @@ export const useControlTowerController = () => {
     }
   }, [selectedAlgorithm, targetPlaybackMinutes]);
 
+  // ── Reconexión a sesión existente (cuando se abre el link con ?session=) ───
   useEffect(() => {
+    const sid = initialSessionId.current;
+    if (!sid) {
+      setIsReconnecting(false);
+      return;
+    }
+    let cancelled = false;
+    apiFetch(`/api/v1/simulation/status/${sid}`)
+      .then(res => {
+        if (!res.ok) throw new Error(`Sesión ${sid} no encontrada (${res.status})`);
+        return res.json();
+      })
+      .then(data => {
+        if (cancelled) return;
+        const status = data.status; // RUNNING | DONE | FAILED
+        const isCollapse = !!data.isCollapseMode;
+        const totalDays = data.totalDays ?? 1;
+        // Determinar pestaña correcta según el tipo de sesión
+        let tab = "vivo";
+        if (isCollapse) tab = "colapso";
+        else if (totalDays > 1) tab = "periodo";
+        setActiveTab(tab);
+        if (tab !== "vivo") setIsDockCollapsed(true);
+        // Restaurar meta del backend
+        setMeta(prev => ({
+          ...prev,
+          status: data.status,
+          percent: data.percent ?? prev.percent,
+          currentDay: data.currentDay ?? prev.currentDay,
+          totalDays: data.totalDays ?? prev.totalDays,
+          isCollapseMode: !!data.isCollapseMode,
+          algorithm: data.algorithm ?? prev.algorithm,
+          startEpoch: data.startEpoch ?? prev.startEpoch,
+          slaFinal: data.slaFinal ?? prev.slaFinal,
+          totalAttended: data.totalAttended ?? prev.totalAttended,
+          totalMissed: data.totalMissed ?? prev.totalMissed,
+          reports: data.reports ?? prev.reports,
+        }));
+        if (data.algorithm) setSelectedAlgorithm(data.algorithm.toLowerCase());
+        if (status === 'RUNNING' || status === 'RECONSTRUCTING') {
+          realStartRef.current = realStartRef.current || Date.now();
+          setSimState('running');
+        } else if (status === 'DONE') {
+          setSimState('completed');
+          setFinalMasterPlan(data.finalMasterPlan || []);
+        } else {
+          setSimState('idle');
+        }
+      })
+      .catch(err => {
+        if (cancelled) return;
+        console.warn('[Tasf.B2B] No se pudo reconectar a sesión:', err.message);
+        // Si la sesión no existe, limpiamos la URL y arrancamos normal
+        setSessionId(null);
+        initialSessionId.current = null;
+      })
+      .finally(() => {
+        if (!cancelled) setIsReconnecting(false);
+      });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Solo al montar
+
+  // ── Auto-inicio de simulación día a día (vivo) ───────────────────────────
+  useEffect(() => {
+    // No auto-iniciar si estamos reconectando una sesión existente desde la URL
+    if (isReconnecting) return;
     if (activeTab === "vivo" && simState === "idle" && !sessionId) {
       const now = new Date();
       const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
