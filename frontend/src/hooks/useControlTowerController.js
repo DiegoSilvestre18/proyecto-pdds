@@ -49,6 +49,13 @@ export const useControlTowerController = () => {
   const [simState, setSimState] = useState("idle");
   const [targetPlaybackMinutes, setTargetPlaybackMinutes] = useState(30);
 
+  // Si había un ?session= en la URL al abrir, lo guardamos para reconexión
+  const initialSessionId = useRef(
+    typeof window !== "undefined" ? new URLSearchParams(window.location.search).get("session") : null
+  );
+  // true mientras estamos consultando el backend para reconectar
+  const [isReconnecting, setIsReconnecting] = useState(() => !!initialSessionId.current);
+
   const [sessionId, setSessionId] = useState(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
@@ -420,13 +427,80 @@ export const useControlTowerController = () => {
     }
   }, [selectedAlgorithm, targetPlaybackMinutes]);
 
+  // ── Reconexión a sesión existente (cuando se abre el link con ?session=) ───
   useEffect(() => {
+    const sid = initialSessionId.current;
+    if (!sid) {
+      setIsReconnecting(false);
+      return;
+    }
+    let cancelled = false;
+    apiFetch(`/api/v1/simulation/status/${sid}`)
+      .then(res => {
+        if (!res.ok) throw new Error(`Session ${sid} not found (${res.status})`);
+        return res.json();
+      })
+      .then(data => {
+        if (cancelled) return;
+        const status = data.status; // RUNNING | DONE | FAILED
+        const isCollapse = !!data.isCollapseMode;
+        const totalDays = data.totalDays ?? 1;
+        // Determinar pestaña correcta
+        let tab = "vivo";
+        if (isCollapse) tab = "colapso";
+        else if (totalDays > 1) tab = "periodo";
+        setActiveTab(tab);
+        if (tab !== "vivo") setIsDockCollapsed(true);
+        // Restaurar meta del backend
+        setMeta(prev => ({
+          ...prev,
+          status: data.status,
+          percent: data.percent ?? prev.percent,
+          currentDay: data.currentDay ?? prev.currentDay,
+          totalDays: data.totalDays ?? prev.totalDays,
+          isCollapseMode: !!data.isCollapseMode,
+          algorithm: data.algorithm ?? prev.algorithm,
+          startEpoch: data.startEpoch ?? prev.startEpoch,
+          slaFinal: data.slaFinal ?? prev.slaFinal,
+          totalAttended: data.totalAttended ?? prev.totalAttended,
+          totalMissed: data.totalMissed ?? prev.totalMissed,
+          reports: data.reports ?? prev.reports,
+        }));
+        if (data.algorithm) setSelectedAlgorithm(data.algorithm.toLowerCase());
+        if (status === 'RUNNING') {
+          realStartRef.current = realStartRef.current || Date.now();
+          setSimState('running');
+        } else if (status === 'DONE') {
+          setSimState('completed');
+          setFinalMasterPlan(data.finalMasterPlan || []);
+        } else {
+          setSimState('idle');
+        }
+      })
+      .catch(err => {
+        if (cancelled) return;
+        console.warn('[Tasf.B2B] No se pudo reconectar a sesión:', err.message);
+        // Si falla (sesión no existe), limpiamos la URL y dejamos arrancar normal
+        setSessionId(null);
+        initialSessionId.current = null;
+      })
+      .finally(() => {
+        if (!cancelled) setIsReconnecting(false);
+      });
+    return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Solo al montar
+
+  // ── Auto-inicio de simulación día a día (vivo) ───────────────────────────
+  useEffect(() => {
+    // No auto-iniciar si estamos reconectando una sesión existente
+    if (isReconnecting) return;
     if (activeTab === "vivo" && simState === "idle" && !sessionId) {
       const now = new Date();
       const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       startDayToDaySimulation(today, 1, [], null, { isRealTime: true, planningHorizon: 30 });
     }
-  }, [activeTab, simState, sessionId, startDayToDaySimulation]);
+  }, [activeTab, simState, sessionId, isReconnecting, startDayToDaySimulation]);
 
   const startCollapseSimulation = useCallback(async (dias = 90, startDate = null, stressFactor = 5, endCondition = "FAILED_DELIVERY") => {
     try {
