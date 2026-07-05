@@ -716,11 +716,32 @@ let f = pendingBySeq.get(seq);
         try {
           const envelope = JSON.parse(msg.body)
           const data = envelope?.data ?? {}
+
           if (data.currentEpochTime) {
             upsertBySeq(envelope?.seq ?? 0, 'kpi', data);
-            if (data.status === 'DONE' || data.status === 'FAILED') {
-              setTimeout(() => client.deactivate(), 250);
-            }
+          }
+
+          if (data.status =='DONE'){
+            setSimState('completed');
+            setMeta(prev => ({
+              ...prev,
+              status: 'DONE',
+              percent: 100,
+              currentDay: data.currentDay ?? prev.currentDay,
+              totalDays:  data.totalDays  ?? prev.totalDays,
+            }));
+            // Fetch para obtener finalMasterPlan y métricas finales
+            apiFetch(`/api/v1/simulation/status/${sessionId}`).then(res => {
+              if (res.ok) res.json().then(finalStatus => {
+                setMeta(prev => ({ ...prev, ...finalStatus }));
+                setFinalMasterPlan(finalStatus.finalMasterPlan || []);
+              });
+            });
+            setTimeout(() => client.deactivate(), 250); //se cierra la com para ambos
+          }else if (data.status === 'FAILED') {
+            setSimState('idle');
+            setMeta(prev => ({ ...prev, status: 'FAILED', errorMessage: data.errorMessage }));
+            setTimeout(() => client.deactivate(), 250);//se cierra la com para ambos
           }
         } catch (err) { console.error('Error parsing kpi:', err) }
       })
