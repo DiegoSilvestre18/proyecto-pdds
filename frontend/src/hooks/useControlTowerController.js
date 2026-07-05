@@ -1135,6 +1135,15 @@ if (selected && !finalSelection.some((p) => p.id === selected.id)) {
     };
 
     if (sessionId && meta.status !== "idle") {
+      let fleetLoad = 0, fleetCap = 0
+      aircraft.forEach(p => {
+        if (p.status !== "cancelled") {
+          fleetLoad += p.ocupacionReal || 0
+          fleetCap += p.capacidadMax || 0
+        }
+      })
+      const fleetOccupancyPct = fleetCap > 0 ? (fleetLoad / fleetCap) * 100 : 0
+
       return {
         scenarioLabel: "Simulación en vivo",
         systemClock: fmtSim(smoothSimTime || currentEpochTime, meta.startEpoch),
@@ -1145,7 +1154,20 @@ if (selected && !finalSelection.some((p) => p.id === selected.id)) {
         globalCapacity: `${globalOccupancyCalculated.toFixed(1)}%`,
         networkLatency: "OK",
         flightsInCourse: { value: aircraft.length ?? 0, delta: "datos reales", status: "green" },
-        storageOccupancy: { value: Math.round(globalOccupancyCalculated), subtitle: "Promedio red", status: (globalOccupancyCalculated >= 90) ? "red" : "green" },
+        storageOccupancy: {
+          value: globalOccupancyCalculated.toFixed(1),
+          subtitle: "Promedio red",
+          status: globalOccupancyCalculated === 0 ? "idle"
+            : globalOccupancyCalculated >= 90 ? "red"
+            : globalOccupancyCalculated >= 70 ? "amber" : "green",
+        },
+        fleetOccupancy: {
+          value: fleetOccupancyPct.toFixed(1),
+          subtitle: "Carga total / Capacidad máxima",
+          status: fleetOccupancyPct === 0 ? "idle"
+            : fleetOccupancyPct >= 90 ? "red"
+            : fleetOccupancyPct >= 70 ? "amber" : "green",
+        },
         sla: { value: kpis.slaPercent?.toFixed(1) ?? 0, subtitle: "Real", status: (kpis.slaPercent >= 90) ? "green" : "red" },
         criticalNodes: { value: kpis.criticalNodes ?? 0, subtitle: ">90% ocupación", status: (kpis.criticalNodes > 5) ? "red" : "green" },
         progress: { label: meta.status === "DONE" ? "Completado" : "Ejecutando", percent: meta.percent ?? 0, simulatedTime: clock.simulatedTime ?? `Día ${meta.currentDay}`, status: meta.status === "DONE" ? "green" : "amber" },
@@ -1164,7 +1186,7 @@ if (selected && !finalSelection.some((p) => p.id === selected.id)) {
       globalCapacity: "0%",
       networkLatency: "--",
       flightsInCourse: { value: 0, delta: "--", status: "green" },
-      storageOccupancy: { value: 0, subtitle: "--", status: "green" },
+      storageOccupancy: { value: "0.0", subtitle: "--", status: "idle" },
       sla: { value: 0, subtitle: "--", status: "green" },
       criticalNodes: { value: 0, subtitle: "--", status: "green" },
       progress: { label: "Listo", percent: 0, simulatedTime: "00:00:00", status: "amber" },
@@ -1193,6 +1215,22 @@ if (selected && !finalSelection.some((p) => p.id === selected.id)) {
 
       return [
         {
+          key: "fleetOccupancy",
+          title: "Ocupación global flota (UT)",
+          value: `${fleetOccupancyPct.toFixed(1)}%`,
+          subtitle: "Carga total / Capacidad máxima",
+          status: fleetOccupancyPct === 0 ? "idle" : fleetOccupancyPct >= 90 ? "red" : fleetOccupancyPct >= 70 ? "amber" : "green",
+        },
+        {
+          key: "occupancy",
+          title: "Ocupación global almacenes",
+          value: `${globalOccupancyCalculated.toFixed(1)}%`,
+          subtitle: "Promedio red · datos reales",
+          status: globalOccupancyCalculated === 0 ? "idle"
+            : globalOccupancyCalculated >= 90 ? "red"
+            : globalOccupancyCalculated >= 70 ? "amber" : "green",
+        },
+        {
           key: "flights",
           title: "Vuelos en curso",
           value: aircraft.filter(r => r.status !== "cancelled").length ?? 0,
@@ -1200,21 +1238,6 @@ if (selected && !finalSelection.some((p) => p.id === selected.id)) {
             ? `Rescatados: ${kpis.rescuedFlights ?? 0}` 
             : `Día ${meta.currentDay} de simulación`,
           status: "green",
-        },
-        {
-          key: "fleetOccupancy",
-          title: "Ocupación global flota (UT)",
-          value: `${fleetOccupancyPct.toFixed(1)}%`,
-          subtitle: "Carga total / Capacidad máxima",
-          status: fleetOccupancyPct >= 90 ? "red" : fleetOccupancyPct >= 70 ? "amber" : "green",
-        },
-        {
-          key: "occupancy",
-          title: "Ocupación global almacenes",
-          value: `${globalOccupancyCalculated.toFixed(1)}%`,
-          subtitle: "Promedio red · datos reales",
-          status: globalOccupancyCalculated >= 90 ? "red"
-            : globalOccupancyCalculated >= 70 ? "amber" : "green",
         },
         {
           key: "sla",
