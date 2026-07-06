@@ -51,6 +51,7 @@ export const useControlTowerController = () => {
   const [simState, setSimState] = useState("idle");
   const [targetPlaybackMinutes, setTargetPlaybackMinutes] = useState(30);
   const [cancelledFlights, setCancelledFlights] = useState([]);
+  const [finalMasterPlan, setFinalMasterPlan] = useState([]);
 
   // Si había un ?session= en la URL al abrir, lo guardamos para reconexión
   const initialSessionId = useRef(
@@ -124,8 +125,9 @@ export const useControlTowerController = () => {
       ...clock,
       interpolatedTime: smoothSimTime,
       eventLog: logs,
+      finalMasterPlan,
     };
-  }, [meta, kpis, airportLoads, aircraft, clock, smoothSimTime, logs, sessionId]);
+  }, [meta, kpis, airportLoads, aircraft, clock, smoothSimTime, logs, sessionId, finalMasterPlan]);
 
   // ── Clock local para interpolar movimiento y tiempo ───────────────────────
   const simClockRef = useRef({
@@ -254,6 +256,7 @@ export const useControlTowerController = () => {
                    if (res.ok) {
                        res.json().then(finalStatus => {
                            setMeta(prev => ({ ...prev, ...finalStatus }));
+                           setFinalMasterPlan(finalStatus.finalMasterPlan || []);
                        });
                    }
                });
