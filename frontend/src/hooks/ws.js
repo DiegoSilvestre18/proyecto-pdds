@@ -12,9 +12,9 @@ export const createStompClient = () => {
   const client = new Client({
     // Usamos SockJS para funcionar bien en dev y con proxies.
     webSocketFactory: () => new SockJS(wsUrl),
-    reconnectDelay: 1500,
-    heartbeatIncoming: 0,
-    heartbeatOutgoing: 20000,
+    reconnectDelay: 5000,
+    heartbeatIncoming: 10000,
+    heartbeatOutgoing: 10000,
   })
 
   return client
