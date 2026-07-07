@@ -603,7 +603,7 @@ public class SimulationService {
                 } catch (Exception e) { log.warn("Error restaurando vuelos: {}", e.getMessage()); }
         }
 
-        private List<Map<String, Object>> buildFinalPlanSnapshot(List<Route> plan) {
+        /*private List<Map<String, Object>> buildFinalPlanSnapshot(List<Route> plan) {
                 if (plan == null) return List.of();
                 List<Map<String, Object>> result = new ArrayList<>();
 
@@ -636,5 +636,43 @@ public class SimulationService {
                         result.add(m);
                 }
                 return result;
+        }*/
+        private List<Map<String, Object>> buildFinalPlanSnapshot(List<Route> plan) {
+                if (plan == null) return List.of();
+
+                // Una entrada por VUELO (no por lote), agrupando maletas de todas las rutas que usan ese vuelo
+                Map<String, Map<String, Object>> byFlight = new LinkedHashMap<>();
+
+                for (Route r : plan) {
+                        if (r.getFlights() == null || r.getLegDepartures() == null || r.getLegDepartures().isEmpty()) continue;
+
+                        List<String> bagIds = r.getBagIds() != null ? r.getBagIds() : List.of();
+
+                        for (int i = 0; i < r.getFlights().size(); i++) {
+                                Vuelo v = r.getFlights().get(i);
+                                long dep = r.getLegDepartures().get(i);
+                                long arr = r.getLegArrivals().get(i);
+                                String key = v.getId() + "-" + dep;
+
+                                Map<String, Object> entry = byFlight.computeIfAbsent(key, k -> {
+                                        Map<String, Object> m = new LinkedHashMap<>();
+                                        m.put("vueloId", v.getId());
+                                        m.put("from", v.getOrigen().getIcaoCode());
+                                        m.put("to", v.getDestino().getIcaoCode());
+                                        m.put("departureTime", dep);
+                                        m.put("arrivalTime", arr);
+                                        m.put("totalBags", 0);
+                                        m.put("bagIds", new ArrayList<String>());
+                                        return m;
+                                });
+
+                                entry.put("totalBags", (int) entry.get("totalBags") + r.getCapacidadAsignada());
+                                @SuppressWarnings("unchecked")
+                                List<String> bags = (List<String>) entry.get("bagIds");
+                                bags.addAll(bagIds);
+                        }
+                }
+
+                return new ArrayList<>(byFlight.values());
         }
 }
