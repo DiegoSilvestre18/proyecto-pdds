@@ -178,6 +178,11 @@ const getLevelColor = (percent) => {
   return '#10b981';
 };
 
+const fmtTime = (ts) => {
+  if (!ts) return '--:--';
+  return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+};
+
 const FlightRow = React.memo(function FlightRow({ index, style, data }) {
   const { flights, expandedUt, handleSelectUT, setExpandedUt, focusedEntity } = data;
   const ut = flights[index];
@@ -202,14 +207,21 @@ const FlightRow = React.memo(function FlightRow({ index, style, data }) {
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'space-between',
-              padding: '10px 12px',
+              padding: '10px 12px 10px 8px',
               boxSizing: 'border-box',
             }}
             onClick={() => { setExpandedUt(isExpanded ? null : ut.id); handleSelectUT(ut); }}
         >
-          <div>
-            <div style={{ fontWeight: 'bold', color: '#e2e8f0', fontSize: '14px', marginBottom: '2px' }}>Vuelo {numericId}</div>
-            <div style={{ fontSize: '11px', color: '#9ca3af' }}>{ut.from} ➔ {ut.to}</div>
+          <div style={{ textAlign: 'left' }}>
+            <div style={{ fontWeight: 'bold', color: '#e2e8f0', fontSize: '14px', marginBottom: '2px', marginLeft: '0px' }}>Vuelo {numericId}</div>
+            <div style={{ fontSize: '11px', color: '#9ca3af', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <span>{ut.from} ➔ {ut.to}</span>
+              {ut.departureTime && ut.arrivalTime && (
+                <span style={{ color: '#64748b', fontSize: '10px', background: 'rgba(0,0,0,0.2)', padding: '2px 6px', borderRadius: '4px' }}>
+                  {fmtTime(ut.departureTime)} - {fmtTime(ut.arrivalTime)}
+                </span>
+              )}
+            </div>
           </div>
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: '14px', fontWeight: 'bold', color: semaforo }}>{pct}%</div>
@@ -512,11 +524,11 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
     }
     if (utSearchOrigin) {
       const q = utSearchOrigin.toLowerCase();
-      result = result.filter(ut => ut.from?.toLowerCase().includes(q));
+      result = result.filter(ut => ut.from?.toLowerCase().startsWith(q));
     }
     if (utSearchDest) {
       const q = utSearchDest.toLowerCase();
-      result = result.filter(ut => ut.to?.toLowerCase().includes(q));
+      result = result.filter(ut => ut.to?.toLowerCase().startsWith(q));
     }
     if (activeFilters.flightStatus) {
       result = result.filter(ut => {
