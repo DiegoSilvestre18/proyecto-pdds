@@ -79,18 +79,27 @@ public class SuperLotService {
     @Transactional(readOnly = true)
     public List<SuperLot> agruparEnviosPorVentana(long startTimeMs, long endTimeMs) {
         Map<String, Accumulator> grupos = new HashMap<>();
-        
-        java.time.LocalDate startDate = java.time.Instant.ofEpochMilli(startTimeMs).atOffset(ZoneOffset.UTC).toLocalDate().minusDays(1);
-        java.time.LocalDate endDate = java.time.Instant.ofEpochMilli(endTimeMs).atOffset(ZoneOffset.UTC).toLocalDate().plusDays(1);
+
+        java.time.LocalDate startDate = java.time.Instant.ofEpochMilli(startTimeMs)
+                .atZone(java.time.ZoneOffset.UTC)
+                .toLocalDate();
+
+        java.time.LocalDate endDate = java.time.Instant.ofEpochMilli(endTimeMs)
+                .atZone(java.time.ZoneOffset.UTC)
+                .toLocalDate();
 
         try (Stream<EnvioResumen> stream = envioRepo.streamResumenesPorRangoFechas(startDate, endDate)) {
             stream.forEach(e -> {
                 long readyTime = java.time.LocalDateTime
                         .of(e.getFecha(), e.getHora())
-                        .toInstant(ZoneOffset.UTC)
+                        .toInstant(java.time.ZoneOffset.UTC)
                         .toEpochMilli();
 
                 if (readyTime >= startTimeMs && readyTime < endTimeMs) {
+                    if ("SPIM".equalsIgnoreCase(e.getOrigenIcao())) {
+                        System.out.println(String.format("[BD SPIM] Registro leído -> Pedido: %s | Cantidad: %d | Hora: %s",
+                                e.getCodigoPedido(), e.getCantidadMaletas(), e.getHora()));
+                    }
                     String key = e.getOrigenIcao() + "-" + e.getDestinoIcao();
                     grupos.computeIfAbsent(key, k -> new Accumulator(
                             e.getOrigenContinente(),

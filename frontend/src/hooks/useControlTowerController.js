@@ -392,7 +392,7 @@ export const useControlTowerController = () => {
 
   const startDayToDaySimulation = useCallback(async (startDate, dias = 5, preCancelledIds = [], startTime = null, options = {}) => {
     try {
-      const { isRealTime = false, planningHorizon = 240 } = options;
+      const { isRealTime = false, planningHorizon = 480 } = options;
       
       let finalStartTime = startTime;
       let finalStartDate = startDate;
@@ -518,7 +518,7 @@ export const useControlTowerController = () => {
     if (activeTab === "vivo" && simState === "idle" && !sessionId) {
       const now = new Date();
       const today = `${now.getFullYear()}-${String(now.getMonth()+1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-      startDayToDaySimulation(today, 1, [], null, { isRealTime: true, planningHorizon: 30 });
+      startDayToDaySimulation(today, 1, [], null, { isRealTime: true, planningHorizon: 480 });
     }
   }, [activeTab, simState, sessionId, startDayToDaySimulation]);
 

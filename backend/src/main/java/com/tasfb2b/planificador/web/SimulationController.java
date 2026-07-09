@@ -60,12 +60,15 @@ public class SimulationController {
             @RequestParam(required = false) String preCancelledFlightIds,
             @RequestParam(required = false) String startTime,
             @RequestParam(required = false, defaultValue = "1440") int saMinutes,
-            @RequestParam(required = false, defaultValue = "240") int planningHorizon,
+            @RequestParam(required = false, defaultValue = "1440") int planningHorizon,
             @RequestParam(required = false, defaultValue = "false") boolean isRealTime) {
 
         //Limpiamos caché al inicio así limpiamos los envíos de la BD de otros escenarios
         envioRepository.deleteAllEnvios();
-
+        //Prueba
+        if (!isRealTime){
+            planningHorizon=14440;
+        }
         int totalDays = (dias != null && dias > 0) ? dias : 5;
         String sessionId = UUID.randomUUID().toString();
 
@@ -118,7 +121,6 @@ public class SimulationController {
             @PathVariable(required = false) Integer dias,
             @RequestParam(required = false, defaultValue = "ALNS") String algorithm,
             @RequestParam(required = false) String startDate,
-            @RequestParam(required = false, defaultValue = "FAILED_DELIVERY") String endCondition,
             @RequestParam(required = false, defaultValue = "60") int playbackMinutes,
             @RequestParam(required = false) String preCancelledFlightIds,
             @RequestParam(required = false, defaultValue = "00:00:00") String startTime,
@@ -130,23 +132,15 @@ public class SimulationController {
 
         String sessionId = UUID.randomUUID().toString();
 
-        java.time.LocalDate fechaInicio = null;
+        java.time.LocalDate fechaInicio = java.time.LocalDate.of(2026, 1, 1);
         if (startDate != null && !startDate.isBlank()) {
             try { fechaInicio = java.time.LocalDate.parse(startDate); } catch (Exception ignored) {}
-        }
-
-        CollapseEndCondition cond;
-        try {
-            cond = CollapseEndCondition.valueOf(endCondition.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            log.warn("[run-collapse] endCondition '{}' inválida; usando FAILED_DELIVERY", endCondition);
-            cond = CollapseEndCondition.FAILED_DELIVERY;
         }
 
         SimulationProgressHolder.SimulationSessionState session = progressHolder.create(sessionId, totalDays);
         session.setCollapseMode(true);
         session.setAlgorithm(algorithm);
-        session.setEndCondition(cond);
+        session.setEndCondition(CollapseEndCondition.FAILED_DELIVERY);
         session.setPlanningHorizon(1440); // 24 Horas para colapso
 
         // En modo colapso playbackMinutes debe ser igual a totalDays para meta 1 min / día
@@ -156,8 +150,8 @@ public class SimulationController {
         Map<String, String> response = new HashMap<>();
         response.put("sessionId", sessionId);
         response.put("totalDays", String.valueOf(totalDays));
-        response.put("endCondition", cond.name());
-        response.put("message", "Simulación de colapso iniciada.");
+        response.put("startDate", fechaInicio.toString());
+        response.put("message", "Simulación de colapso iniciada desde " + fechaInicio);
 
         return ResponseEntity.accepted().body(response);
     }

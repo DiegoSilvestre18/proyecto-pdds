@@ -310,12 +310,34 @@ public class SimulationService {
                                         .collect(Collectors.toSet());
 
                                 for (SuperLot lot : nuevosEnHorizonte) {
-                                        // se filtra SOLO nuevos se descartan los que ya están y comprometidos
+                                    // se filtra SOLO nuevos se descartan los que ya están y comprometidos
+                                    // ÚNICAMNETE PARA DEBUGGEAR EN SPIM
+                                    boolean esSpim = "SPIM".equalsIgnoreCase(lot.getOrigenIcao());
+
+                                    if (esSpim) {
+                                      log.info("[DEBUG SPIM] ── Ventana detecta lote ID: {} hacia {} con {} maletas originales.",
+                                                        lot.getId(), lot.getDestinoIcao(), lot.getBagIds().size());
+                                      log.info("[DEBUG SPIM] Muestra de IDs originales en este lote: {}",
+                                                        lot.getBagIds().stream().limit(3).toList());
+                                    }
+                                    //
                                     List<String> bagIdsRealmenteNuevos = lot.getBagIds().stream()
                                                 .filter(b -> !bagIdsYaEnPool.contains(b))
                                                 .filter(b -> !bagIdsComprometidos.contains(b))
                                                 .toList();
-                                    if (bagIdsRealmenteNuevos.isEmpty()) continue; //NO hay nuevos SKIP
+                                    if (esSpim) {
+                                        int descartadasPool = (int) lot.getBagIds().stream().filter(bagIdsYaEnPool::contains).count();
+                                        int descartadasComprometidas = (int) lot.getBagIds().stream().filter(bagIdsComprometidos::contains).count();
+
+                                        log.warn("[DEBUG SPIM] Resultado del filtro -> Conservadas: {} | Descartadas por Pool: {} | Descartadas por Comprometidas: {}",
+                                                bagIdsRealmenteNuevos.size(), descartadasPool, descartadasComprometidas);
+                                    }
+                                    if (bagIdsRealmenteNuevos.isEmpty()) {
+                                            if (esSpim) {
+                                                    log.error("[DEBUG SPIM] ❌ Lote de SPIM COMPLETAMENTE DESCARTADO (SKIP). No pasa al planificador.");
+                                            }
+                                            continue; //NO hay nuevos SKIP
+                                    }
 
                                     SuperLot lotFiltrado = (bagIdsRealmenteNuevos.size() == lot.getBagIds().size())
                                                 ? lot
@@ -337,9 +359,10 @@ public class SimulationService {
                                 }
 
                                 long tPlanStart = System.currentTimeMillis();
-                                Solution sol = alnsPlanner.plan(superLotService.mergeLots(new ArrayList<>(planifiablePool.values())), 3000L, 
+                                Solution sol = alnsPlanner.plan(superLotService.mergeLots(new ArrayList<>(planifiablePool.values())), 5000L,
                                                 globalState.getCapacidadVuelo(), globalState.getCargaAeropuerto(), currentSimTime);
                                 session.setLastTaMs(System.currentTimeMillis() - tPlanStart);
+                                long tiempoPlanificadorMs = session.getLastTaMs();
                                 masterPlan = sol.getRoutes();
                                 session.setCurrentPlanId(sol.getPlanId());
 
@@ -360,7 +383,9 @@ public class SimulationService {
                                 int microSteps = isRealTime ? currentSa * 60 : currentSa; 
                                 long stepDurationMs = isRealTime ? 1000L : 60_000L;
                                 long sleepPerCycleMsDynamic = computeSleepPerCycleMs(dias, playbackMinutes, 1440 / currentSa, isRealTime, currentSa);
-                                long sleepPerMicroStep = (sleepPerCycleMsDynamic / microSteps) / session.getSpeedFactor();
+
+                                long tiempoDisponibleParaDormirMs = Math.max(0, sleepPerCycleMsDynamic - tiempoPlanificadorMs);
+                                long sleepPerMicroStep = (tiempoDisponibleParaDormirMs / microSteps) ;
 
                                 for (int step = 0; step < microSteps; step++) {
                                         long tMicroStart = System.nanoTime();
@@ -418,6 +443,11 @@ public class SimulationService {
                                                 shipmentTracker.observe(event);
                                         }
 
+                                        if (globalState.isColapsado()) {
+                                                log.warn("[COLAPSO INMEDIATO] Almacén excedido en microEnd={}", microEnd);
+                                                break; // salir del loop de microsteps para ir directo al check de día
+                                        }
+
                                         int mPercent = (int) ((((day * 1440.0) + currentSimMinuteOfDay + step) / (dias * 1440.0)) * 100);
                                         if (microEnd >= targetEpoch || (isCatchingUp && step == microSteps - 1)) {
                                                 updateProgress(session, day + 1, dias, mPercent, simulatedTimeStr, slaPercent, globalState, airportMap, inTransitRoutes, microEnd, startTime, algorithm, session.getCurrentPlanId(), masterPlan, todosLosVuelos, planifiablePool, isRealTime);
@@ -429,8 +459,36 @@ public class SimulationService {
                                 }
                                 currentSimMinuteOfDay += currentSa;
                         }
+                        //Chequea si llegó al colaspo
+                        SimulationDayReport reportProvisional = new SimulationDayReport();
+                        reportProvisional.setDayIndex(day);
+                        reportProvisional.setSlaPercent(totalMaletasDia == 0 ? 100.0
+                                : (malatetasAtendidasDia * 100.0) / totalMaletasDia);
+                        reportProvisional.setTotalMaletas(totalMaletasDia);
+                        reportProvisional.setMalatetasAtendidas(malatetasAtendidasDia);
+
+                        CollapseHelper.CollapseCheckResult collapseCheck = collapseHelper.checkEndCondition(
+                                session, reportProvisional, globalState, airportMap);
+
+                        if (collapseCheck.terminated()) {
+                                log.warn("[COLAPSO] Día {} — {}", day + 1, collapseCheck.reason());
+                                session.setCollapseReason(collapseCheck.reason());
+                                session.setCollapseDayIndex(day + 1);
+                                if (masterPlan != null && !masterPlan.isEmpty()) {
+                                        session.setFinalMasterPlan(buildFinalPlanSnapshot(masterPlan, dayStartEpochMs));
+                                }
+                                // Guardar el reporte del día del colapso y salir
+                                SimulationDayReport collapseReport = new SimulationDayReport();
+                                collapseReport.setDayIndex(day);
+                                collapseReport.setSlaPercent(reportProvisional.getSlaPercent());
+                                collapseReport.setTotalMaletas(totalMaletasDia);
+                                collapseReport.setMalatetasAtendidas(malatetasAtendidasDia);
+                                history.add(collapseReport);
+                                break; //  Detiene el loop de días en AMBOS modos
+                        }
+                        //
                         if (masterPlan != null && !masterPlan.isEmpty()) {
-                                session.setFinalMasterPlan(buildFinalPlanSnapshot(masterPlan));
+                                session.setFinalMasterPlan(buildFinalPlanSnapshot(masterPlan, dayStartEpochMs));
                         }
 
                         SimulationDayReport report = new SimulationDayReport();
@@ -467,17 +525,12 @@ public class SimulationService {
                 session.setCurrentEpochTime(currentSimTime);
 
                 Map<String, Integer> airportBags = new HashMap<>();
-                if (isRealTime && planifiablePool != null) {
-                        for (SuperLot lot : planifiablePool.values()) {
-                                airportBags.put(lot.getOrigenIcao(), airportBags.getOrDefault(lot.getOrigenIcao(), 0) + lot.getTotalMaletas());
-                        }
-                }
 
                 Map<String, Map<String, Object>> loads = new HashMap<>();
                 int totalWaitingBags = 0;
                 for (String icao : airportMap.keySet()) {
                     Map<String, Object> data = new HashMap<>();
-                    int bags = isRealTime ? airportBags.getOrDefault(icao, 0) : state.getLoadAt(icao);
+                    int bags = state.getLoadAt(icao);
                     totalWaitingBags += bags;
                     Aeropuerto ap = airportMap.get(icao);
                     double occ = ap.getStorageCapacity() > 0 ? (bags * 100.0) / ap.getStorageCapacity() : 0;
@@ -603,48 +656,21 @@ public class SimulationService {
                 } catch (Exception e) { log.warn("Error restaurando vuelos: {}", e.getMessage()); }
         }
 
-        /*private List<Map<String, Object>> buildFinalPlanSnapshot(List<Route> plan) {
+        private List<Map<String, Object>> buildFinalPlanSnapshot(List<Route> plan, long fromEpoch) {
                 if (plan == null) return List.of();
-                List<Map<String, Object>> result = new ArrayList<>();
-
-                for (Route r : plan) {
-                        if (r.getLot() == null) continue;
-                        Map<String, Object> m = new HashMap<>();
-                        m.put("lotId", r.getLot().getId());
-                        m.put("origin", r.getLot().getOrigenIcao());
-                        m.put("destination", r.getLot().getDestinoIcao());
-                        m.put("totalBags", r.getDemandaTotal());
-                        m.put("assignedBags", r.getCapacidadAsignada());
-                        m.put("status", r.getStatus());
-                        m.put("arrivalTime", r.getArrivalTime());
-                        m.put("deadline", r.getDeadline());
-
-                        List<Map<String, Object>> hops = new ArrayList<>();
-                        if (r.getFlights() != null && r.getLegDepartures() != null) {
-                                for (int i = 0; i < r.getFlights().size(); i++) {
-                                        Vuelo v = r.getFlights().get(i);
-                                        Map<String, Object> hop = new HashMap<>();
-                                        hop.put("vueloId", v.getId());
-                                        hop.put("from", v.getOrigen().getIcaoCode());
-                                        hop.put("to", v.getDestino().getIcaoCode());
-                                        hop.put("departureTime", r.getLegDepartures().get(i));
-                                        hop.put("arrivalTime", r.getLegArrivals().get(i));
-                                        hops.add(hop);
-                                }
-                        }
-                        m.put("hops", hops);
-                        result.add(m);
-                }
-                return result;
-        }*/
-        private List<Map<String, Object>> buildFinalPlanSnapshot(List<Route> plan) {
-                if (plan == null) return List.of();
-
-                // Una entrada por VUELO (no por lote), agrupando maletas de todas las rutas que usan ese vuelo
                 Map<String, Map<String, Object>> byFlight = new LinkedHashMap<>();
 
                 for (Route r : plan) {
                         if (r.getFlights() == null || r.getLegDepartures() == null || r.getLegDepartures().isEmpty()) continue;
+
+                        // Solo rutas donde algún tramo LLEGA después del inicio del último día
+                        // Esto incluye: vuelos del día 5 que aterrizan el 5 o el 6 (cross-day)
+                        // Excluye: vuelos que completaron antes del día 5
+                        boolean esRelevante = false;
+                        for (int i = 0; i < r.getLegArrivals().size(); i++) {
+                                if (r.getLegArrivals().get(i) > fromEpoch) { esRelevante = true; break; }
+                        }
+                        if (!esRelevante) continue;
 
                         List<String> bagIds = r.getBagIds() != null ? r.getBagIds() : List.of();
 
@@ -652,8 +678,11 @@ public class SimulationService {
                                 Vuelo v = r.getFlights().get(i);
                                 long dep = r.getLegDepartures().get(i);
                                 long arr = r.getLegArrivals().get(i);
-                                String key = v.getId() + "-" + dep;
 
+                                // También filtrar tramos individuales: solo mostrar hops del último día en adelante
+                                if (arr <= fromEpoch) continue;
+
+                                String key = v.getId() + "-" + dep;
                                 Map<String, Object> entry = byFlight.computeIfAbsent(key, k -> {
                                         Map<String, Object> m = new LinkedHashMap<>();
                                         m.put("vueloId", v.getId());
@@ -665,14 +694,12 @@ public class SimulationService {
                                         m.put("bagIds", new ArrayList<String>());
                                         return m;
                                 });
-
                                 entry.put("totalBags", (int) entry.get("totalBags") + r.getCapacidadAsignada());
                                 @SuppressWarnings("unchecked")
                                 List<String> bags = (List<String>) entry.get("bagIds");
                                 bags.addAll(bagIds);
                         }
                 }
-
                 return new ArrayList<>(byFlight.values());
         }
 }

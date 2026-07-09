@@ -8,7 +8,7 @@ function CollapseSimConfig({ isOpen, onClose, onStart, liveStatus, onReset, sess
   const toast = useToast()
   const [activeSection, setActiveSection] = useState('config')
 const [isStarting, setIsStarting]       = useState(false)
-  const [startDate, setStartDate]         = useState('2026-04-09')
+  const [startDate, setStartDate]         = useState('2026-01-01')
   const [startTime, setStartTime]         = useState('00:00')
   const [destroyFraction, setDestroyFraction] = useState(20)
 
