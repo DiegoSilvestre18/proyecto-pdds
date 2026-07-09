@@ -49,13 +49,13 @@ export const createRoutesLayers = ({
     const isAircraftSelected = selectedAircraftId != null;
     const isTrackingActive = trackedRoute?.hops?.length > 0;
     const isDimmed = isAircraftSelected || isTrackingActive;
-    const opacity = isDimmed ? (isSelected ? 255 : 60) : 220;
+    const opacity = isDimmed ? (isSelected ? 255 : 40) : 150;
     const trailColor = isSelected
       ? [129, 140, 248, opacity]
       : [colorRgb[0], colorRgb[1], colorRgb[2], opacity];
     const remainingColor = isSelected
-      ? [129, 140, 248, Math.max(30, opacity - 100)]
-      : [colorRgb[0], colorRgb[1], colorRgb[2], Math.max(30, opacity - 100)];
+      ? [129, 140, 248, Math.max(20, opacity - 80)]
+      : [colorRgb[0], colorRgb[1], colorRgb[2], Math.max(20, opacity - 80)];
 
     if (progress > 0.02) {
       trailLines.push({
@@ -76,7 +76,7 @@ export const createRoutesLayers = ({
       data: trailLines,
       getPath: d => d.path,
       getColor: d => d.color,
-      getWidth: 2,
+      getWidth: 1,
       widthUnits: 'pixels',
       jointRounded: true,
       capRounded: true
@@ -89,7 +89,7 @@ export const createRoutesLayers = ({
       data: remainingLines,
       getPath: d => d.path,
       getColor: d => d.color,
-      getWidth: 2,
+      getWidth: 1,
       widthUnits: 'pixels',
       jointRounded: true,
       capRounded: true
