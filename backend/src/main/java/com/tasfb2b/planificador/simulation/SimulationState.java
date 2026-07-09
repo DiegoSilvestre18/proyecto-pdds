@@ -5,6 +5,7 @@ import com.tasfb2b.aeropuerto.domain.Aeropuerto;
 import com.tasfb2b.vuelo.domain.Vuelo;
 import com.tasfb2b.bloqueo.service.BloqueoService;
 import lombok.Getter;
+import lombok.extern.slf4j.Slf4j;
 
 import java.util.*;
 
@@ -12,7 +13,11 @@ import java.util.*;
  * Estado mutable de la simulación, actualizado evento a evento.
  */
 @Getter
+@Slf4j
 public class SimulationState {
+
+    private boolean violacionCapacidadVuelo = false;
+    public boolean isViolacionCapacidadVuelo() { return violacionCapacidadVuelo; }
 
     private long currentTime;
 
@@ -127,7 +132,7 @@ public class SimulationState {
     // ─────────────────────────────────────────────
     // APLICAR EVENTO
     // ─────────────────────────────────────────────
-
+    private final Map<String, Integer> cargaAcumuladaPorInstanciaVuelo = new HashMap<>();
     public void apply(Event event,
                       Map<String, Aeropuerto> airports) {
 
@@ -139,9 +144,20 @@ public class SimulationState {
 
             case FLIGHT_DEPARTURE -> {
                 Vuelo v = event.getVuelo();
-
-                // Hard Constraint: descontar capacidad real, no planificada
                 int remaining = capacidadVuelo.getOrDefault(v.getId(), v.getCapacidadTotal());
+
+
+                String instanciaKey = v.getId() + "-" + event.getTime();
+                int cargaAcumulada = cargaAcumuladaPorInstanciaVuelo.getOrDefault(instanciaKey, 0) + event.getLoad();
+                cargaAcumuladaPorInstanciaVuelo.put(instanciaKey, cargaAcumulada);
+
+                if (cargaAcumulada > v.getCapacidadTotal()) {
+                    violacionCapacidadVuelo = true;
+                    log.warn("[VIOLACION] Vuelo {} instancia {} sobrecargado: acumulado {} > capacidad {}",
+                            v.getId(), instanciaKey, cargaAcumulada, v.getCapacidadTotal());
+                }
+
+
                 int actualLoad = Math.min(event.getLoad(), remaining);
 
                 maletasEmbarcadas.put(v.getId() + "-" + event.getLot().getId(), actualLoad);
