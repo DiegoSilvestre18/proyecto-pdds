@@ -162,6 +162,9 @@ public class SimulationProgressHolder {
 
         /** Vuelos cuya cancelación se difirió al día siguiente por la regla de 1h. */
         private final Set<Long> pendingNextDayCancellations = ConcurrentHashMap.newKeySet();
+
+        /** Vuelos cancelados en vivo (durante microsteps) para replanificación reactiva. */
+        private final java.util.concurrent.ConcurrentLinkedQueue<Long> cancelacionesInyectadasEnVivo = new java.util.concurrent.ConcurrentLinkedQueue<>();
     }
 
     private final ConcurrentHashMap<String, SimulationSessionState> sessions =

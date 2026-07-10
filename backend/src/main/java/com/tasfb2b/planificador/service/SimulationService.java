@@ -391,6 +391,52 @@ public class SimulationService {
                                         long tMicroStart = System.nanoTime();
                                         long microEnd = currentSimTime + ((step + 1) * stepDurationMs);
 
+                                        boolean needsMidDayReplanning = false;
+                                        while (!session.getCancelacionesInyectadasEnVivo().isEmpty()) {
+                                                Long vueloId = session.getCancelacionesInyectadasEnVivo().poll();
+                                                if (processedCancelledFlightIds.add(vueloId)) {
+                                                        log.info("[REACTIVO] Replanificando en vivo vuelo cancelado {} en microEnd={}", vueloId, microEnd);
+                                                        List<Route> afectadas = sol.getRoutes().stream()
+                                                                        .filter(r -> r.getArrivalTime() > microEnd && !"cancelled".equals(r.getStatus()))
+                                                                        .filter(r -> r.getFlights().stream().anyMatch(f -> f.getId().equals(vueloId)))
+                                                                        .toList();
+                                                        for (Route r : afectadas) {
+                                                                r.setStatus("cancelled");
+                                                                SuperLot replanLot = elevateToMaxPriority(r, microEnd);
+                                                                replanLot.setTotalMaletas(r.getCapacidadAsignada());
+
+                                                                Set<String> bagIdsAfectados = new HashSet<>(replanLot.getBagIds());
+                                                                bagIdsAfectados.forEach(bagIdsComprometidos::remove);
+
+                                                                globalEventQueue.removeIf(e ->
+                                                                                e.getTime() > microEnd
+                                                                                                && e.getBagIds() != null
+                                                                                                && e.getBagIds().stream().anyMatch(bagIdsAfectados::contains)
+                                                                );
+                                                                r.setCapacidadAsignada(0);
+                                                                planifiablePool.put(replanLot.getId(), replanLot);
+                                                                needsMidDayReplanning = true;
+                                                        }
+                                                }
+                                        }
+
+                                        if (needsMidDayReplanning) {
+                                                long tReplan = System.currentTimeMillis();
+                                                sol = alnsPlanner.plan(superLotService.mergeLots(new ArrayList<>(planifiablePool.values())), 3000L,
+                                                                globalState.getCapacidadVuelo(), globalState.getCargaAeropuerto(), microEnd);
+                                                
+                                                masterPlan = sol.getRoutes();
+                                                session.setCurrentPlanId(sol.getPlanId());
+
+                                                inTransitRoutes.removeIf(r -> "cancelled".equals(r.getStatus()) && r.getCapacidadAsignada() == 0);
+                                                inTransitRoutes.addAll(sol.getRoutes().stream().filter(r -> r.getCapacidadAsignada() > 0).collect(Collectors.toList()));
+                                                
+                                                Map<Integer, Route> inTransitMap = inTransitRoutes.stream().collect(Collectors.toMap(r -> r.getLot().getId(), r -> r, (a, b) -> b));
+                                                inTransitRoutes = inTransitMap.values().stream().filter(r -> r.getArrivalTime() > microEnd).collect(Collectors.toList());
+                                                
+                                                log.info("[REACTIVO] Replanificación completada en {}ms", System.currentTimeMillis() - tReplan);
+                                        }
+
                                         for (Route r : sol.getRoutes()) {
 
                                                 if (!r.isAtendido() || r.getFlights() == null || r.getFlights().isEmpty()) continue;
@@ -547,7 +593,7 @@ public class SimulationService {
                 for (Vuelo v : todosLosVuelos) {
                         long dep = v.getDepartureEpoch(currentDayStartEpoch);
                         long arr = v.getArrivalEpoch(currentDayStartEpoch);
-                        if (currentSimTime >= dep && currentSimTime < arr) {
+                        if (currentSimTime >= dep && currentSimTime < arr && !Boolean.TRUE.equals(v.getCancelled())) {
                                 /*
                                 System.out.println(String.format(
                                         "[FISICO-HOY] vueloId=%d dep=%d key=%s currentDayStartEpoch=%d",
