@@ -280,7 +280,7 @@ public class SimulationService {
                                         if (processedCancelledFlightIds.add(vf.getId())) {
                                                 todosLosVuelos.stream().filter(v -> v.getId().equals(vf.getId())).forEach(v -> v.setCancelled(true));
                                                 List<Route> afectadas = inTransitRoutes.stream()
-                                                        .filter(r -> r.getArrivalTime() > currentSimTime && !"cancelled".equals(r.getStatus()))
+                                                        .filter(r -> r.getDepartureTime() > currentSimTime && !"cancelled".equals(r.getStatus()))
                                                         .filter(r -> r.getFlights().stream().anyMatch(f -> f.getId().equals(vf.getId())))
                                                         .toList();
                                                 for (Route r : afectadas) {
@@ -399,7 +399,7 @@ public class SimulationService {
                                                         todosLosVuelos.stream().filter(v -> v.getId().equals(vueloId)).forEach(v -> v.setCancelled(true));
                                                         log.info("[REACTIVO] Replanificando en vivo vuelo cancelado {} en microEnd={}", vueloId, microEnd);
                                                         List<Route> afectadas = sol.getRoutes().stream()
-                                                                        .filter(r -> r.getArrivalTime() > microEnd && !"cancelled".equals(r.getStatus()))
+                                                                        .filter(r -> r.getDepartureTime() > microEnd && !"cancelled".equals(r.getStatus()))
                                                                         .filter(r -> r.getFlights().stream().anyMatch(f -> f.getId().equals(vueloId)))
                                                                         .toList();
                                                         for (Route r : afectadas) {
