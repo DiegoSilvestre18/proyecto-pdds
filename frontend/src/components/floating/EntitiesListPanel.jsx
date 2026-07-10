@@ -178,9 +178,11 @@ const getLevelColor = (percent) => {
   return '#10b981';
 };
 
-const fmtTime = (ts) => {
-  if (!ts) return '--:--';
-  return new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+const fmtTimeRange = (dep, arr) => {
+  if (!dep || !arr) return '--:--';
+  const t1 = new Date(dep).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' });
+  const t2 = new Date(arr).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' });
+  return `${t1} - ${t2} UTC`;
 };
 
 const FlightRow = React.memo(function FlightRow({ index, style, data }) {
@@ -218,7 +220,7 @@ const FlightRow = React.memo(function FlightRow({ index, style, data }) {
               <span>{ut.from} ➔ {ut.to}</span>
               {ut.departureTime && ut.arrivalTime && (
                 <span style={{ color: '#64748b', fontSize: '10px', background: 'rgba(0,0,0,0.2)', padding: '2px 6px', borderRadius: '4px' }}>
-                  {fmtTime(ut.departureTime)} - {fmtTime(ut.arrivalTime)}
+                  {fmtTimeRange(ut.departureTime, ut.arrivalTime)}
                 </span>
               )}
             </div>

@@ -5,7 +5,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 
 import { WebMercatorViewport } from "@deck.gl/core";
 import { useSelectionBridge } from "../../hooks/useSelectionBridge";
-import { AIRPORTS, AIRPORT_BY_ICAO, interpolateCoordinates } from "../../data/airportsData";
+import { AIRPORTS, AIRPORT_BY_ICAO } from "../../data/airportsData";
 
 function getFitViewState(width = 1200, height = 800) {
   const bounds = AIRPORTS.reduce((acc, ap) => {
@@ -223,34 +223,44 @@ const WorldMap = ({
 
   const lastSelectedAircraftRef = useRef(null);
 
-  // Tracking del avión seleccionado
+  // Al seleccionar vuelo → zoom para ver ambos aeropuertos
   useEffect(() => {
     if (selectedAircraftId) {
       const plane = activeAircraft.find(p => p.id === selectedAircraftId);
       if (plane) {
         const from = airportByIcao[plane.from] || AIRPORT_BY_ICAO[plane.from];
         const to = airportByIcao[plane.to] || AIRPORT_BY_ICAO[plane.to];
-        if (from && to) {
+        if (from && to && from.coordinates && to.coordinates) {
           if (lastSelectedAircraftRef.current !== selectedAircraftId) {
             lastSelectedAircraftRef.current = selectedAircraftId;
-            // Comentado para evitar que la cámara haga auto-zoom al avión
-            /*
-            const pos = interpolateCoordinates(from, to, plane.progress ?? 0);
+            const bounds = {
+              minLng: Math.min(from.coordinates[0], to.coordinates[0]),
+              maxLng: Math.max(from.coordinates[0], to.coordinates[0]),
+              minLat: Math.min(from.coordinates[1], to.coordinates[1]),
+              maxLat: Math.max(from.coordinates[1], to.coordinates[1]),
+            };
+            const w = containerRef.current?.clientWidth || 1200;
+            const h = containerRef.current?.clientHeight || 800;
+            const padding = Math.min(w, h) * 0.15;
+            const viewport = new WebMercatorViewport({ width: w, height: h });
+            const fitted = viewport.fitBounds(
+              [[bounds.minLng, bounds.minLat], [bounds.maxLng, bounds.maxLat]],
+              { padding }
+            );
             setViewState(prev => ({
               ...prev,
-              longitude: pos[0],
-              latitude: pos[1],
-              zoom: 4,
+              longitude: fitted.longitude,
+              latitude: fitted.latitude,
+              zoom: Math.min(fitted.zoom, 5),
               transitionDuration: 1000
             }));
-            */
           }
         }
       }
     } else {
       lastSelectedAircraftRef.current = null;
     }
-  }, [selectedAircraftId, airportByIcao]);
+  }, [selectedAircraftId, activeAircraft, airportByIcao]);
 
   const lastSelectedAirportRef = useRef(null);
 
