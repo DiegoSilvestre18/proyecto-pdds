@@ -241,8 +241,8 @@ const App = () => {
               onClose={() => handleToggleWindow("telemetry")}
               initialPosition={{ x: 20, y: 100 }}
               defaultSize={{
-                  width: 340,
-                  height: 400
+                  width: 280,
+                  height: 260
               }}
               isActive={openWindowsQueue[openWindowsQueue.length-1] === "telemetry"}
               onFocus={() => handleFocusWindow("telemetry")}
