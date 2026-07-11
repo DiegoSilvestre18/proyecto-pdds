@@ -71,7 +71,8 @@ public class FlightCancellationService {
                             vueloId, e.getMessage());
                 }
             } else {
-                log.info("Simulación activa detectada. La replanificación del vuelo {} se realizará de forma reactiva en el ciclo actual/siguiente.", vueloId);
+                log.info("Simulación activa detectada. Añadiendo vuelo {} a la cola de cancelaciones en vivo para replanificación reactiva.", vueloId);
+                session.getCancelacionesInyectadasEnVivo().add(vueloId);
             }
         }
     }
