@@ -60,12 +60,15 @@ public class SimulationController {
             @RequestParam(required = false) String preCancelledFlightIds,
             @RequestParam(required = false) String startTime,
             @RequestParam(required = false, defaultValue = "1440") int saMinutes,
-            @RequestParam(required = false, defaultValue = "240") int planningHorizon,
+            @RequestParam(required = false, defaultValue = "1440") int planningHorizon,
             @RequestParam(required = false, defaultValue = "false") boolean isRealTime) {
 
         //Limpiamos caché al inicio así limpiamos los envíos de la BD de otros escenarios
         envioRepository.deleteAllEnvios();
-
+        //Prueba
+        if (!isRealTime){
+            planningHorizon=14440;
+        }
         int totalDays = (dias != null && dias > 0) ? dias : 5;
         String sessionId = UUID.randomUUID().toString();
 
@@ -118,7 +121,6 @@ public class SimulationController {
             @PathVariable(required = false) Integer dias,
             @RequestParam(required = false, defaultValue = "ALNS") String algorithm,
             @RequestParam(required = false) String startDate,
-            @RequestParam(required = false, defaultValue = "FAILED_DELIVERY") String endCondition,
             @RequestParam(required = false, defaultValue = "60") int playbackMinutes,
             @RequestParam(required = false) String preCancelledFlightIds,
             @RequestParam(required = false, defaultValue = "00:00:00") String startTime,
@@ -130,23 +132,15 @@ public class SimulationController {
 
         String sessionId = UUID.randomUUID().toString();
 
-        java.time.LocalDate fechaInicio = null;
+        java.time.LocalDate fechaInicio = java.time.LocalDate.of(2026, 1, 1);
         if (startDate != null && !startDate.isBlank()) {
             try { fechaInicio = java.time.LocalDate.parse(startDate); } catch (Exception ignored) {}
-        }
-
-        CollapseEndCondition cond;
-        try {
-            cond = CollapseEndCondition.valueOf(endCondition.toUpperCase());
-        } catch (IllegalArgumentException e) {
-            log.warn("[run-collapse] endCondition '{}' inválida; usando FAILED_DELIVERY", endCondition);
-            cond = CollapseEndCondition.FAILED_DELIVERY;
         }
 
         SimulationProgressHolder.SimulationSessionState session = progressHolder.create(sessionId, totalDays);
         session.setCollapseMode(true);
         session.setAlgorithm(algorithm);
-        session.setEndCondition(cond);
+        session.setEndCondition(CollapseEndCondition.FAILED_DELIVERY);
         session.setPlanningHorizon(1440); // 24 Horas para colapso
 
         // En modo colapso playbackMinutes debe ser igual a totalDays para meta 1 min / día
@@ -156,8 +150,8 @@ public class SimulationController {
         Map<String, String> response = new HashMap<>();
         response.put("sessionId", sessionId);
         response.put("totalDays", String.valueOf(totalDays));
-        response.put("endCondition", cond.name());
-        response.put("message", "Simulación de colapso iniciada.");
+        response.put("startDate", fechaInicio.toString());
+        response.put("message", "Simulación de colapso iniciada desde " + fechaInicio);
 
         return ResponseEntity.accepted().body(response);
     }
@@ -247,9 +241,13 @@ public class SimulationController {
         double globalOccupancy = 0;
         if (session.getAirportLoads() != null && !session.getAirportLoads().isEmpty()) {
             globalOccupancy = session.getAirportLoads().values().stream()
-                    .mapToInt(data -> (Integer) data.getOrDefault("occupancy", 0))
+                    .mapToDouble(data -> {
+                        Object occ = data.getOrDefault("occupancy", 0);
+                        if (occ instanceof Number) return ((Number) occ).doubleValue();
+                        return 0.0;
+                    })
                     .average()
-                    .orElse(0);
+                    .orElse(0.0);
         }
 
         java.util.List<java.util.Map<String, Object>> reportsList = session.getReports().stream()
@@ -294,7 +292,8 @@ public class SimulationController {
                 .errorMessage(session.getErrorMessage())
                 .reports(reportsList)
                 .taMs(session.getLastTaMs())
-                .saMinutes(session.getCurrentSaMinutes());
+                .saMinutes(session.getCurrentSaMinutes())
+                .finalMasterPlan(session.getFinalMasterPlan());
 
         if ("DONE".equals(session.getStatus().name()) && session.getStartEpoch() != null) {
             try {
@@ -339,7 +338,7 @@ public class SimulationController {
         trace.put("arrival", r.getArrivalTime());
         trace.put("deadline", r.getLot().getDeadline());
         trace.put("status", r.getStatus());
-        
+
         List<Map<String, Object>> hops = r.getFlights().stream().map(v -> {
             Map<String, Object> h = new HashMap<>();
             h.put("id", v.getId());
@@ -349,9 +348,17 @@ public class SimulationController {
             h.put("arr", v.getArrivalMinute());
             return h;
         }).collect(Collectors.toList());
-        
+
         trace.put("route", hops);
         return trace;
+    }
+
+    @GetMapping("/current-plan/{sessionId}")
+    public ResponseEntity<List<Map<String, Object>>> getCurrentPlan(@PathVariable String sessionId) {
+        SimulationProgressHolder.SimulationSessionState session = progressHolder.get(sessionId);
+        if (session == null) return ResponseEntity.notFound().build();
+        List<Map<String, Object>> plan = session.getFinalMasterPlan();
+        return ResponseEntity.ok(plan != null ? plan : List.of());
     }
 
     // ── POST /export-excel/{sessionId} ─────────────────────────────────────
@@ -548,9 +555,13 @@ public class SimulationController {
         sb.append("- **Maletas Atendidas (A tiempo)**: ").append(String.format("%,d", session.getTotalAttended())).append("\n");
         sb.append("- **Maletas No Atendidas (Ecap)**: ").append(String.format("%,d", session.getTotalMissed())).append("\n");
         if (session.isCollapseMode()) {
-            sb.append("- **Modo de Simulación**: 🚨 Búsqueda de Punto de Quiebre (Colapso Logístico/Computacional)\n");  sb.append("- **Vuelos Replanificados/Rescatados**: ").append(session.getRescuedFlights()).append("\n");
-        } else {
+            sb.append("- **Modo de Simulación**: 🚨 Búsqueda de Punto de Quiebre (Colapso Logístico/Computacional)\n");
+            sb.append("- **Vuelos Replanificados/Rescatados**: ").append(session.getRescuedFlights()).append("\n");
+        } else if (session.isRealTime()) {
             sb.append("- **Modo de Simulación**: 🟢 Operación Día a Día (Normal)\n");
+        } else {
+            sb.append("- **Modo de Simulación**: 📊 Simulación de Periodo\n");
+            sb.append("\n> Presentar como reporte la última planificación estable al finalizar en simulación del periodo\n");
         }
         sb.append("\n---\n\n");
 

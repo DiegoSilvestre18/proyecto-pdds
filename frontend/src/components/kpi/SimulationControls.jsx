@@ -3,17 +3,10 @@ function SimulationControls({
   simState,
   simulatedClock,
   elapsedReal,
-  speed,
-  onStart,
-  onPause,
-  onStop,
-  onSpeedChange,
 }) {
   if (!isVisible) {
     return null
   }
-
-  const speedOptions = [1, 10, 60]
 
   return (
     <div className="ct-sim-controls" aria-label="Controles de simulación">
@@ -33,14 +26,14 @@ function SimulationControls({
       </div>
 
       <div className="ct-sim-controls__status">
-        <span className={`ct-sim-status-badge ct-sim-status-badge--${simState}`}>
+        <span className={`ct-sim-status-badge ct-sim-status-badge--${simState}`} role="status">
           {{
-            idle: 'Listo',
-            running: 'En ejecución',
-            paused: 'Pausado',
-            completed: 'Completado',
+            idle: '⏹ Listo',
+            running: '▶ En ejecución',
+            paused: '⏸ Pausado',
+            completed: '✓ Completado',
             collapsed: '⚠ Colapsado'
-          }[simState] || 'Desconocido'}
+          }[simState] || '• Desconocido'}
         </span>
       </div>
     </div>

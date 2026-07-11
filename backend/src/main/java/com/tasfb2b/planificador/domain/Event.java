@@ -6,6 +6,7 @@ import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.Getter;
 
+import java.util.List;
 @Data
 @Getter
 @AllArgsConstructor
@@ -18,4 +19,12 @@ public class Event {
     private Vuelo vuelo;
 
     private int load;         // carga asociada (maletas)
+
+    // Maletas específicas afectadas por este evento
+    private List<String> bagIds;
+
+    //Para diferenciar vuelos: "{vueloId}-{departureEpochDeEsteTramo}".
+    private String flightInstanceKey;
+
+    private boolean isFinalLeg; //Es true si es el destino final, para otro eventos o caso false
 }

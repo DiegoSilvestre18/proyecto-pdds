@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.Set;
 
 /**
  * Almacena el progreso en tiempo real de las simulaciones asíncronas.
@@ -155,6 +156,15 @@ public class SimulationProgressHolder {
         
         /** Futuro para el ALNS de la siguiente ventana concurrente */
         private java.util.concurrent.CompletableFuture<?> nextPlanFuture;
+
+        /** Plan maestro de la última planificación realizada (se sobreescribe cada día). */
+        private List<Map<String, Object>> finalMasterPlan = new ArrayList<>();
+
+        /** Vuelos cuya cancelación se difirió al día siguiente por la regla de 1h. */
+        private final Set<Long> pendingNextDayCancellations = ConcurrentHashMap.newKeySet();
+
+        /** Vuelos cancelados en vivo (durante microsteps) para replanificación reactiva. */
+        private final java.util.concurrent.ConcurrentLinkedQueue<Long> cancelacionesInyectadasEnVivo = new java.util.concurrent.ConcurrentLinkedQueue<>();
     }
 
     private final ConcurrentHashMap<String, SimulationSessionState> sessions =
@@ -193,6 +203,34 @@ public class SimulationProgressHolder {
         if (state != null) {
             state.setStatus(Status.DONE);
             state.setPercent(100);
+            
+            WsFrame oldFrame = state.getWsFrame();
+            if (oldFrame != null) {
+                state.setWsFrame(new WsFrame(
+                        oldFrame.sessionId(),
+                        Status.DONE.name(),
+                        oldFrame.currentEpochTime(),
+                        oldFrame.simulatedTime(),
+                        100,
+                        oldFrame.currentDay(),
+                        oldFrame.totalDays(),
+                        oldFrame.slaPercent(),
+                        oldFrame.criticalNodes(),
+                        oldFrame.airportLoads(),
+                        oldFrame.totalBagsWaiting(),
+                        oldFrame.isCollapseMode(),
+                        oldFrame.rescuedFlights(),
+                        oldFrame.errorMessage(),
+                        oldFrame.startEpoch(),
+                        oldFrame.activeRoutes(),
+                        oldFrame.algorithm(),
+                        oldFrame.taMs(),
+                        oldFrame.saMinutes(),
+                        oldFrame.planId(),
+                        oldFrame.plannedRoutes(),
+                        oldFrame.globalFleetOccupancy()
+                ));
+            }
         }
     }
 
@@ -201,6 +239,34 @@ public class SimulationProgressHolder {
         if (state != null) {
             state.setStatus(Status.FAILED);
             state.setErrorMessage(errorMessage);
+            
+            WsFrame oldFrame = state.getWsFrame();
+            if (oldFrame != null) {
+                state.setWsFrame(new WsFrame(
+                        oldFrame.sessionId(),
+                        Status.FAILED.name(),
+                        oldFrame.currentEpochTime(),
+                        oldFrame.simulatedTime(),
+                        oldFrame.percent(),
+                        oldFrame.currentDay(),
+                        oldFrame.totalDays(),
+                        oldFrame.slaPercent(),
+                        oldFrame.criticalNodes(),
+                        oldFrame.airportLoads(),
+                        oldFrame.totalBagsWaiting(),
+                        oldFrame.isCollapseMode(),
+                        oldFrame.rescuedFlights(),
+                        errorMessage,
+                        oldFrame.startEpoch(),
+                        oldFrame.activeRoutes(),
+                        oldFrame.algorithm(),
+                        oldFrame.taMs(),
+                        oldFrame.saMinutes(),
+                        oldFrame.planId(),
+                        oldFrame.plannedRoutes(),
+                        oldFrame.globalFleetOccupancy()
+                ));
+            }
         }
     }
 

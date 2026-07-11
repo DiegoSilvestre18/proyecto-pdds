@@ -1,43 +1,88 @@
-import React, { useEffect, useRef, useState } from "react";
-
+import React, { useEffect, useRef, useState, useCallback, useMemo } from "react";
+import { SkeletonList, Spinner, EmptyState } from "../common/Skeleton";
+import { apiFetch } from "../../hooks/api";
+import { useSelectionBridge } from "../../hooks/useSelectionBridge";
 
 const PAGE_SIZE = 50;
 
-const ShipmentsPanel = () => {
+const STATUS_META = {
+    SIN_ASIGNAR:           { label: "Sin asignar",        color: "#64748b" },
+    PLANIFICADO:           { label: "Planificado",        color: "#64748b" },
+    EN_ALMACEN_ORIGEN:     { label: "Almacén origen",     color: "#f59e0b" },
+    EN_ALMACEN_INTERMEDIO: { label: "Almacén intermedio", color: "#fb923c" },
+    EN_VUELO:              { label: "En vuelo",           color: "#10b981" },
+    EN_ALMACEN_DESTINO:    { label: "Almacén destino",    color: "#3b82f6" },
+    ENTREGADO:             { label: "Entregado",          color: "#22c55e" },
+    REPLANIFICACION:       { label: "Replanificación",    color: "#ef4444" },
+};
+
+// El código globalmente único de un envío es origenIcao + codigoPedido
+// (codigoPedido SOLO es único por origen — ver @UniqueConstraint en Envio.java).
+function buildGlobalCode(shipment) {
+    return `${shipment.origenIcao}_${shipment.codigoPedido}`;
+}
+
+function summarize(list) {
+    if (!list || list.length === 0) return null;
+    const counts = {};
+    list.forEach((s) => { counts[s.estado] = (counts[s.estado] || 0) + 1; });
+    const sorted = Object.entries(counts).sort((a, b) => b[1] - a[1]);
+    return { dominant: sorted[0][0], dominantCount: sorted[0][1], total: list.length, mixed: sorted.length > 1 };
+}
+
+function pickPrimaryBag(list) {
+    if (!list || list.length === 0) return null;
+    return (
+        list.find((s) => s.estado === "EN_VUELO") ||
+        list.find((s) => s.estado?.startsWith("EN_ALMACEN")) ||
+        list[0]
+    );
+}
+
+function formatTime(ms) {
+    if (!ms) return "—";
+    return new Date(ms).toLocaleString("es-PE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" });
+}
+
+const ShipmentsPanel = ({ sessionId, airports, onSelectFlight, onAirportSelect }) => {
+    const { setFocusedEntity, dispatchMapCommand } = useSelectionBridge();
+
     const [shipments, setShipments] = useState([]);
     const [loading, setLoading] = useState(false);
-
     const [searchOrigin, setSearchOrigin] = useState("");
+    const [searchDestino, setSearchDestino] = useState("");
     const [searchCode, setSearchCode] = useState("");
-
     const [page, setPage] = useState(0);
     const [hasMore, setHasMore] = useState(true);
 
-    const debounceRef = useRef(null);
-    const observerRef = useRef(null);
-    const lastItemRef = useRef(null);
+    // Keyed by GLOBAL code (origenIcao_codigoPedido), no por codigoPedido crudo.
+    const [statusByShipment, setStatusByShipment] = useState({});
+    const [hopsByShipment, setHopsByShipment] = useState({});
+    const [expandedCode, setExpandedCode] = useState(null); // global code
+    const [expandedBagId, setExpandedBagId] = useState(null);
+
+    const [auditViolations, setAuditViolations] = useState([]);
+    const [showAudit, setShowAudit] = useState(false);
+
+    const containerRef = useRef(null);
+    const scrollTimerRef = useRef(null);
+    const shipmentsRef = useRef(shipments);
+    useEffect(() => { shipmentsRef.current = shipments; }, [shipments]);
 
     const fetchShipments = async (pageToLoad = 0, reset = false) => {
         if (loading) return;
-
         setLoading(true);
-
         try {
-            const params = new URLSearchParams({
-                page: pageToLoad,
-                size: PAGE_SIZE,
-            });
-
+            const params = new URLSearchParams({ page: pageToLoad, size: PAGE_SIZE });
             if (searchOrigin) params.append("origen", searchOrigin);
+            if (searchDestino) params.append("destino", searchDestino);
             if (searchCode) params.append("codigo", searchCode);
 
             const res = await fetch(`/api/v1/envios?${params.toString()}`);
             const data = await res.json();
 
             setHasMore(!data.last);
-            setShipments(prev =>
-                reset ? data.content : [...prev, ...data.content]
-            );
+            setShipments((prev) => (reset ? data.content : [...prev, ...data.content]));
             setPage(pageToLoad);
         } catch (err) {
             console.error("Error cargando envíos", err);
@@ -46,85 +91,292 @@ const ShipmentsPanel = () => {
         }
     };
 
-    // Búsqueda con debounce
     useEffect(() => {
-        const timer = setTimeout(() => {
-            fetchShipments(0, true);   // ← solo 2 args, reset=true real
-        }, 300);
-
+        const timer = setTimeout(() => fetchShipments(0, true), 300);
         return () => clearTimeout(timer);
-    }, [searchOrigin, searchCode]);
+    }, [searchOrigin, searchDestino, searchCode]);
 
-    const containerRef = useRef(null);
-
-    // Scroll infinito
     useEffect(() => {
         const el = containerRef.current;
         if (!el) return;
-
         const handleScroll = () => {
-            const bottom =
-                el.scrollTop + el.clientHeight >= el.scrollHeight - 100;
-
-            if (bottom && !loading && hasMore) {
-                fetchShipments(page + 1, false);   // ← reset=false explícito y correcto
-            }
+            if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
+            scrollTimerRef.current = setTimeout(() => {
+                const bottom = el.scrollTop + el.clientHeight >= el.scrollHeight - 100;
+                if (bottom && !loading && hasMore) fetchShipments(page + 1, false);
+            }, 150);
         };
+        el.addEventListener("scroll", handleScroll, { passive: true });
+        return () => {
+            el.removeEventListener("scroll", handleScroll);
+            if (scrollTimerRef.current) clearTimeout(scrollTimerRef.current);
+        };
+    }, [page, loading, hasMore, searchOrigin, searchDestino, searchCode]);
 
-        el.addEventListener("scroll", handleScroll);
-        return () => el.removeEventListener("scroll", handleScroll);
-    }, [page, loading, hasMore, searchOrigin, searchCode]);
+    const fetchStatusBatch = useCallback(async (globalCodes) => {
+        if (!sessionId || globalCodes.length === 0) return;
+        try {
+            const res = await apiFetch(`/api/shipments/${sessionId}/status-batch`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(globalCodes),
+            });
+            if (!res.ok) return;
+            const data = await res.json();
+            setStatusByShipment((prev) => ({ ...prev, ...data }));
+        } catch (err) {
+            console.error("Error cargando estado de envíos", err);
+        }
+    }, [sessionId]);
+
+    useEffect(() => {
+        if (shipments.length === 0) return;
+        fetchStatusBatch(shipments.map(buildGlobalCode));
+    }, [shipments, fetchStatusBatch]);
+
+    const fetchHops = useCallback(async (globalCode) => {
+        if (!sessionId) return;
+        try {
+            const res = await apiFetch(`/api/shipments/${sessionId}/shipment/${globalCode}/hops`);
+            if (res.ok) {
+                const data = await res.json();
+                setHopsByShipment((prev) => ({ ...prev, [globalCode]: data }));
+            }
+        } catch (err) {
+            console.error("Error cargando escalas", err);
+        }
+    }, [sessionId]);
+
+    useEffect(() => {
+        if (!sessionId) return;
+        const id = setInterval(() => {
+            if (shipmentsRef.current.length > 0) {
+                fetchStatusBatch(shipmentsRef.current.map(buildGlobalCode));
+            }
+            if (expandedCode) fetchHops(expandedCode);
+        }, 4000);
+        return () => clearInterval(id);
+    }, [sessionId, fetchStatusBatch, fetchHops, expandedCode]);
+
+    useEffect(() => {
+        if (!sessionId) return;
+        const check = async () => {
+            try {
+                const res = await apiFetch(`/api/shipments/${sessionId}/audit`);
+                if (res.ok) setAuditViolations(await res.json());
+            } catch (err) { /* solo diagnóstico */ }
+        };
+        check();
+        const id = setInterval(check, 5000);
+        return () => clearInterval(id);
+    }, [sessionId]);
+
+    const handleLocate = useCallback((bagState) => {
+        if (!bagState) return;
+        if (bagState.estado === "EN_VUELO") {
+            if (!bagState.vueloInstanceActual) return;
+            const targetId = `vuelo-${bagState.vueloInstanceActual}`;
+            setFocusedEntity("flight", targetId, "panel");
+            onSelectFlight?.(targetId);
+            return;
+        }
+        if (bagState.estado?.startsWith("EN_ALMACEN")) {
+            const icao = bagState.aeropuertoActual;
+            if (!icao) return;
+            const ap = airports?.find((a) => a.icao === icao);
+            setFocusedEntity("airport", icao, "panel");
+            onAirportSelect?.(icao);
+            if (ap?.coordinates) {
+                dispatchMapCommand("flyTo", { coordinates: ap.coordinates, zoom: 5, targetId: icao });
+            }
+        }
+    }, [airports, onSelectFlight, onAirportSelect, setFocusedEntity, dispatchMapCommand]);
+
+    const toggleExpand = (globalCode) => {
+        setExpandedBagId(null);
+        setExpandedCode((prev) => {
+            const next = prev === globalCode ? null : globalCode;
+            if (next && !hopsByShipment[next]) fetchHops(next);
+            if (next && !statusByShipment[next]) fetchStatusBatch([next]);
+            return next;
+        });
+    };
+
+    const expandedShipmentMeta = shipments.find((s) => buildGlobalCode(s) === expandedCode);
+    const totalBags = expandedShipmentMeta?.cantidadMaletas ?? 0;
+    const statusList = statusByShipment[expandedCode] || [];
+    const statusByBagId = useMemo(() => {
+        const m = new Map();
+        statusList.forEach((s) => m.set(s.bagId, s));
+        return m;
+    }, [statusList]);
+    const hopsMap = hopsByShipment[expandedCode] || {};
+    const expandedBagIds = useMemo(
+        () => Array.from({ length: totalBags }, (_, i) => `${expandedCode}-${i + 1}`),
+        [expandedCode, totalBags]
+    );
 
     return (
-        <div style={{ padding: "12px", color: "#e2e8f0" }}>
-            <h3>Envíos</h3>
+        <div style={{ padding: "8px", color: "#e2e8f0", display: "flex", flexDirection: "column", gap: "4px", height: "100%" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                <h3 style={{ margin: 0, fontSize: "12px", color: "#f8fafc" }}>Envíos</h3>
+                {loading && shipments.length > 0 && <Spinner size={12} label="Actualizando…" />}
+                {sessionId && (
+                    <span
+                        onClick={() => setShowAudit((v) => !v)}
+                        title="Auditoría de consistencia de trazabilidad"
+                        style={{
+                            marginLeft: "auto", fontSize: "10px", cursor: "pointer", padding: "2px 6px", borderRadius: "10px",
+                            background: auditViolations.length > 0 ? "rgba(239,68,68,0.15)" : "rgba(16,185,129,0.15)",
+                            color: auditViolations.length > 0 ? "#ef4444" : "#10b981",
+                            border: `1px solid ${auditViolations.length > 0 ? "#ef4444" : "#10b981"}`,
+                        }}
+                    >
+            {auditViolations.length > 0 ? `⚠ ${auditViolations.length} inconsist.` : "✓ Sincronizado"}
+          </span>
+                )}
+            </div>
 
-            {/* SEARCH */}
-            <div style={{ display: "flex", gap: "8px", marginBottom: "12px" }}>
-                <input
-                    placeholder="Origen (SKBO)"
-                    value={searchOrigin}
-                    onChange={(e) => setSearchOrigin(e.target.value.toUpperCase())}
-                />
+            {showAudit && (
+                <div style={{ fontSize: "10px", maxHeight: "100px", overflowY: "auto", background: "rgba(0,0,0,0.3)", borderRadius: "4px", padding: "6px" }}>
+                    {auditViolations.length === 0
+                        ? <span style={{ color: "#64748b" }}>Sin inconsistencias detectadas.</span>
+                        : auditViolations.map((v, i) => (
+                            <div key={i} style={{ color: "#fca5a5", padding: "1px 0" }}>{v.bagId}: {v.reason}</div>
+                        ))}
+                </div>
+            )}
 
+            <div style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
+                <div style={{ display: "flex", gap: "4px" }}>
+                    <input
+                        placeholder="Origen (ICAO/ciudad/pais)"
+                        value={searchOrigin}
+                        onChange={(e) => setSearchOrigin(e.target.value)}
+                        style={{ flex: 1, padding: "4px 6px", borderRadius: "4px", fontSize: "11px", background: "rgba(15,23,42,0.9)", border: "1px solid rgba(255,255,255,0.1)", color: "white", outline: "none" }}
+                    />
+                    <input
+                        placeholder="Destino (ICAO/ciudad/pais)"
+                        value={searchDestino}
+                        onChange={(e) => setSearchDestino(e.target.value)}
+                        style={{ flex: 1, padding: "4px 6px", borderRadius: "4px", fontSize: "11px", background: "rgba(15,23,42,0.9)", border: "1px solid rgba(255,255,255,0.1)", color: "white", outline: "none" }}
+                    />
+                </div>
                 <input
-                    placeholder="Código"
+                    placeholder="Código de pedido"
                     value={searchCode}
                     onChange={(e) => setSearchCode(e.target.value)}
+                    style={{ width: "100%", padding: "4px 6px", borderRadius: "4px", fontSize: "11px", background: "rgba(15,23,42,0.9)", border: "1px solid rgba(255,255,255,0.1)", color: "white", outline: "none", boxSizing: "border-box" }}
                 />
             </div>
 
-            {/* LISTA */}
-            <div>
-                {shipments.map((shipment, index) => {
-                    const isLast = index === shipments.length - 1;
+            <div ref={containerRef} style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: "2px" }}>
+                {loading && shipments.length === 0 && <SkeletonList rows={10} rowHeight={28} label="Cargando envíos…" />}
+                {!loading && shipments.length === 0 && (
+                    <EmptyState icon="📦" title={searchOrigin || searchCode ? "Sin resultados" : "No hay envíos"} hint={searchOrigin || searchCode ? "Ajusta los filtros." : null} />
+                )}
+
+                {shipments.map((shipment) => {
+                    const globalCode = buildGlobalCode(shipment);
+                    const summary = summarize(statusByShipment[globalCode]);
+                    const isExpanded = expandedCode === globalCode;
 
                     return (
-                        <div
-                            key={shipment.id}
-                            ref={isLast ? lastItemRef : null}
-                            style={{
-                                padding: "8px",
-                                borderBottom: "1px solid #334155",
-                            }}
-                        >
-                            <div><b>{shipment.codigoPedido}</b></div>
+                        <div key={shipment.id} style={{ background: "rgba(255,255,255,0.02)", borderRadius: "4px", border: "1px solid rgba(255,255,255,0.04)" }}>
+                            <div
+                                onClick={() => toggleExpand(globalCode)}
+                                style={{ padding: "4px 6px", display: "flex", alignItems: "center", gap: "6px", cursor: "pointer" }}
+                            >
+                                <span style={{ fontSize: "11px", fontWeight: "bold", color: "#38bdf8", minWidth: "90px" }}>{shipment.codigoPedido}</span>
+                                <span style={{ fontSize: "10px", color: "#cbd5e1", whiteSpace: "nowrap" }}>
+                                    {shipment.origenIcao}{shipment.origenCiudad ? ` (${shipment.origenCiudad}${shipment.origenPais ? `, ${shipment.origenPais}` : ""})` : ""}→{shipment.destinoIcao}{shipment.destinoCiudad ? ` (${shipment.destinoCiudad}${shipment.destinoPais ? `, ${shipment.destinoPais}` : ""})` : ""}
+                                </span>
 
-                            <div>
-                                {shipment.origenIcao} ➔ {shipment.destinoIcao}
+                                {summary && (
+                                    <span style={{ fontSize: "9px", padding: "1px 6px", borderRadius: "8px", background: `${STATUS_META[summary.dominant]?.color}20`, color: STATUS_META[summary.dominant]?.color, border: `1px solid ${STATUS_META[summary.dominant]?.color}` }}>
+                    {STATUS_META[summary.dominant]?.label}{summary.mixed ? ` (+${summary.total - summary.dominantCount})` : ""}
+                  </span>
+                                )}
+
+                                <span style={{ fontSize: "10px", color: "#64748b", marginLeft: "auto", whiteSpace: "nowrap" }}>{shipment.cantidadMaletas} maletas</span>
+
+                                {summary && (
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); handleLocate(pickPrimaryBag(statusByShipment[globalCode])); }}
+                                        title="Localizar en el mapa"
+                                        style={{ background: "transparent", border: "none", color: "#60a5fa", cursor: "pointer", fontSize: "12px", padding: "0 2px" }}
+                                    >
+                                        📍
+                                    </button>
+                                )}
                             </div>
 
-                            <div style={{ fontSize: "12px", color: "#94a3b8" }}>
-                                {shipment.cantidadMaletas} maletas
-                            </div>
+                            {isExpanded && (
+                                <div style={{ padding: "6px", borderTop: "1px solid rgba(255,255,255,0.05)", background: "rgba(0,0,0,0.2)" }}>
+                                    {totalBags === 0 ? (
+                                        <div style={{ fontSize: "10px", color: "#64748b", fontStyle: "italic" }}>Sin maletas registradas.</div>
+                                    ) : (
+                                        expandedBagIds.map((bagId) => {
+                                            const bagState = statusByBagId.get(bagId);
+                                            const meta = bagState ? STATUS_META[bagState.estado] : STATUS_META.SIN_ASIGNAR;
+                                            const isBagExpanded = expandedBagId === bagId;
+                                            const hops = hopsMap[bagId] || [];
+
+                                            return (
+                                                <div key={bagId} style={{ marginBottom: "3px" }}>
+                                                    <div style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "10px", padding: "2px 0" }}>
+                                                        <span style={{ color: "#94a3b8", minWidth: "115px" }}>{bagId}</span>
+                                                        <span style={{ padding: "1px 6px", borderRadius: "8px", background: `${meta.color}20`, color: meta.color, border: `1px solid ${meta.color}` }}>
+                              {bagState ? meta.label : "Pendiente de planificación"}
+                            </span>
+                                                        {bagState && bagState.aeropuertoActual && (
+                                                            <span style={{ color: "#64748b" }}>{bagState.aeropuertoActual}</span>
+                                                        )}
+                                                        {bagState && (bagState.estado === "EN_VUELO" || bagState.estado?.startsWith("EN_ALMACEN")) && (
+                                                            <button
+                                                                onClick={() => handleLocate(bagState)}
+                                                                title="Localizar en el mapa"
+                                                                style={{ background: "transparent", border: "none", color: "#60a5fa", cursor: "pointer", fontSize: "11px" }}
+                                                            >
+                                                                📍
+                                                            </button>
+                                                        )}
+                                                        <button
+                                                            onClick={() => setExpandedBagId(isBagExpanded ? null : bagId)}
+                                                            style={{ marginLeft: "auto", background: "transparent", border: "none", color: "#64748b", cursor: "pointer", fontSize: "10px" }}
+                                                        >
+                                                            {isBagExpanded ? "▴ ocultar ruta" : "▾ ver ruta"}
+                                                        </button>
+                                                    </div>
+
+                                                    {isBagExpanded && (
+                                                        <div style={{ paddingLeft: "12px", borderLeft: "2px solid rgba(255,255,255,0.06)", marginTop: "2px" }}>
+                                                            {hops.length === 0 ? (
+                                                                <div style={{ fontSize: "9px", color: "#64748b", fontStyle: "italic" }}>Aún sin ruta comprometida.</div>
+                                                            ) : (
+                                                                hops.map((h, i) => (
+                                                                    <div key={i} style={{ display: "flex", justifyContent: "space-between", fontSize: "9px", color: "#9ca3af", padding: "1px 0" }}>
+                                                                        <span>✈ Vuelo {h.vueloId}: {h.origenIcao} → {h.destinoIcao}</span>
+                                                                        <span>{formatTime(h.departureTime)} → {formatTime(h.arrivalTime)}</span>
+                                                                    </div>
+                                                                ))
+                                                            )}
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            );
+                                        })
+                                    )}
+                                </div>
+                            )}
                         </div>
                     );
                 })}
             </div>
 
-            {loading && (
-                <div style={{ fontSize: "12px", marginTop: "10px" }}>
-                    Cargando...
+            {loading && shipments.length > 0 && (
+                <div style={{ display: "flex", alignItems: "center", gap: "4px", fontSize: "10px", color: "#94a3b8" }}>
+                    <Spinner size={10} label="Cargando…" /> Cargando más…
                 </div>
             )}
         </div>

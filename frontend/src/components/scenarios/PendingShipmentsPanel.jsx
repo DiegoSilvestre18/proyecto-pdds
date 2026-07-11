@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {apiFetch} from "../../hooks/api.js";
+import { SkeletonList, Spinner } from "../common/Skeleton";
 
 const PendingShipmentsPanel = ({ isOpen, onClose, sessionId }) => {
     const [shipments, setShipments] = useState([]);
@@ -7,17 +8,23 @@ const PendingShipmentsPanel = ({ isOpen, onClose, sessionId }) => {
 
     useEffect(() => {
         let interval;
+        let controller;
         if (isOpen && sessionId) {
             const fetchShipments = async () => {
+                // Aborta la petición anterior si sigue en vuelo al refrescar/cerrar.
+                controller?.abort();
+                controller = new AbortController();
                 try {
                     setLoading(true);
-                    const response = await apiFetch(`/api/v1/simulation/active-shipments/${sessionId}`);
+                    const response = await apiFetch(`/api/v1/simulation/active-shipments/${sessionId}`, { signal: controller.signal });
                     if (response.ok) {
                         const data = await response.json();
                         setShipments(data);
                     }
                 } catch (error) {
-                    console.error("Error fetching shipments:", error);
+                    if (error.name !== 'AbortError') {
+                        console.error("Error fetching shipments:", error);
+                    }
                 } finally {
                     setLoading(false);
                 }
@@ -26,18 +33,23 @@ const PendingShipmentsPanel = ({ isOpen, onClose, sessionId }) => {
             fetchShipments();
             interval = setInterval(fetchShipments, 5000);
         }
-        return () => clearInterval(interval);
+        return () => {
+            clearInterval(interval);
+            controller?.abort();
+        };
     }, [isOpen, sessionId]);
 
     if (!isOpen) return null;
 
     return (
         <div style={{
-            position: 'absolute',
-            left: '70px', // Right next to the ControlDock
+            position: 'fixed',
+            // Anclado junto al ControlDock pero responsive: nunca desborda en
+            // pantallas estrechas (antes width fijo 450px + left 70px overflow).
+            left: 'clamp(8px, 5vw, 52px)',
             top: '50%',
             transform: 'translateY(-50%)',
-            width: '450px',
+            width: 'min(450px, calc(100vw - 70px))',
             maxHeight: '80vh',
             background: 'rgba(15, 23, 42, 0.95)',
             backdropFilter: 'blur(16px)',
@@ -63,8 +75,9 @@ const PendingShipmentsPanel = ({ isOpen, onClose, sessionId }) => {
                     <h3 style={{ margin: 0, color: '#e2e8f0', fontSize: '15px', fontWeight: 'bold', letterSpacing: '0.5px' }}>
                         Envíos en Ventana Actual (4H)
                     </h3>
+                    {loading && shipments.length > 0 && <Spinner size={14} label="Actualizando…" />}
                 </div>
-                <button onClick={onClose} style={{
+                <button onClick={onClose} aria-label="Cerrar panel de envíos pendientes" style={{
                     background: 'transparent',
                     border: 'none',
                     color: '#94a3b8',
@@ -78,9 +91,16 @@ const PendingShipmentsPanel = ({ isOpen, onClose, sessionId }) => {
                 }}>✕</button>
             </div>
 
-            {/* Body / Table */}
-            <div style={{ flex: 1, overflowY: 'auto', padding: '12px' }}>
-                {shipments.length === 0 && !loading ? (
+            {/* Body / Table — auto-refresco cada 5s, anunciado a lectores de pantalla */}
+            <div
+                style={{ flex: 1, overflowY: 'auto', padding: '12px' }}
+                aria-live="polite"
+                aria-busy={loading}
+                aria-label="Envíos en la ventana actual"
+            >
+                {shipments.length === 0 && loading ? (
+                    <SkeletonList rows={6} rowHeight={40} label="Cargando envíos…" />
+                ) : shipments.length === 0 && !loading ? (
                     <div style={{ textAlign: 'center', padding: '40px 20px', color: '#64748b', fontSize: '13px' }}>
                         No hay envíos programados para esta ventana horaria.
                     </div>

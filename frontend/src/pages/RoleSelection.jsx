@@ -1,12 +1,66 @@
-import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useAirports } from '../hooks/useAirports';
 
 const RoleSelection = () => {
     const navigate = useNavigate();
+    const location = useLocation();
+    const { airports } = useAirports();
+    
+    const [showModal, setShowModal] = useState(false);
+    const [registradorCode, setRegistradorCode] = useState('');
+    const [error, setError] = useState('');
 
     const handleSelectRole = (role, path) => {
-        sessionStorage.setItem('userRole', role);
-        navigate(path);
+        if (role === 'REGISTRADOR') {
+            setShowModal(true);
+        } else {
+            sessionStorage.setItem('userRole', role);
+            // Preservamos el ?session= usando location.search que es confiable en React Router
+            const existingSession = new URLSearchParams(location.search).get('session');
+            const destination = existingSession ? `${path}?session=${existingSession}` : path;
+            navigate(destination);
+        }
+    };
+
+    const handleLoginRegistrador = (e) => {
+        e.preventDefault();
+        
+        // Simulación de códigos de usuario: 
+        // Aceptaremos OP-{ICAO} o validaremos si es un código de aeropuerto válido
+        let foundAirport = null;
+        const code = registradorCode.trim().toUpperCase();
+        
+        // Hardcoded example profiles
+        const predefinedProfiles = {
+            'LIM-001': 'SPIM',
+            'AMS-001': 'EHAM',
+            'BOG-001': 'SKBO'
+        };
+
+        if (predefinedProfiles[code]) {
+            foundAirport = predefinedProfiles[code];
+        } else if (code.startsWith('OP-') && code.length === 7) {
+            const icao = code.substring(3);
+            if (airports.find(a => a.icao === icao)) {
+                foundAirport = icao;
+            }
+        } else {
+            // Fallback: If they just type the ICAO code for testing
+            if (airports.find(a => a.icao === code)) {
+                foundAirport = code;
+            }
+        }
+
+        if (foundAirport) {
+            sessionStorage.setItem('userRole', 'REGISTRADOR');
+            // Guardamos el perfil en localStorage para que toda la app sepa de dónde viene
+            localStorage.setItem('profileAirport', foundAirport);
+            localStorage.setItem('profileCode', code);
+            navigate('/registro-datos');
+        } else {
+            setError('Código de registrador inválido o aeropuerto no encontrado. Ej: LIM-001 o OP-SPIM');
+        }
     };
 
     return (
@@ -75,6 +129,33 @@ const RoleSelection = () => {
                         </div>
                     </div>
                 </div>
+
+                {/* Modal de Login de Registrador */}
+                {showModal && (
+                    <div style={styles.modalOverlay}>
+                        <div style={styles.modalContent}>
+                            <h3 style={{ margin: '0 0 1rem 0', color: '#e2e8f0', fontSize: '1.2rem' }}>Acceso Registrador</h3>
+                            <p style={{ fontSize: '0.9rem', color: '#94a3b8', marginBottom: '1.5rem' }}>
+                                Ingrese su código de operador para identificar su aeropuerto de origen automáticamente.
+                            </p>
+                            <form onSubmit={handleLoginRegistrador} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                                <input 
+                                    type="text" 
+                                    placeholder="Ej: LIM-001 o OP-SPIM" 
+                                    value={registradorCode}
+                                    onChange={(e) => { setRegistradorCode(e.target.value); setError(''); }}
+                                    style={styles.input}
+                                    autoFocus
+                                />
+                                {error && <div style={{ color: '#ef4444', fontSize: '0.8rem' }}>{error}</div>}
+                                <div style={{ display: 'flex', gap: '1rem', marginTop: '0.5rem' }}>
+                                    <button type="button" onClick={() => setShowModal(false)} style={styles.btnCancel}>Cancelar</button>
+                                    <button type="submit" style={styles.btnPrimary}>Ingresar</button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                )}
             </div>
         </div>
     );
@@ -177,6 +258,61 @@ const styles = {
         color: '#94a3b8',
         margin: 0,
         lineHeight: '1.6'
+    },
+    modalOverlay: {
+        position: 'fixed',
+        top: 0, left: 0, right: 0, bottom: 0,
+        backgroundColor: 'rgba(15, 23, 42, 0.8)',
+        backdropFilter: 'blur(4px)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 50
+    },
+    modalContent: {
+        background: 'rgba(30, 41, 59, 0.95)',
+        border: '1px solid rgba(56, 189, 248, 0.3)',
+        borderRadius: '16px',
+        padding: '2rem',
+        width: '100%',
+        maxWidth: '400px',
+        boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.5)',
+        textAlign: 'left'
+    },
+    input: {
+        width: '100%',
+        padding: '0.75rem',
+        borderRadius: '8px',
+        background: 'rgba(15, 23, 42, 0.9)',
+        border: '1px solid rgba(255, 255, 255, 0.1)',
+        color: '#fff',
+        fontSize: '1rem',
+        outline: 'none',
+        boxSizing: 'border-box'
+    },
+    btnPrimary: {
+        flex: 1,
+        padding: '0.75rem',
+        background: '#38bdf8',
+        color: '#0f172a',
+        border: 'none',
+        borderRadius: '8px',
+        fontWeight: 'bold',
+        cursor: 'pointer',
+        fontSize: '1rem',
+        transition: 'background 0.2s'
+    },
+    btnCancel: {
+        flex: 1,
+        padding: '0.75rem',
+        background: 'transparent',
+        color: '#94a3b8',
+        border: '1px solid rgba(255,255,255,0.1)',
+        borderRadius: '8px',
+        fontWeight: 'bold',
+        cursor: 'pointer',
+        fontSize: '1rem',
+        transition: 'background 0.2s'
     }
 };
 

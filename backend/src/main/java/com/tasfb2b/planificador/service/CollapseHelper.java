@@ -156,47 +156,28 @@ public class CollapseHelper {
             SimulationState endOfDayState,
             Map<String, Aeropuerto> airportMap) {
 
-        // REGLA ESTRICTA 1: Capacidad de almacén excedida
+        // ── CONDICIÓN 1: Almacén excedido ──────────────────────────────────
         if (endOfDayState.isColapsado()) {
-            return new CollapseCheckResult(true, "CAPACIDAD_EXCEDIDA: Se ha superado la capacidad física de almacenamiento en la red.");
+            return new CollapseCheckResult(true,
+                    "ALMACEN_EXCEDIDO: Un almacén superó su capacidad física máxima.");
         }
 
-        // REGLA ESTRICTA 2: Incumplimiento de entrega (SLA < 100%)
-        if (session.getEndCondition() == CollapseEndCondition.FAILED_DELIVERY) {
-            if (report.getMalatetasAtendidas() < report.getTotalMaletas() || !report.getPendingLots().isEmpty()) {
-                return new CollapseCheckResult(true, "INCUMPLIMIENTO_ENTREGA: Se han detectado maletas que no pudieron ser entregadas a tiempo.");
-            }
+        // ── CONDICIÓN 2: Avión sobrecargado ────────────────────────────────
+        if (endOfDayState.isViolacionCapacidadVuelo()) {
+            return new CollapseCheckResult(true,
+                    "VUELO_EXCEDIDO: Se intentó embarcar más maletas de las permitidas en un vuelo.");
         }
 
-        // REGLA ESTRICTA 3: Lotes remanentes persistentemente grandes
- //(sin capacidad de aviones)
-        // Como heurística: si los pendientes superan la capacidad total diaria de la flota,
-        // no hay forma de recuperarse.
-        long totalCapacity = 0;
-        for (Integer cap : endOfDayState.getCapacidadVuelo().values()) totalCapacity += cap;
-        long totalPendientes = report.getPendingLots().stream().mapToLong(com.tasfb2b.superlote.domain.SuperLot::getTotalMaletas).sum();
-        
-        if (totalPendientes > totalCapacity && totalCapacity > 0) {
-            return new CollapseCheckResult(true, "Demanda crónicamente rechazada (Pendientes > Capacidad Total de Flota).");
-        }
-
-        // REGLA ESTRICTA 3: SLA por debajo del umbral de negocio (por defecto 30%)
-        int streak = report.getSlaPercent() < collapseSlaThreshold ? session.getSlaStreak() + 1 : 0;
-        session.setSlaStreak(streak);
-        if (streak >= collapseConsecutiveDays) {
-            return new CollapseCheckResult(true, String.format("SLA < %.1f%% por %d días consecutivos (actual %.1f%%)",
-                            collapseSlaThreshold, collapseConsecutiveDays, report.getSlaPercent()));
-        }
-
-        // REGLA OPCIONAL: Usuario seleccionó terminación manual cuando todos los aeropuertos estén en 90%
-        if (session.getEndCondition() == CollapseEndCondition.ALL_AIRPORTS_CRITICAL) {
-            final int total = airportMap.size();
-            long critical = airportMap.keySet().stream()
-                    .filter(icao -> endOfDayState.getOccupancyPercent(icao, airportMap) >= 90)
-                    .count();
-            if (critical >= total) {
-                return new CollapseCheckResult(true, String.format("Todos los aeropuertos críticos (%d/%d)", critical, total));
-            }
+        // ── CONDICIÓN 3: SLA incumplido ────────────────────────────────────
+        // Cualquier maleta que no llegó a tiempo es violación de negocio.
+        // report.getSlaPercent() < 100 significa que al menos 1 maleta no cumplió su ventana.
+        if (report.getTotalMaletas() > 0 && report.getSlaPercent() < 100.0) {
+            return new CollapseCheckResult(true,
+                    String.format("SLA_INCUMPLIDO: Solo %.1f%% de entregas cumplieron su deadline " +
+                                    "(%d/%d maletas). Se requiere 100%%.",
+                            report.getSlaPercent(),
+                            report.getMalatetasAtendidas(),
+                            report.getTotalMaletas()));
         }
 
         return new CollapseCheckResult(false, "NONE");

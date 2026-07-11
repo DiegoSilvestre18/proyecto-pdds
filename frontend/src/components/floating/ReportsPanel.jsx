@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { Spinner } from "../common/Skeleton";
 
 const ReportsPanel = ({
   sessionId,
@@ -7,15 +8,26 @@ const ReportsPanel = ({
   exportDetailedSimulationReport = () => {},
 }) => {
   const [activeTab, setActiveTab] = useState("ejecutivo");
+  const [downloading, setDownloading] = useState(null); // 'ejecutivo' | 'consolidado' | null
 
-  const downloadExecutiveReport = () => {
-    if (!sessionId) return;
-    exportDetailedSimulationReport(sessionId);
+  const downloadExecutiveReport = async () => {
+    if (!sessionId || downloading) return;
+    setDownloading("ejecutivo");
+    try {
+      await exportDetailedSimulationReport(sessionId);
+    } finally {
+      setDownloading(null);
+    }
   };
 
-  const downloadConsolidated = () => {
-    if (!sessionId) return;
-    exportSimulationExcel(sessionId, selectedAlgorithm);
+  const downloadConsolidated = async () => {
+    if (!sessionId || downloading) return;
+    setDownloading("consolidado");
+    try {
+      await exportSimulationExcel(sessionId, selectedAlgorithm);
+    } finally {
+      setDownloading(null);
+    }
   };
 
   const hasNoSession = !sessionId;
@@ -72,22 +84,24 @@ const ReportsPanel = ({
             Genera un documento Markdown detallado con el resumen narrativo de la simulación. 
             Incluye métricas operativas y análisis de embotellamientos.
           </p>
-          <button 
+          <button
             onClick={downloadExecutiveReport}
-            disabled={hasNoSession}
+            disabled={hasNoSession || downloading === "ejecutivo"}
             style={{
+              display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
               padding: "10px", borderRadius: "8px", border: "none",
-              background: hasNoSession 
-                ? "rgba(255,255,255,0.08)" 
+              background: hasNoSession
+                ? "rgba(255,255,255,0.08)"
                 : "linear-gradient(90deg, #db2777, #be185d)",
               color: hasNoSession ? "#64748b" : "white",
-              fontWeight: "bold", fontSize: "13px", 
-              cursor: hasNoSession ? "not-allowed" : "pointer",
+              fontWeight: "bold", fontSize: "13px",
+              cursor: hasNoSession || downloading === "ejecutivo" ? "not-allowed" : "pointer",
+              opacity: downloading === "ejecutivo" ? 0.8 : 1,
               boxShadow: hasNoSession ? "none" : "0 4px 15px rgba(219, 39, 119, 0.3)",
               transition: "all 0.2s"
             }}
           >
-            📝 Descargar .MD
+            {downloading === "ejecutivo" ? (<><Spinner size={14} color="#fff" label="Generando…" /> Generando…</>) : "📝 Descargar .MD"}
           </button>
         </div>
       )}
@@ -98,22 +112,24 @@ const ReportsPanel = ({
             Exporta una sábana de datos completa. Incluye el detalle de todos los vuelos, 
             maletas atendidas, cancelaciones y reacomodaciones por evento.
           </p>
-          <button 
+          <button
             onClick={downloadConsolidated}
-            disabled={hasNoSession}
+            disabled={hasNoSession || downloading === "consolidado"}
             style={{
+              display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
               padding: "10px", borderRadius: "8px", border: "none",
-              background: hasNoSession 
-                ? "rgba(255,255,255,0.08)" 
+              background: hasNoSession
+                ? "rgba(255,255,255,0.08)"
                 : "linear-gradient(90deg, #059669, #047857)",
               color: hasNoSession ? "#64748b" : "white",
-              fontWeight: "bold", fontSize: "13px", 
-              cursor: hasNoSession ? "not-allowed" : "pointer",
+              fontWeight: "bold", fontSize: "13px",
+              cursor: hasNoSession || downloading === "consolidado" ? "not-allowed" : "pointer",
+              opacity: downloading === "consolidado" ? 0.8 : 1,
               boxShadow: hasNoSession ? "none" : "0 4px 15px rgba(5, 150, 105, 0.3)",
               transition: "all 0.2s"
             }}
           >
-            📊 Descargar CSV / Excel
+            {downloading === "consolidado" ? (<><Spinner size={14} color="#fff" label="Generando…" /> Generando…</>) : "📊 Descargar CSV / Excel"}
           </button>
         </div>
       )}

@@ -20,13 +20,10 @@ function PeriodSimConfig({
   isOpen,
   onClose,
   selectedAlgorithm,
-  onAlgorithmChange,
   onStart,           // (dias: number, startDate: string) => void
   liveStatus,
   simState,
   sessionId,
-  targetPlaybackMinutes,
-  setTargetPlaybackMinutes,
   onExportExcel,
   onExportMd,
   onExportDetails,
@@ -37,12 +34,8 @@ function PeriodSimConfig({
   const [month,      setMonth]      = useState(1);
   const [year,       setYear]       = useState(2026);
   const [startTime,  setStartTime]  = useState("00:00");
-  const [destroyFraction, setDestroyFraction] = useState(20);
-  const [mutationRate, setMutationRate] = useState(15);
   const [isStarting, setIsStarting] = useState(false);
-  const [preCancelledFlights, setPreCancelledFlights] = useState([]);
-  const [tempFlightId, setTempFlightId] = useState("");
-  const [tempDay, setTempDay] = useState("all");
+  const [preCancelledFlights] = useState([]);
 
   const PLAYBACK_OPTIONS = [
     { label: "Balanceado", value: 15, sub: "15 min" },
@@ -113,8 +106,14 @@ function PeriodSimConfig({
   const handleStart = async () => {
     if (!onStart) return;
     setIsStarting(true);
-    await onStart(DIAS_SIMULACION, startDate, preCancelledFlights, startTime);
-    setIsStarting(false);
+    try {
+      await onStart(DIAS_SIMULACION, startDate, preCancelledFlights, startTime);
+    } catch (e) {
+      // Antes el botón quedaba bloqueado en "iniciando" si onStart fallaba.
+      console.error('[PeriodSim] Error al iniciar simulación:', e);
+    } finally {
+      setIsStarting(false);
+    }
   };
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -159,7 +158,12 @@ function PeriodSimConfig({
                   className="ct-config-form__select"
                   style={{ flex: 2 }}
                   value={month}
-                  onChange={e => { setMonth(Number(e.target.value)); setDay(1); }}
+                  onChange={e => {
+                    const newMonth = Number(e.target.value);
+                    setMonth(newMonth);
+                    const newDaysInSel = newMonth === 2 && year % 4 === 0 ? 29 : DAYS_IN_MONTH[newMonth - 1];
+                    if (day > newDaysInSel) setDay(newDaysInSel);
+                  }}
                 >
                   {MONTHS.map((m, i) => (
                     <option key={i+1} value={i+1}>{m}</option>
@@ -171,7 +175,12 @@ function PeriodSimConfig({
                   className="ct-config-form__select"
                   style={{ flex: 1 }}
                   value={year}
-                  onChange={e => setYear(Number(e.target.value))}
+                  onChange={e => {
+                    const newYear = Number(e.target.value);
+                    setYear(newYear);
+                    const newDaysInSel = month === 2 && newYear % 4 === 0 ? 29 : DAYS_IN_MONTH[month - 1];
+                    if (day > newDaysInSel) setDay(newDaysInSel);
+                  }}
                 >
                   {YEARS.map(y => <option key={y} value={y}>{y}</option>)}
                 </select>
@@ -203,39 +212,6 @@ function PeriodSimConfig({
             </div>
 
             {/* Playback fijo en 30 min — sin controles visibles para el usuario */}
-
-            {/* Selector de algoritmo */}
-            {/* EXPERIMENTAL MODE - DISABLED FOR BUSINESS UI
-            <div className="ct-config-section">
-              <p className="ct-config-section__title">⚡ ALGORITMO</p>
-              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                {[
-                  { val: "alns", icon: "⚡", name: "ALNS", sub: "Adaptive Large Neighborhood Search" },
-                ].map(opt => (
-                  <button key={opt.val} id={`period-algo-${opt.val}`} type="button"
-                    onClick={() => onAlgorithmChange(opt.val)}
-                    style={{
-                      flex: 1, padding: "10px 0", borderRadius: 8, border: "none",
-                      fontWeight: 700, fontSize: 13, cursor: "pointer",
-                      transition: "all 0.2s",
-                      background: selectedAlgorithm === opt.val
-                        ? "linear-gradient(135deg, #4f46e5, #7c3aed)"
-                        : "rgba(255,255,255,0.06)",
-                      color: selectedAlgorithm === opt.val ? "#fff" : "#94a3b8",
-                      boxShadow: selectedAlgorithm === opt.val ? "0 4px 15px rgba(79,70,229,0.4)" : "none",
-                    }}
-                  >
-                    {opt.icon} {opt.name}
-                    <span style={{ display: "block", fontSize: 9, fontWeight: 400, opacity: 0.75, marginTop: 2 }}>
-                      {opt.sub}
-                    </span>
-                  </button>
-                ))}
-              </div>
-            </div>
-            */}
-
-            {/* Parámetros del algoritmo y cancelaciones — ocultos para usuario final */}
 
             {/* Botón iniciar */}
             <div style={{ paddingBottom: 8 }}>
@@ -280,7 +256,14 @@ function PeriodSimConfig({
                   <span>Día {liveStatus?.currentDay ?? 0} / {liveStatus?.totalDays ?? DIAS_SIMULACION}</span>
                   <span style={{ color: "#38bdf8", fontWeight: 700 }}>{liveStatus?.percent ?? 0}%</span>
                 </div>
-                <div style={{ height: 8, background: "rgba(255,255,255,0.08)", borderRadius: 4 }}>
+                <div
+                  style={{ height: 8, background: "rgba(255,255,255,0.08)", borderRadius: 4 }}
+                  role="progressbar"
+                  aria-valuenow={Math.round(liveStatus?.percent ?? 0)}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-label="Progreso de la simulación por periodo"
+                >
                   <div style={{
                     height: "100%", borderRadius: 4,
                     width: `${liveStatus?.percent ?? 0}%`,
@@ -329,87 +312,7 @@ function PeriodSimConfig({
               </p>
             </div>
 
-            {/* Acumulados (simulacion) */}
-            <RSection title="⚖️ ACUMULADOS BRUTOS (simulación)">
-              <MRow label="Demanda total"       value={fmt(reportMetrics.totalDemanda)} />
-              <MRow label="Atendidas (cap)"     value={fmt(reportMetrics.atendidas)}    color="#34d399" />
-              <MRow label="No atendidas (Ecap)" value={fmt(reportMetrics.ecap)}         color="#f87171" />
-            </RSection>
 
-            {/* Demanda real de los archivos .txt */}
-            {liveStatus?.dailyRealDemand && Object.keys(liveStatus.dailyRealDemand).length > 0 && (
-              <RSection title="📂 DEMANDA REAL (archivos fuente)">
-                {Object.entries(liveStatus.dailyRealDemand).map(([fecha, total]) => {
-                  const d = `${fecha.slice(0,4)}-${fecha.slice(4,6)}-${fecha.slice(6,8)}`;
-                  return <MRow key={fecha} label={d} value={`${Number(total).toLocaleString('es-PE')} maletas`} />;
-                })}
-                <div style={{ borderTop: '1px solid rgba(10,60,110,0.12)', marginTop: 6, paddingTop: 6 }}>
-                  <MRow
-                    label="Total real 5 días"
-                    value={fmt(Object.values(liveStatus.dailyRealDemand).reduce((a,b) => a+b, 0))}
-                    color="#60a5fa"
-                  />
-                </div>
-              </RSection>
-            )}
-
-            {/* Promedios */}
-            <RSection title="÷ PROMEDIOS DIARIOS">
-              <MRow label="Demanda / día"   value={fmt(Math.round(reportMetrics.avgDemanda))} />
-              <MRow label="Atendidas / día" value={fmt(Math.round(reportMetrics.avgAtendidas))} color="#34d399" />
-              <MRow label="Ecap / día"      value={fmt(Math.round(reportMetrics.avgEcap))} color="#f87171" />
-            </RSection>
-
-            {/* KPIs */}
-            <RSection title="📊 KPIs">
-              <MRow label="Ocupación eff."     value={fmtPct(reportMetrics.ocupacion)} />
-              <MRow label="Cumplimiento"        value={fmtPct(reportMetrics.cumplimiento)}
-                color={reportMetrics.cumplimiento >= 90 ? "#34d399" : "#f87171"} />
-              <MRow label="Sat. aeroportuaria"  value={fmtPct(reportMetrics.saturacion)}
-                color={reportMetrics.saturacion > 100 ? "#f87171" : "#fbbf24"} />
-            </RSection>
-
-            {/* Fitness Score */}
-            <div style={{
-              background: "linear-gradient(135deg, rgba(129,140,248,0.1), rgba(99,102,241,0.05))",
-              border: "1px solid rgba(129,140,248,0.25)", borderRadius: 10,
-              padding: "12px 14px", marginBottom: 12,
-            }}>
-              <p style={{ fontSize: 10, color: "#a78bfa", margin: "0 0 3px", fontWeight: 700 }}>🧠 FITNESS SCORE</p>
-              <p style={{ fontSize: 9, color: "#94a3b8", margin: "0 0 8px" }}>10A − 0.005Ecap − 2Dh − 12Saero</p>
-              <p style={{
-                fontSize: 24, fontWeight: 800, margin: 0,
-                color: reportMetrics.score >= 0 ? "#34d399" : "#f87171",
-              }}>
-                {Number(reportMetrics.score).toLocaleString("es-PE", { maximumFractionDigits: 1 })}
-              </p>
-            </div>
-
-            {/* Desglose por día */}
-            {reportMetrics.byDay?.length > 0 && (
-              <RSection title="📅 DESGLOSE POR DÍA">
-                <table style={{ width: "100%", fontSize: 10, borderCollapse: "collapse" }}>
-                  <thead>
-                    <tr style={{ color: "#94a3b8" }}>
-                      {["Día","Demanda","Atend.","Ecap","SLA"].map(h => (
-                        <th key={h} style={{ textAlign: "right", padding: "4px 4px", borderBottom: "1px solid rgba(255,255,255,0.1)" }}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {reportMetrics.byDay.map(d => (
-                      <tr key={d.dia} style={{ background: d.colapsed ? "rgba(248,113,113,0.15)" : "transparent" }}>
-                        <td style={{ textAlign: "right", padding: "3px 4px", color: d.colapsed ? "#fca5a5" : "#cbd5e1", fontWeight: 600 }}>{d.dia}{d.colapsed ? " ⚠" : ""}</td>
-                        <td style={{ textAlign: "right", padding: "3px 4px", color: "#e2e8f0" }}>{(d.demanda/1000).toFixed(0)}k</td>
-                        <td style={{ textAlign: "right", padding: "3px 4px", color: "#34d399", fontWeight: 600 }}>{(d.atendidas/1000).toFixed(0)}k</td>
-                        <td style={{ textAlign: "right", padding: "3px 4px", color: "#f87171" }}>{(d.ecap/1000).toFixed(0)}k</td>
-                        <td style={{ textAlign: "right", padding: "3px 4px", color: "#fbbf24", fontWeight: 600 }}>{d.sla.toFixed(1)}%</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </RSection>
-            )}
 
             {/* Acciones */}
             <div style={{ display: "flex", flexDirection: "column", gap: 8, paddingTop: 4 }}>
@@ -436,7 +339,7 @@ function PeriodSimConfig({
                     boxShadow: "0 4px 15px rgba(79, 70, 229, 0.35)",
                   }}
                 >
-                  📝 Exportar Reporte (.md)
+                  📋 Exportar Última Planificación (.md)
                 </button>
               )}
               {onExportDetails && (

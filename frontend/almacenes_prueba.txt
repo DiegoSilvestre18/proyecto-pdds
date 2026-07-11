@@ -1,0 +1,8 @@
+PDDS 26-1 (basado en 2026.1)  20260404
+***********************************************************************************************************************	
+       Africa
+01   FAOR   Johannesburgo       Sudafrica       joha    +2     450     Latitude: 26° 08' 21" S   Longitude:  28° 14' 46" E
+02   FACT   Ciudad del Cabo     Sudafrica       ciud    +2     430     Latitude: 33° 58' 05" S   Longitude:  18° 36' 17" E
+03   HECA   El Cairo            Egipto          cair    +2     480     Latitude: 30° 07' 19" N   Longitude:  31° 24' 20" E
+04   HAAB   Adis Abeba          Etiopia         adis    +3     440     Latitude: 08° 58' 40" N   Longitude:  38° 47' 58" E
+05   HKJK   Nairobi             Kenia           nair    +3     410     Latitude: 01° 19' 09" S   Longitude:  36° 55' 40" E

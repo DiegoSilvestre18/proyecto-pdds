@@ -1,12 +1,14 @@
 import { useState } from 'react'
+import { useToast } from '../../hooks/useToast'
 
 
 // Fecha mínima = hoy, máxima = 31 dic 2026
 
 function CollapseSimConfig({ isOpen, onClose, onStart, liveStatus, onReset, sessionId }) {
+  const toast = useToast()
   const [activeSection, setActiveSection] = useState('config')
 const [isStarting, setIsStarting]       = useState(false)
-  const [startDate, setStartDate]         = useState('2026-04-09')
+  const [startDate, setStartDate]         = useState('2026-01-01')
   const [startTime, setStartTime]         = useState('00:00')
   const [destroyFraction, setDestroyFraction] = useState(20)
 
@@ -23,10 +25,17 @@ const [isStarting, setIsStarting]       = useState(false)
     }
     if (!onStart) return;
     setIsStarting(true);
-    // En el nuevo motor de colapso, buscamos el quiebre hasta por 90 días con condición estricta
-    await onStart(90, startDate, "FAILED_DELIVERY");
-    setIsStarting(false);
-    setActiveSection('progreso');
+    try {
+      // En el nuevo motor de colapso, buscamos el quiebre hasta por 90 días con condición estricta
+      await onStart(90, startDate, "FAILED_DELIVERY");
+      setActiveSection('progreso');
+    } catch (e) {
+      // Antes el botón quedaba bloqueado en "iniciando" si onStart fallaba.
+      console.error('[CollapseSim] Error al iniciar simulación:', e);
+      toast.error('No se pudo iniciar la simulación de colapso.');
+    } finally {
+      setIsStarting(false);
+    }
   };
 
   if (!isOpen) return null
@@ -273,7 +282,7 @@ const [isStarting, setIsStarting]       = useState(false)
                     type="button"
                     onClick={async () => {
                       const res = await fetch(`/api/v1/simulation/export-details/${sessionId}`);
-                      if (!res.ok) { alert("Error descargando reporte de colapso"); return; }
+                      if (!res.ok) { toast.error("Error descargando reporte de colapso"); return; }
                       const blob = await res.blob();
                       const url = window.URL.createObjectURL(blob);
                       const a = document.createElement("a");
@@ -390,7 +399,14 @@ const [isStarting, setIsStarting]       = useState(false)
                       {liveStatus.currentDay ?? 0} / {liveStatus.totalDays ?? 5}
                     </span>
                   </div>
-                  <div style={{ height: 6, background: 'rgba(255,255,255,0.08)', borderRadius: 4 }}>
+                  <div
+                    style={{ height: 6, background: 'rgba(255,255,255,0.08)', borderRadius: 4 }}
+                    role="progressbar"
+                    aria-valuenow={Math.round(liveStatus.percent ?? 0)}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-label="Progreso de la simulación de colapso"
+                  >
                     <div style={{
                       height: '100%', borderRadius: 4,
                       width: `${liveStatus.percent ?? 0}%`,

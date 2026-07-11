@@ -6,10 +6,11 @@ public record VueloResponse(
         String destinoIcao,
         Integer capacity,
         Boolean cancelled,
+        Boolean reagendado,
         Integer departureMinute,
         Integer arrivalMinute
 ) {
-    public VueloResponse(Long id, String origenIcao, String destinoIcao, Integer capacity, Boolean cancelled) {
-        this(id, origenIcao, destinoIcao, capacity, cancelled, 0, 0);
+    public VueloResponse(Long id, String origenIcao, String destinoIcao, Integer capacity, Boolean cancelled, Boolean reagendado) {
+        this(id, origenIcao, destinoIcao, capacity, cancelled, reagendado, 0, 0);
     }
 }

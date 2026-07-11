@@ -1,100 +1,69 @@
-function TelemetryPanel({ isVisible, summary, elapsedOperationTime, kpis, onHide }) {
-  if (!isVisible) {
-    return null
+const STATUS_META = {
+  danger:  { icon: '⛔', text: 'Crítico', color: '#f87171' },
+  warning: { icon: '⚠️', text: 'Alerta', color: '#fbbf24' },
+  idle:    { icon: '○', text: 'Inactivo', color: '#94a3b8' },
+  default: { icon: '✓', text: 'Normal', color: '#4ade80' },
+}
+
+const VALUE_COLORS = { red: '#f87171', amber: '#fbbf24', green: '#4ade80', idle: '#94a3b8' }
+
+function TelemetryPanel({ isVisible, summary, kpis, elapsedOperationTime }) {
+  if (!isVisible) return null
+
+  const fmtReal = (s) => {
+    if (!s || s === '00:00:00') return '—'
+    const hhmm = s.split(':')
+    if (hhmm.length < 2) return s
+    const h = parseInt(hhmm[0])
+    return h > 0 ? `${h}d ${hhmm[1]}h` : `${hhmm[0]}:${hhmm[1]}`
   }
 
   return (
-    <>
-      <style>{`
-        .telemetry-scroll::-webkit-scrollbar {
-          width: 4px;
-        }
-        .telemetry-scroll::-webkit-scrollbar-track {
-          background: transparent;
-        }
-        .telemetry-scroll::-webkit-scrollbar-thumb {
-          background: rgba(148, 163, 184, 0.2);
-          border-radius: 4px;
-        }
-        .telemetry-scroll::-webkit-scrollbar-thumb:hover {
-          background: rgba(148, 163, 184, 0.5);
-        }
-      `}</style>
-      <aside className="ct-panel ct-panel--telemetry telemetry-scroll" style={{ 
-        width: '440px', 
-        maxWidth: '90vw',
-        maxHeight: '75vh',
-        overflowX: 'hidden', 
-        overflowY: 'auto',
-        backdropFilter: 'blur(12px)', 
-        background: 'rgba(15, 23, 42, 0.85)', 
-        padding: 0 
-      }}>
-      <div className="ct-panel-header" style={{ padding: '12px 16px', background: 'rgba(0,0,0,0.2)' }}>
-        <p style={{ fontWeight: 'bold', color: '#e2e8f0', margin: 0 }}>TELEMETRÍA EN TIEMPO REAL</p>
-      </div>
-
-      {/* BLOQUE A: KPIs Principales (Antiguo KpiStrip) */}
+    <div style={{
+      width: '100%', height: '100%', overflowX: 'hidden', overflowY: 'auto',
+      background: 'rgba(15, 23, 42, 0.95)', padding: '8px'
+    }}>
       {kpis && kpis.length > 0 && (
-        <div style={{ padding: '16px', borderBottom: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            <h4 style={{ margin: 0, fontSize: '11px', color: '#94a3b8', letterSpacing: '1px' }}>MÉTRICAS GLOBALES</h4>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
-              {kpis.map((kpi, idx) => (
-                <div key={kpi.key || idx} style={{ 
-                  background: 'rgba(30, 41, 59, 0.5)', 
-                  padding: '12px', 
-                  borderRadius: '8px',
-                  border: '1px solid rgba(56, 189, 248, 0.1)',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '4px'
-                }}>
-                  <span style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{kpi.title}</span>
-                  <strong style={{ fontSize: '18px', color: kpi.status === 'danger' ? '#ef4444' : kpi.status === 'warning' ? '#f59e0b' : '#38bdf8' }}>{kpi.value}</strong>
-                  {kpi.subtitle && <span style={{ fontSize: '10px', color: '#64748b' }}>{kpi.subtitle}</span>}
-                </div>
-              ))}
-            </div>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' }} aria-live="polite">
+          {kpis.map((kpi, idx) => {
+            const meta = STATUS_META[kpi.status] || STATUS_META.default
+            const showBadge = kpi.status === 'danger' || kpi.status === 'warning'
+            const isOcc = kpi.key === 'occupancy' || kpi.key === 'fleetOccupancy'
+            return (
+              <div key={kpi.key || idx} style={{
+                background: 'rgba(40, 58, 78, 0.6)', padding: '4px 6px', borderRadius: '6px',
+                border: '1px solid rgba(56, 189, 248, 0.2)', display: 'flex', flexDirection: 'column',
+                gap: '2px', alignItems: 'center', minWidth: 0
+              }}>
+                <span style={{ fontSize: '9px', color: '#94a3b8', textTransform: 'uppercase', textAlign: 'center', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', width: '100%' }}>
+                  {isOcc ? kpi.title.split('global ')[1] || kpi.title : kpi.title}
+                </span>
+                <strong style={{ fontSize: '12px', color: isOcc ? (VALUE_COLORS[kpi.status] || '#e2e8f0') : '#e2e8f0', display: 'flex', alignItems: 'center', gap: '3px' }}>
+                  {showBadge && <span title={meta.text}>{meta.icon}</span>}
+                  {kpi.value}
+                </strong>
+              </div>
+            )
+          })}
+          <div style={{
+            background: 'rgba(40, 58, 78, 0.6)', padding: '4px 6px', borderRadius: '6px',
+            border: '1px solid rgba(56, 189, 248, 0.2)', display: 'flex', flexDirection: 'column',
+            gap: '2px', alignItems: 'center'
+          }}>
+            <span style={{ fontSize: '9px', color: '#94a3b8', textTransform: 'uppercase' }}>T. SIMULADO</span>
+            <strong style={{ fontSize: '12px', color: '#e2e8f0' }}>{summary.simulatedElapsed || '—'}</strong>
+          </div>
+          <div style={{
+            background: 'rgba(40, 58, 78, 0.6)', padding: '4px 6px', borderRadius: '6px',
+            border: '1px solid rgba(56, 189, 248, 0.2)', display: 'flex', flexDirection: 'column',
+            gap: '2px', alignItems: 'center'
+          }}>
+            <span style={{ fontSize: '9px', color: '#94a3b8', textTransform: 'uppercase' }}>T. REAL</span>
+            <strong style={{ fontSize: '12px', color: '#e2e8f0' }}>{fmtReal(elapsedOperationTime)}</strong>
+          </div>
         </div>
       )}
-
-      {/* BLOQUE B: Telemetría Técnica original */}
-      <div style={{ padding: '16px' }}>
-        <h4 style={{ margin: '0 0 12px 0', fontSize: '11px', color: '#94a3b8', letterSpacing: '1px' }}>DATOS OPERATIVOS</h4>
-        <div className="ct-metrics-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '16px', margin: 0 }}>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span style={{ fontSize: '10px', color: '#64748b' }}>USO ALMACENES</span>
-            <strong style={{ fontSize: '14px', color: '#e2e8f0' }}>{summary.storageOccupancy.value}%</strong>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span style={{ fontSize: '10px', color: '#64748b' }}>VUELOS EN CURSO</span>
-            <strong style={{ fontSize: '14px', color: '#e2e8f0' }}>{summary.flightsInCourse.value}</strong>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span style={{ fontSize: '10px', color: '#64748b' }}>HORA INICIO</span>
-            <strong style={{ fontSize: '14px', color: '#e2e8f0' }}>{summary.operationStart}</strong>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span style={{ fontSize: '10px', color: '#64748b' }}>TRANSCURRIDO</span>
-            <strong style={{ fontSize: '14px', color: '#e2e8f0' }}>{elapsedOperationTime}</strong>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span style={{ fontSize: '10px', color: '#64748b' }}>FASE DE SIMULACIÓN</span>
-            <strong style={{ fontSize: '14px', color: '#e2e8f0' }}>{summary.progress.label}</strong>
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column' }}>
-            <span style={{ fontSize: '10px', color: '#64748b' }}>ESCENARIO ACTIVO</span>
-            <strong style={{ fontSize: '14px', color: '#e2e8f0' }}>{summary.scenarioLabel}</strong>
-          </div>
-        </div>
-      </div>
-
-      <div className="ct-average" style={{ background: 'rgba(15, 23, 42, 0.6)', borderTop: '1px solid rgba(255,255,255,0.05)', padding: '12px 16px', fontSize: '12px', display: 'flex', justifyContent: 'space-between' }}>
-        <span style={{ color: '#94a3b8' }}>OCUPACIÓN PROMEDIO</span>
-        <strong style={{ color: '#38bdf8' }}>{summary.storageOccupancy.value}%</strong>
-      </div>
-    </aside>
-    </>
+    </div>
   )
 }
 

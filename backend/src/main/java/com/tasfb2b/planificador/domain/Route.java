@@ -7,7 +7,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.util.List;
-
+import java.util.ArrayList;
 @Data
 @Builder
 @NoArgsConstructor
@@ -23,9 +23,35 @@ public class Route {
     private int capacidadAsignada;
     private long arrivalTime;
     private long deadline;
+    private List<Long> legDepartures = new ArrayList<>();
+    private List<Long> legArrivals = new ArrayList<>();
 
     @Builder.Default
     private String status = "normal";
+    /**
+     * Maletas específicas que ESTA ruta transporta (subconjunto de lot.getBagIds()).
+     * Se sincroniza automáticamente cada vez que se llama setCapacidadAsignada(),
+     *Si en algún punto
+     * se construye una Route con Route.builder()...build() o con el constructor
+     * @AllArgsConstructor directamente (sin pasar por setCapacidadAsignada),
+     * bagIds NO se sincroniza automáticamente.
+     */
+    private List<String> bagIds;
+
+    /**
+     * Setter custom: cada vez que se fija la capacidad asignada, se re-recorta
+     * bagIds para que coincida exactamente. Esto cubre tanto la asignación inicial
+     * en RouteBuilder como los ajustes posteriores en resolverConflictosCapacidad.
+     */
+    public void setCapacidadAsignada(int capacidadAsignada) {
+        this.capacidadAsignada = capacidadAsignada;
+        if (lot != null && lot.getBagIds() != null && !lot.getBagIds().isEmpty()) {
+            int n = Math.max(0, Math.min(capacidadAsignada, lot.getBagIds().size()));
+            this.bagIds = new ArrayList<>(lot.getBagIds().subList(0, n));
+        } else {
+            this.bagIds = new ArrayList<>();
+        }
+    }
 
     // ── DERIVADOS ─────────────────────────────────────
 
@@ -125,6 +151,9 @@ public class Route {
         this.flights = null;
         this.demandaTotal = 0;
         this.capacidadAsignada = 0;
+        this.bagIds = new ArrayList<>();
+        this.legDepartures = new ArrayList<>();
+        this.legArrivals = new ArrayList<>();
         this.arrivalTime = 0;
         this.deadline = 0;
         this.status = "normal";

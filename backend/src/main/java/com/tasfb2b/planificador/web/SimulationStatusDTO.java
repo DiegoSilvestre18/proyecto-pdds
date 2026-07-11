@@ -120,4 +120,6 @@ public class SimulationStatusDTO {
 
     /** Salto de algoritmo actual (minutos) */
     private Integer saMinutes;
+
+    private List<Map<String, Object>> finalMasterPlan;
 }
