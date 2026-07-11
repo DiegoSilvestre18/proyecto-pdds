@@ -33,12 +33,13 @@ public class FlightCancellationService {
 
         if (session != null
                 && session.getCurrentEpochTime() != null
-                && session.getStartEpoch() != null
-                && session.getCurrentDay() > 0) {
+                && session.getStartEpoch() != null) {
 
             Vuelo vuelo = vueloService.obtenerVuelo(vueloId);
-            long dayStartEpoch = session.getStartEpoch()
-                    + ((long) (session.getCurrentDay() - 1) * 86_400_000L);
+            // currentDay arranca en 0 antes del primer updateProgress; usamos max(0, currentDay-1)
+            // para que la regla de 1h funcione correctamente desde el primer minuto del día 1.
+            int dayIndex = Math.max(0, session.getCurrentDay() - 1);
+            long dayStartEpoch = session.getStartEpoch() + ((long) dayIndex * 86_400_000L);
             long todayDeparture = vuelo.getDepartureEpoch(dayStartEpoch);
             long currentSimTime = session.getCurrentEpochTime();
 
