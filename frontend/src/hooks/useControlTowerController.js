@@ -49,7 +49,7 @@ export const useControlTowerController = () => {
   const [isScenarioConfigOpen, setIsScenarioConfigOpen] = useState(false);
   const [selectedAlgorithm, setSelectedAlgorithm] = useState("alns");
   const [simState, setSimState] = useState("idle");
-  const [targetPlaybackMinutes, setTargetPlaybackMinutes] = useState(10);
+  const [targetPlaybackMinutes, setTargetPlaybackMinutes] = useState(30);
   const [cancelledFlights, setCancelledFlights] = useState([]);
   const [finalMasterPlan, setFinalMasterPlan] = useState([]);
 
