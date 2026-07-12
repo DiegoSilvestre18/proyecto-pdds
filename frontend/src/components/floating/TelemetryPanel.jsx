@@ -7,16 +7,8 @@ const STATUS_META = {
 
 const VALUE_COLORS = { red: '#f87171', amber: '#fbbf24', green: '#4ade80', idle: '#94a3b8' }
 
-function TelemetryPanel({ isVisible, summary, kpis, elapsedOperationTime }) {
+function TelemetryPanel({ isVisible, kpis }) {
   if (!isVisible) return null
-
-  const fmtReal = (s) => {
-    if (!s || s === '00:00:00') return '—'
-    const hhmm = s.split(':')
-    if (hhmm.length < 2) return s
-    const h = parseInt(hhmm[0])
-    return h > 0 ? `${h}d ${hhmm[1]}h` : `${hhmm[0]}:${hhmm[1]}`
-  }
 
   return (
     <div style={{
@@ -45,22 +37,7 @@ function TelemetryPanel({ isVisible, summary, kpis, elapsedOperationTime }) {
               </div>
             )
           })}
-          <div style={{
-            background: 'rgba(40, 58, 78, 0.6)', padding: '4px 6px', borderRadius: '6px',
-            border: '1px solid rgba(56, 189, 248, 0.2)', display: 'flex', flexDirection: 'column',
-            gap: '2px', alignItems: 'center'
-          }}>
-            <span style={{ fontSize: '9px', color: '#94a3b8', textTransform: 'uppercase' }}>T. SIMULADO</span>
-            <strong style={{ fontSize: '12px', color: '#e2e8f0' }}>{summary.simulatedElapsed || '—'}</strong>
-          </div>
-          <div style={{
-            background: 'rgba(40, 58, 78, 0.6)', padding: '4px 6px', borderRadius: '6px',
-            border: '1px solid rgba(56, 189, 248, 0.2)', display: 'flex', flexDirection: 'column',
-            gap: '2px', alignItems: 'center'
-          }}>
-            <span style={{ fontSize: '9px', color: '#94a3b8', textTransform: 'uppercase' }}>T. REAL</span>
-            <strong style={{ fontSize: '12px', color: '#e2e8f0' }}>{fmtReal(elapsedOperationTime)}</strong>
-          </div>
+
         </div>
       )}
     </div>
