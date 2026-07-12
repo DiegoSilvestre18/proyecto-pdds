@@ -173,7 +173,7 @@ public class SimulationService {
                 List<Vuelo> todosLosVuelos = vueloRepo.findAllWithAirports();
                 updateProgress(session, 1, dias, 0, "Inicializando...", 100.0,
                         new SimulationState(new ArrayList<>(airportMap.values()), new ArrayList<>(), initialDisplayTime, bloqueoService),
-                        airportMap, new ArrayList<>(), initialDisplayTime, startTime, algorithm, null, new ArrayList<>(), todosLosVuelos, null, false);
+                        airportMap, new ArrayList<>(), initialDisplayTime, startTime, algorithm, null, new ArrayList<>(), todosLosVuelos, null, false, new HashSet<>());
 
                 wsPublisher.pushImmediate(session.getSessionId(), session);
 
@@ -194,6 +194,8 @@ public class SimulationService {
                 long totalFlightLegs = 0;
                 long totalRoutesWithFlights = 0;
                 Set<Long> processedCancelledFlightIds = new HashSet<>();
+                // Vuelos cancelados el día anterior (para excluirlos del midnight crossing sin eliminar los que sí volaron)
+                Set<Long> cancelledOnPreviousDayIds = new HashSet<>();
                 // Maletas cuyo vuelo asignado YA despegó (currentSimTime cruzó su departureTime).
 //              A partir de ahí son físicamente irreversibles. Antes de despegar, su asignación
 //              es provisional y ALNS puede reasignarlas libremente cada ciclo.
@@ -205,7 +207,11 @@ public class SimulationService {
                         long dayStartEpochMs = fechaDia.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli();
 
                         if (day > 0) {
+                                // Capturar qué vuelos se cancelaron ESTE día antes de limpiar el set
+                                cancelledOnPreviousDayIds = new HashSet<>(processedCancelledFlightIds);
                                 restaurarVuelosEnBD();
+                                // Sincronizar la lista en memoria: restaurar cancelled=false en todos
+                                todosLosVuelos.forEach(v -> v.setCancelled(false));
                                 processedCancelledFlightIds.clear();
                                 // aplicar cancelaciones diferidas por la regla de 1h
                                 if (!session.getPendingNextDayCancellations().isEmpty()) {
@@ -214,6 +220,11 @@ public class SimulationService {
                                         List<Vuelo> aCancelar = vueloRepo.findAllByIdWithAirports(aAplicar);
                                         aCancelar.forEach(v -> v.setCancelled(true));
                                         vueloRepo.saveAll(aCancelar);
+                                        // Sincronizar también la lista en memoria para que el visualizador no muestre el vuelo
+                                        Set<Long> idsAplicados = aAplicar.stream().collect(java.util.stream.Collectors.toSet());
+                                        todosLosVuelos.stream()
+                                                .filter(v -> idsAplicados.contains(v.getId()))
+                                                .forEach(v -> v.setCancelled(true));
                                         networkAdapter.invalidateGraph();
                                 }
                         }
@@ -498,7 +509,7 @@ public class SimulationService {
 
                                         int mPercent = (int) ((((day * 1440.0) + currentSimMinuteOfDay + step) / (dias * 1440.0)) * 100);
                                         if (microEnd >= targetEpoch || (isCatchingUp && step == microSteps - 1)) {
-                                                updateProgress(session, day + 1, dias, mPercent, simulatedTimeStr, slaPercent, globalState, airportMap, inTransitRoutes, microEnd, startTime, algorithm, session.getCurrentPlanId(), masterPlan, todosLosVuelos, planifiablePool, isRealTime);
+                                                updateProgress(session, day + 1, dias, mPercent, simulatedTimeStr, slaPercent, globalState, airportMap, inTransitRoutes, microEnd, startTime, algorithm, session.getCurrentPlanId(), masterPlan, todosLosVuelos, planifiablePool, isRealTime, cancelledOnPreviousDayIds);
                                         }
 
                                         long workTimeMs = (System.nanoTime() - tMicroStart) / 1_000_000;
@@ -565,7 +576,7 @@ public class SimulationService {
                 vuelosInyectadosEnVivo.offer(vuelo);
         }
 
-        private void updateProgress(SimulationProgressHolder.SimulationSessionState session, int completedDays, int totalDays, int currentPercent, String simulatedTime, double slaPercent, SimulationState state, Map<String, Aeropuerto> airportMap, List<Route> activeRoutesList, long currentSimTime, long baseTime, String algorithm, String planId, List<Route> masterPlan, List<Vuelo> todosLosVuelos, Map<Integer, SuperLot> planifiablePool, boolean isRealTime) {
+        private void updateProgress(SimulationProgressHolder.SimulationSessionState session, int completedDays, int totalDays, int currentPercent, String simulatedTime, double slaPercent, SimulationState state, Map<String, Aeropuerto> airportMap, List<Route> activeRoutesList, long currentSimTime, long baseTime, String algorithm, String planId, List<Route> masterPlan, List<Vuelo> todosLosVuelos, Map<Integer, SuperLot> planifiablePool, boolean isRealTime, Set<Long> cancelledOnPreviousDayIds) {
                 session.setCurrentDay(completedDays);
                 session.setPercent(currentPercent);
                 session.setSimulatedTime(simulatedTime);
@@ -596,28 +607,23 @@ public class SimulationService {
                         long dep = v.getDepartureEpoch(currentDayStartEpoch);
                         long arr = v.getArrivalEpoch(currentDayStartEpoch);
                         if (currentSimTime >= dep && currentSimTime < arr && !Boolean.TRUE.equals(v.getCancelled())) {
-                                /*
-                                System.out.println(String.format(
-                                        "[FISICO-HOY] vueloId=%d dep=%d key=%s currentDayStartEpoch=%d",
-                                        v.getId(), dep, v.getId() + "-" + dep, currentDayStartEpoch
-                                ));
-                                */
                                 vuelosFisicos.put(v.getId() + "-" + dep, createAvionMap(v, dep, arr, currentSimTime, "normal"));
                         }
-                        // Cruce de medianoche (Vuelo que despegó ayer pero aterriza hoy)
+                }
+
+                // Cruce de medianoche: mostrar si el vuelo NO fue cancelado el día anterior
+                // (si fue directamente cancelado ayer = no despegó = no hay ghost)
+                // (si fue diferido a mañana = sí despegó ayer = debe seguir visible cruzando medianoche)
+                for (Vuelo v : todosLosVuelos) {
                         long prevDep = v.getDepartureEpoch(currentDayStartEpoch - 86400000L);
                         long prevArr = v.getArrivalEpoch(currentDayStartEpoch - 86400000L);
-                        if (currentSimTime >= prevDep && currentSimTime < prevArr) {
-                                /*
-                                System.out.println(String.format(
-                                        "[FISICO-AYER] vueloId=%d dep=%d key=%s",
-                                        v.getId(), prevDep, v.getId() + "-" + prevDep
-                                ));
-                                */
-
-                                vuelosFisicos.put(v.getId() + "-" + prevDep, createAvionMap(v, prevDep, prevArr, currentSimTime, "normal"));
+                        if (currentSimTime >= prevDep && currentSimTime < prevArr
+                                        && !cancelledOnPreviousDayIds.contains(v.getId())) {
+                                String midKey = v.getId() + "-" + prevDep;
+                                vuelosFisicos.put(midKey, createAvionMap(v, prevDep, prevArr, currentSimTime, "normal"));
                         }
                 }
+
 
                 // 2. Capa de Carga: Superponer ocupación real sobre los vuelos base (Deduplicación Estricta)
                 for (Route r : activeRoutesList) {
