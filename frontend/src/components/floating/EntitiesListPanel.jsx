@@ -285,7 +285,7 @@ function FlightDetailPanel({ flight, onClose, bagSummary }) {
 }
 
 const WarehouseRow = React.memo(function WarehouseRow({ index, style, data }) {
-  const { warehouses, expandedWh, setExpandedWh, handleSelectWarehouse, focusedEntity, airportMetrics } = data;
+  const { warehouses, expandedWh, setExpandedWh, handleSelectWarehouse, focusedEntity, airportMetrics, warehouseNearestTimes } = data;
   const wh = warehouses[index];
   if (!wh) return null;
 
@@ -293,6 +293,14 @@ const WarehouseRow = React.memo(function WarehouseRow({ index, style, data }) {
   const pct = metrics.occupancy ?? 0;
   const semaforo = getLevelColor(pct);
   const isFocused = focusedEntity?.type === 'airport' && focusedEntity?.id === wh.icao;
+  const nextDep = warehouseNearestTimes?.dep[wh.icao];
+  const nextArr = warehouseNearestTimes?.arr[wh.icao];
+  const fmtNext = (info) => {
+    if (!info) return '--:--';
+    const fid = info.id?.toString().replace('vuelo-', '').split('-')[0] ?? '?';
+    const t = new Date(info.time).toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit', timeZone: 'UTC' });
+    return `V${fid} ${t}`;
+  };
 
   return (
     <div style={{ ...style, padding: '2px 4px', boxSizing: 'border-box' }}>
@@ -305,9 +313,9 @@ const WarehouseRow = React.memo(function WarehouseRow({ index, style, data }) {
           cursor: 'pointer',
           height: '100%',
           display: 'flex',
-          alignItems: 'center',
+          alignItems: 'flex-start',
           justifyContent: 'space-between',
-          padding: '10px 12px',
+          padding: '8px 10px',
           boxSizing: 'border-box',
         }}
         onClick={() => {
@@ -315,13 +323,21 @@ const WarehouseRow = React.memo(function WarehouseRow({ index, style, data }) {
           handleSelectWarehouse(wh);
         }}
       >
-        <div>
-          <div style={{ fontWeight: 'bold', color: '#e2e8f0', fontSize: '14px', marginBottom: '2px' }}>{wh.icao}</div>
-          <div style={{ fontSize: '11px', color: '#9ca3af' }}>{wh.city}</div>
+        <div style={{ flexShrink: 0 }}>
+          <div style={{ fontWeight: 'bold', color: '#e2e8f0', fontSize: '14px', marginBottom: '3px' }}>{wh.icao}</div>
+          <div style={{ fontSize: '11px', color: '#cbd5e1' }}>{wh.city}</div>
+        </div>
+        <div style={{ fontSize: '10px', color: '#9ca3af', textAlign: 'center' }}>
+          <div style={{ marginBottom: '2px' }}>
+            <span>→{fmtNext(nextDep)}</span>
+          </div>
+          <div>
+            <span>←{fmtNext(nextArr)}</span>
+          </div>
         </div>
         <div style={{ textAlign: 'right' }}>
           <div style={{ fontSize: '14px', fontWeight: 'bold', color: semaforo }}>{Math.trunc(pct).toFixed(0)}%</div>
-          <div style={{ fontSize: '10px', color: '#94a3b8' }}>{metrics.storedBags ?? 0} / {metrics.warehouseCapacity ?? 0} stock</div>
+          <div style={{ fontSize: '10px', color: '#94a3b8' }}>{metrics.storedBags ?? 0} / {metrics.warehouseCapacity ?? 0}</div>
         </div>
       </div>
     </div>
@@ -331,9 +347,13 @@ const WarehouseRow = React.memo(function WarehouseRow({ index, style, data }) {
   const b = next.data.warehouses[next.index];
   const ma = prev.data.airportMetrics[a?.icao] || {};
   const mb = next.data.airportMetrics[b?.icao] || {};
+  const ta = prev.data.warehouseNearestTimes;
+  const tb = next.data.warehouseNearestTimes;
   return a?.icao === b?.icao
       && ma.occupancy === mb.occupancy
       && ma.storedBags === mb.storedBags
+      && ta?.dep[a?.icao] === tb?.dep[b?.icao]
+      && ta?.arr[a?.icao] === tb?.arr[b?.icao]
       && prev.data.expandedWh === next.data.expandedWh
       && prev.data.focusedEntity?.id === next.data.focusedEntity?.id;
 });
@@ -542,7 +562,6 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
       });
     }
 
-    // Filtro por continente para los vuelos en la lista
     if (activeFilters.continent) {
       result = result.filter(ut => {
         const fromAirport = airports.find(a => a.icao === ut.from);
@@ -563,7 +582,7 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
     });
 
     return result;
-  }, [activeAircraft, utSearch, utSearchOrigin, utSearchDest, utSort, activeFilters.flightStatus, activeFilters.continent, airports]);
+  }, [activeTab, activeAircraft, utSearch, utSearchOrigin, utSearchDest, utSort, activeFilters.flightStatus, activeFilters.continent, airports]);
 
   const selectedFlightDetail = useMemo(() => {
     if (!expandedUt) return null;
@@ -605,6 +624,22 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
     return connected.size > 1 ? connected : null;
   }, [focusedEntity, activeAircraft]);
 
+  const warehouseNearestTimes = useMemo(() => {
+    const dep = {};
+    const arr = {};
+    (activeAircraft || []).forEach(f => {
+      if (f.from && f.departureTime) {
+        if (!dep[f.from] || f.departureTime < dep[f.from].time)
+          dep[f.from] = { time: f.departureTime, id: f.id };
+      }
+      if (f.to && f.arrivalTime) {
+        if (!arr[f.to] || f.arrivalTime < arr[f.to].time)
+          arr[f.to] = { time: f.arrivalTime, id: f.id };
+      }
+    });
+    return { dep, arr };
+  }, [activeAircraft]);
+
   const filteredWarehouses = useMemo(() => {
     if (activeTab !== 'wh') return [];
     let result = [...(airports || [])];
@@ -612,7 +647,7 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
     if (whSearch) {
       const q = whSearch.toLowerCase();
       result = result.filter(wh =>
-          wh.icao?.toLowerCase().includes(q) ||
+          wh.icao?.toLowerCase().startsWith(q) ||
           wh.city?.toLowerCase().includes(q)
       );
     }
@@ -655,7 +690,7 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
     });
 
     return result;
-  }, [airports, airportMetrics, activeAircraft, whSearch, activeFilters.continent, whSort, activeFilters.semaphoreLevel, connectedIcaoSet]);
+  }, [activeTab, airports, airportMetrics, activeAircraft, whSearch, activeFilters.continent, whSort, activeFilters.semaphoreLevel, connectedIcaoSet]);
 
   useEffect(() => {
     const last = lastMapSelectionRef.current;
@@ -754,26 +789,26 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
                         ))}
                       </div>
 
-                      <div style={{ display: 'flex', gap: '4px' }}>
-                        <input type="text" placeholder="ID..." value={utSearch} onChange={(e) => setUtSearch(e.target.value)}
-                               style={{ width: '60px', fontSize: '11px', padding: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '4px', boxSizing: 'border-box' }} />
-                        <input type="text" placeholder="Origen..." value={utSearchOrigin} onChange={(e) => setUtSearchOrigin(e.target.value)}
-                               style={{ flex: 1, fontSize: '11px', padding: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '4px', boxSizing: 'border-box' }} />
-                        <input type="text" placeholder="Destino..." value={utSearchDest} onChange={(e) => setUtSearchDest(e.target.value)}
-                               style={{ flex: 1, fontSize: '11px', padding: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '4px', boxSizing: 'border-box' }} />
-                      </div>
-                      <div style={{ display: 'flex', gap: '4px' }}>
-                        <select value={utSort} onChange={(e) => setUtSort(e.target.value)}
-                                style={{ flex: 1,  height: '30px', padding: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '4px', fontSize: '11px' }}
-                        >
-                          <option value="occupancy_desc">Ocupación (Mayor a Menor)</option>
-                          <option value="occupancy_asc">Ocupación (Menor a Mayor)</option>
-                          <option value="dep_asc">Hora de Salida</option>
-                          <option value="arr_asc">Hora de Llegada</option>
-                          <option value="origin">Origen (A-Z)</option>
-                          <option value="dest">Destino (A-Z)</option>
-                        </select>
-                      </div>
+                       <div style={{ display: 'flex', gap: '4px' }}>
+                         <input type="text" placeholder="ID..." value={utSearch} onChange={(e) => setUtSearch(e.target.value)}
+                                style={{ width: '60px', fontSize: '11px', padding: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '4px', boxSizing: 'border-box' }} />
+                         <input type="text" placeholder="Origen..." value={utSearchOrigin} onChange={(e) => setUtSearchOrigin(e.target.value)}
+                                style={{ flex: 1, fontSize: '11px', padding: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '4px', boxSizing: 'border-box' }} />
+                         <input type="text" placeholder="Destino..." value={utSearchDest} onChange={(e) => setUtSearchDest(e.target.value)}
+                                style={{ flex: 1, fontSize: '11px', padding: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '4px', boxSizing: 'border-box' }} />
+                       </div>
+                       <div style={{ display: 'flex', gap: '4px' }}>
+                         <select value={utSort} onChange={(e) => setUtSort(e.target.value)}
+                                 style={{ flex: 1,  height: '30px', padding: '8px', background: 'rgba(0,0,0,0.3)', border: '1px solid rgba(255,255,255,0.1)', color: 'white', borderRadius: '4px', fontSize: '11px' }}
+                         >
+                           <option value="occupancy_desc">Ocupación (Mayor a Menor)</option>
+                           <option value="occupancy_asc">Ocupación (Menor a Mayor)</option>
+                           <option value="dep_asc">Hora de Salida</option>
+                           <option value="arr_asc">Hora de Llegada</option>
+                           <option value="origin">Origen (A-Z)</option>
+                           <option value="dest">Destino (A-Z)</option>
+                         </select>
+                       </div>
 
                       {filteredUTs.length > 0 && (
                           <List
@@ -781,7 +816,7 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
                               width="100%"
                               itemCount={filteredUTs.length}
                               itemSize={72}
-                              itemData={{ flights: filteredUTs, expandedUt, setExpandedUt, handleSelectUT, focusedEntity }}
+                               itemData={{ flights: filteredUTs, expandedUt, setExpandedUt, handleSelectUT, focusedEntity }}
                           >
                             {FlightRow}
                           </List>
@@ -902,14 +937,15 @@ export default function EntitiesListPanel({ activeAircraft, airports, airportMet
                               height={420}
                               width="100%"
                               itemCount={filteredWarehouses.length}
-                              itemSize={56}
-                              itemData={{
+              itemSize={62}
+              itemData={{
                                 warehouses: filteredWarehouses,
                                 expandedWh,
                                 setExpandedWh,
                                 handleSelectWarehouse,
                                 focusedEntity,
                                 airportMetrics,
+                                warehouseNearestTimes,
                               }}
                           >
                             {WarehouseRow}
